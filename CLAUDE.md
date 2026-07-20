@@ -42,7 +42,7 @@ Do **not** skip ahead. Finish and confirm each phase with me before starting the
 - **Phase 4 — Reporting screens:** a small Next.js app that surfaces what the agent did — runs, outputs, status — for a non-technical viewer. Read-only, simple, clear.
 - **Phase 5 — Packaging:** make it demoable and repeatably deployable — clean setup, docs — so I can stand it up in front of a prospect.
 
-**We are at Phase 1 — complete.** Hermes installed locally (self-hosted, direct Anthropic API, provider pinned to `anthropic` rather than `auto`), verified responding via `hermes -z`. Next: Phase 2 (listing-to-social pipeline as a Hermes skill), pending sign-off.
+**We are at Phase 2a — complete.** Hermes installed (Phase 1). Listing-to-social skill built at `agent/skills/real-estate/listing-to-social/` and tested directly via `hermes -z`: correct, facts-only output across Instagram/Facebook/Yad2 in Hebrew+English, and correctly asks a batched follow-up rather than inventing facts when input is incomplete. Next: Phase 2b (WhatsApp trigger via Baileys/QR, dedicated test number), pending sign-off.
 
 ## 6. Guardrails
 - Simplicity over cleverness — smallest thing that works, then iterate.
