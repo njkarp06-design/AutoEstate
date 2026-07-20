@@ -4,7 +4,7 @@ A productized marketing-automation service. A Hermes agent runs one end-to-end m
 
 See [CLAUDE.md](CLAUDE.md) for the full project brief, target industry, and build phases.
 
-**Status:** Phase 0 — Foundation.
+**Status:** Phase 1 — Hermes installed and verified (self-hosted, direct Anthropic API).
 
 ## Structure
 

@@ -42,7 +42,7 @@ Do **not** skip ahead. Finish and confirm each phase with me before starting the
 - **Phase 4 — Reporting screens:** a small Next.js app that surfaces what the agent did — runs, outputs, status — for a non-technical viewer. Read-only, simple, clear.
 - **Phase 5 — Packaging:** make it demoable and repeatably deployable — clean setup, docs — so I can stand it up in front of a prospect.
 
-**We are at Phase 0.**
+**We are at Phase 1 — complete.** Hermes installed locally (self-hosted, direct Anthropic API, provider pinned to `anthropic` rather than `auto`), verified responding via `hermes -z`. Next: Phase 2 (listing-to-social pipeline as a Hermes skill), pending sign-off.
 
 ## 6. Guardrails
 - Simplicity over cleverness — smallest thing that works, then iterate.
