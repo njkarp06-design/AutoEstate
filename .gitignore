@@ -1,0 +1,18 @@
+# Secrets — never committed
+.env
+.env.local
+*.env
+!.env.example
+
+# Hermes local state (credentials, memory, logs — lives outside the repo by default,
+# ignored here defensively in case HERMES_HOME ever points into the project)
+.hermes/
+
+# Node
+node_modules/
+.next/
+out/
+
+# OS / editor
+.DS_Store
+Thumbs.db
