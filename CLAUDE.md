@@ -1,8 +1,10 @@
 # CLAUDE.md — Project Brief
 
-> Two things still open, to decide together before real work starts: a **project name** and the **specific first workflow** (Phase 2).
+> **Decided — project name:** AutoEstate.
 >
-> **Decided:** target industry = **independent real estate agents in Tel Aviv** (not big franchises/agencies). Rationale: sharp recurring pain (constant listing content, no time to produce it), WhatsApp/Facebook-group-native distribution fits the local market, ~450-570 agents in Tel Aviv is a large enough market with warm local network access for a pilot.
+> **Decided — target industry:** independent real estate agents in Tel Aviv (not big franchises/agencies). Rationale: sharp recurring pain (constant listing content, no time to produce it), WhatsApp/Facebook-group-native distribution fits the local market, ~450-570 agents in Tel Aviv is a large enough market with warm local network access for a pilot.
+>
+> **Decided — Phase 2 first workflow:** listing-to-social pipeline. Agent sends listing facts via WhatsApp → Hermes drafts Hebrew+English captions formatted for Instagram/Facebook/Yad2 → agent reviews and posts manually (no auto-posting in v1).
 
 ## 1. What we're building
 I'm building a **productized marketing-automation service**. At its core is a **Hermes agent** — an open-source, CLI-based AI agent — that runs one end-to-end marketing process for a client automatically. Around that core sit two things: **secure configuration** (the client's data and credentials handled properly) and a **small reporting web app** so a non-technical person can see what the agent is doing and trust it.
@@ -42,7 +44,7 @@ Do **not** skip ahead. Finish and confirm each phase with me before starting the
 - **Phase 4 — Reporting screens:** a small Next.js app that surfaces what the agent did — runs, outputs, status — for a non-technical viewer. Read-only, simple, clear.
 - **Phase 5 — Packaging:** make it demoable and repeatably deployable — clean setup, docs — so I can stand it up in front of a prospect.
 
-**We are at Phase 1 — complete.** Hermes installed locally (self-hosted, direct Anthropic API, provider pinned to `anthropic` rather than `auto`), verified responding via `hermes -z`. Next: Phase 2 (listing-to-social pipeline as a Hermes skill), pending sign-off.
+**We are at Phase 2a — complete.** Hermes installed (Phase 1). Listing-to-social skill built at `agent/skills/real-estate/listing-to-social/` and tested directly via `hermes -z`: correct, facts-only output across Instagram/Facebook/Yad2 in Hebrew+English, and correctly asks a batched follow-up rather than inventing facts when input is incomplete. Next: Phase 2b (WhatsApp trigger via Baileys/QR, dedicated test number), pending sign-off.
 
 ## 6. Guardrails
 - Simplicity over cleverness — smallest thing that works, then iterate.
