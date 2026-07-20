@@ -1,8 +1,10 @@
 # CLAUDE.md — Project Brief
 
-> Two things still open, to decide together before real work starts: a **project name** and the **specific first workflow** (Phase 2).
+> **Decided — project name:** AutoEstate.
 >
-> **Decided:** target industry = **independent real estate agents in Tel Aviv** (not big franchises/agencies). Rationale: sharp recurring pain (constant listing content, no time to produce it), WhatsApp/Facebook-group-native distribution fits the local market, ~450-570 agents in Tel Aviv is a large enough market with warm local network access for a pilot.
+> **Decided — target industry:** independent real estate agents in Tel Aviv (not big franchises/agencies). Rationale: sharp recurring pain (constant listing content, no time to produce it), WhatsApp/Facebook-group-native distribution fits the local market, ~450-570 agents in Tel Aviv is a large enough market with warm local network access for a pilot.
+>
+> **Decided — Phase 2 first workflow:** listing-to-social pipeline. Agent sends listing facts via WhatsApp → Hermes drafts Hebrew+English captions formatted for Instagram/Facebook/Yad2 → agent reviews and posts manually (no auto-posting in v1).
 
 ## 1. What we're building
 I'm building a **productized marketing-automation service**. At its core is a **Hermes agent** — an open-source, CLI-based AI agent — that runs one end-to-end marketing process for a client automatically. Around that core sit two things: **secure configuration** (the client's data and credentials handled properly) and a **small reporting web app** so a non-technical person can see what the agent is doing and trust it.
