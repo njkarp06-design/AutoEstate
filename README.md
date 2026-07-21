@@ -4,7 +4,7 @@ A productized marketing-automation service. A Hermes agent runs one end-to-end m
 
 See [CLAUDE.md](CLAUDE.md) for the full project brief, target industry, and build phases.
 
-**Status:** Phase 2a — listing-to-social skill built and tested (content generation only; WhatsApp trigger is Phase 2b, not yet built).
+**Status:** Phase 2a complete (listing-to-social skill built, tested, and hardened for sale/rental pricing). Phase 2b in progress — WhatsApp trigger via a Baileys/QR bridge, approach decided, currently blocked on eSIM provisioning for the dedicated bot number.
 
 ## Structure
 
