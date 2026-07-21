@@ -1,7 +1,7 @@
 ---
 name: listing-to-social
 description: Use when a real estate agent provides new listing details (facts about a property, and optionally photo descriptions) and wants ready-to-post content. Turns raw listing facts into platform-formatted Hebrew and English captions for Instagram, a Facebook group, and Yad2.
-version: 0.2.0
+version: 0.2.1
 author: AutoEstate
 license: MIT
 metadata:
@@ -43,7 +43,12 @@ never invent it):
 - At least one or two **standout features** (renovated kitchen, balcony,
   parking, view, etc.)
 - Optional: condition, nearby highlights (park, beach, transit), photo
-  descriptions, contact info to include
+  descriptions, contact info to include (if given, include it on all three
+  platforms, not just one)
+
+Nearby highlights must come from the agent — never infer them from general
+knowledge of the neighborhood (e.g. don't add "walking distance to the
+beach" just because the area is known for that, unless the agent said it).
 
 If the agent's message is missing something on this list, ask a single
 follow-up question batching everything missing — don't generate partial
@@ -65,6 +70,9 @@ For rentals, phrase price as a monthly amount (e.g. "₪6,500/month" /
 "₪6,500 לחודש"). For sales, phrase it as the total (e.g. "₪3,200,000").
 Never present one as the other.
 
+If the agent gives contact info, include it on all three platforms, not
+just one.
+
 **1. Instagram caption**
 Short (3-5 sentences), engaging, light emoji use (not excessive), ends with
 5-8 relevant hashtags mixing Hebrew and English (e.g. #תלאביב #דירהלמכירה
@@ -75,7 +83,7 @@ Slightly longer and more conversational than Instagram, no hashtags. Israeli
 Facebook real-estate groups expect a clear structure: a one-line hook,
 then a short bullet list of key facts (rooms, size, price, floor), then a
 closing line with a call to action ("לפרטים ותיאום צפייה..." / "For details
-and viewing..."). Include contact info only if the agent provided it.
+and viewing...").
 
 **3. Yad2-style listing description**
 Formal and factual — this is a property listing, not a social post. No
@@ -88,6 +96,12 @@ site.
 
 1. **Inventing facts.** Never add a price, room count, address detail, or
    feature that wasn't given. If it's ambiguous, ask rather than assume.
+   This includes condition/availability claims: "renovated" does not mean
+   "move-in ready" or "vacant" — don't upgrade a stated feature into a
+   stronger claim the agent didn't make. It also includes neighborhood
+   claims: don't add "walking distance to the beach" or similar just
+   because it's generally true of the area — only use nearby highlights the
+   agent actually stated.
 2. **Skipping a language or platform.** All three platforms, both
    languages, every time, unless explicitly told otherwise.
 3. **Wrong tone per platform.** Don't write Yad2's formal listing tone for
@@ -107,7 +121,10 @@ site.
       asked instead of guessing
 - [ ] All three platforms produced (Instagram, Facebook, Yad2)
 - [ ] Each platform has both a Hebrew and an English version, clearly labeled
-- [ ] No fact appears that wasn't in the agent's input
+- [ ] No fact appears that wasn't in the agent's input, including no
+      upgraded condition/availability claims (e.g. "move-in ready") beyond
+      what was actually said, and no inferred neighborhood highlights the
+      agent didn't state
 - [ ] Tone matches each platform's convention (see Output Format)
 - [ ] Numbers use sqm and ₪ (unless told otherwise)
 - [ ] Sale vs. rental is clear, and price phrasing (total vs. monthly)
