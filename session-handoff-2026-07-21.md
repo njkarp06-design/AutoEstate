@@ -4,17 +4,17 @@
 
 Building **AutoEstate**: a productized marketing-automation service for independent real estate agents in Tel Aviv. Core is a self-hosted **Hermes agent** (nousresearch/hermes-agent) running one marketing workflow end-to-end. Following a strict bottom-up phase plan defined in [CLAUDE.md](CLAUDE.md) (source of truth — read it first on resume). This session covered Phase 0 through the start of Phase 2b.
 
-GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). PR #1 (Phase 1) and PR #2 (Phase 2a) are both merged to `main`.
+GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). PR #1 (Phase 1), PR #2 (Phase 2a), and PR #3 (skill hardening to v0.2.0) are all merged to `main`.
 
 ### Files Modified
 
 **In the git repo** (`c:\dev\Portfolio\AI-Marketing`):
-- `CLAUDE.md` — updated the top decisions note as project name/target industry/first workflow got decided; updated the phase-status line as each phase completed. Currently says "Phase 2a — complete."
+- `CLAUDE.md` — updated the top decisions note as project name/target industry/first workflow got decided; the Section 5 phase-status paragraph is updated after every material change (most recently: v0.2.0 hardening, self-chat mode ruled out, gateway pipeline validated via Telegram) — always read that paragraph directly for current status rather than relying on a quote here, since quotes like this go stale.
 - `README.md` — status line kept in sync with CLAUDE.md's phase tracker.
 - `.gitignore` — created in Phase 0 (secrets, node_modules, `.hermes/`, OS files); later added `.claude/` (local Claude Code tooling state, e.g. scheduler lock files — not project content).
 - `agent/README.md` — documents the agent folder; corrected once (see Errors Hit) to accurately say credentials never live in this repo.
 - `agent/.env.example` — created in Phase 0 as a placeholder, **deleted** during a later tidy-up pass once we confirmed Hermes never reads a repo-local `.env` at all (it only reads `~/.hermes/.env`). This file was dead/misleading and is gone — don't recreate it.
-- `agent/skills/real-estate/listing-to-social/SKILL.md` — **the actual Phase 2a deliverable.** A Hermes skill that takes raw listing facts (rooms, size, price, floor, features) and produces ready-to-post Hebrew + English content for Instagram, a Facebook group, and Yad2. Tested directly (not yet via WhatsApp): correctly produces all 3 platforms × 2 languages from complete input, and correctly asks one batched follow-up question instead of inventing missing facts. Explicitly does NOT auto-post or handle photos yet — text generation only.
+- `agent/skills/real-estate/listing-to-social/SKILL.md` — **the actual Phase 2a deliverable.** A Hermes skill that takes raw listing facts (rooms, size, price, floor, features) and produces ready-to-post Hebrew + English content for Instagram, a Facebook group, and Yad2. Tested directly, and later via a real Telegram message end-to-end: correctly produces all 3 platforms × 2 languages from complete input, correctly asks one batched follow-up question instead of inventing missing facts, and (as of v0.2.0, PR #3) correctly distinguishes sale vs. rental price phrasing and draws concrete details from agent-provided photo *descriptions*. Still does NOT auto-post, and still doesn't handle actual photo files/images — only text descriptions of them.
 - `reporting-app/README.md` — placeholder only, Phase 4, untouched since Phase 0.
 
 **Outside the repo** (local machine state, NOT version-controlled — matters if this is ever reproduced on another machine, e.g. a client install in a later phase):
@@ -53,7 +53,7 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). PR #1 (Pha
 
 - **Works, verified:** Hermes installed and responding via direct Anthropic API (Phase 1). The listing-to-social skill produces correct, good-quality bilingual output for all 3 target platforms when tested directly via `hermes -z`, hardened to v0.2.0 for sale/rental price phrasing and photo-description handling, and merged (Phase 2a, PR #3).
 - **Also new this session:** the full messaging-gateway pipeline was validated end-to-end — using a disposable Telegram bot (zero ban risk, no phone number needed) as a stand-in for WhatsApp, a real inbound message was sent, the allowlist correctly gated it, the skill fired, and a correct reply was delivered back. This proves the gateway process, allowlist config, skill-firing, and reply delivery all work — the only unproven piece left for WhatsApp specifically is the Baileys pairing step itself.
-- A follow-up `/inspect` pass (code-review skill) also found and fixed 3 stale/incorrect docs across the repo (see Errors Hit #8), merged directly to `main`.
+- A follow-up `/inspect` pass (code-review skill) also found and fixed 3 stale/incorrect docs across the repo, merged directly to `main`: the `agent/README.md` wrong-command bug (Errors Hit #8), a stale `README.md` status line that hadn't kept pace with `CLAUDE.md`'s phase tracker, and a dead `!.env.example` exception rule left over in `.gitignore` after that file was deleted.
 - **Does not work yet / not started:** Nothing is connected to WhatsApp. No message has ever actually triggered the skill via WhatsApp specifically — the gateway has never been run with WhatsApp paired. No WhatsApp allowlist is configured yet (the `.env` template line is ready, just needs the user's number).
 - **Blocked on the user**, external to this session: getting the eSIM provisioned and WhatsApp Business registered on it. Still not done as of this update.
 - Repo is clean: nothing uncommitted, no stale branches, `main` is up to date (includes PR #3 and the `/inspect` doc fixes).
