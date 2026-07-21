@@ -1,7 +1,7 @@
 ---
 name: listing-to-social
 description: Use when a real estate agent provides new listing details (facts about a property, and optionally photo descriptions) and wants ready-to-post content. Turns raw listing facts into platform-formatted Hebrew and English captions for Instagram, a Facebook group, and Yad2.
-version: 0.1.0
+version: 0.2.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -34,8 +34,11 @@ Before generating anything, confirm you have (ask for anything missing —
 never invent it):
 
 - **Area / neighborhood** (e.g. Florentin, Tel Aviv)
+- **Sale or rental** — determines price phrasing (see Output Format); never
+  assume one or the other
 - **Rooms** and **size in sqm**
-- **Price** (in ₪ unless told otherwise)
+- **Price** (in ₪ unless told otherwise) — for rentals, confirm it's a
+  monthly figure
 - **Floor** (and whether there's an elevator, if known)
 - At least one or two **standout features** (renovated kitchen, balcony,
   parking, view, etc.)
@@ -46,11 +49,21 @@ If the agent's message is missing something on this list, ask a single
 follow-up question batching everything missing — don't generate partial
 content and don't guess.
 
+If the agent includes rough **photo descriptions**, you may draw specific,
+concrete details from them (e.g. "sun-lit balcony," "renovated marble
+kitchen") to enrich the captions — but treat them exactly like any other
+agent-provided fact: use only what's explicitly described, never elaborate
+or invent beyond it.
+
 ## Output Format
 
 Produce all three, each with a Hebrew version first and an English version
 second, clearly labeled with headers. Do not skip a platform or a language
 unless the agent explicitly asks for only one.
+
+For rentals, phrase price as a monthly amount (e.g. "₪6,500/month" /
+"₪6,500 לחודש"). For sales, phrase it as the total (e.g. "₪3,200,000").
+Never present one as the other.
 
 **1. Instagram caption**
 Short (3-5 sentences), engaging, light emoji use (not excessive), ends with
@@ -84,6 +97,9 @@ site.
    religion, or similar) — keep language about the property's features, not
    who should live there.
 5. **Wrong units/currency.** Sqm, not sqft. ₪, not $, unless told otherwise.
+6. **Conflating sale and rental pricing.** A rental price is monthly; a sale
+   price is a total. Don't infer which one applies — if the agent didn't say,
+   it's part of the required batched follow-up, not a guess.
 
 ## Verification Checklist
 
@@ -94,3 +110,5 @@ site.
 - [ ] No fact appears that wasn't in the agent's input
 - [ ] Tone matches each platform's convention (see Output Format)
 - [ ] Numbers use sqm and ₪ (unless told otherwise)
+- [ ] Sale vs. rental is clear, and price phrasing (total vs. monthly)
+      matches it
