@@ -44,7 +44,9 @@ Do **not** skip ahead. Finish and confirm each phase with me before starting the
 - **Phase 4 — Reporting screens:** a small Next.js app that surfaces what the agent did — runs, outputs, status — for a non-technical viewer. Read-only, simple, clear.
 - **Phase 5 — Packaging:** make it demoable and repeatably deployable — clean setup, docs — so I can stand it up in front of a prospect.
 
-**We are at Phase 2a — complete.** Hermes installed (Phase 1). Listing-to-social skill built at `agent/skills/real-estate/listing-to-social/` and tested directly via `hermes -z`: correct, facts-only output across Instagram/Facebook/Yad2 in Hebrew+English, and correctly asks a batched follow-up rather than inventing facts when input is incomplete. Next: Phase 2b (WhatsApp trigger via Baileys/QR, dedicated test number), pending sign-off.
+**We are at Phase 2a — complete, Phase 2b — in progress.** Hermes installed (Phase 1). Listing-to-social skill built at `agent/skills/real-estate/listing-to-social/` and tested directly via `hermes -z`: correct, facts-only output across Instagram/Facebook/Yad2 in Hebrew+English, and correctly asks a batched follow-up rather than inventing facts when input is incomplete.
+
+Phase 2b approach confirmed: WhatsApp via the **Baileys/QR bridge** (not the official Business Cloud API — that's a Phase 5 production concern once this needs a real public server and Meta verification), paired to a **dedicated eSIM number registered on the WhatsApp Business app** (never the personal number), knowingly accepting Baileys' unofficial-use ban risk at this prototype stage — mitigated by using a throwaway number rather than avoided entirely. Currently **blocked on the user provisioning that eSIM and registering WhatsApp Business on it** — next action once unblocked is running the `hermes whatsapp` pairing wizard together and scanning the QR code. Full session-by-session detail: `session-handoff-2026-07-21.md`.
 
 ## 6. Guardrails
 - Simplicity over cleverness — smallest thing that works, then iterate.
