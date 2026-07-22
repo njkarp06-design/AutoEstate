@@ -4,7 +4,7 @@ A productized marketing-automation service. A Hermes agent runs one end-to-end m
 
 See [CLAUDE.md](CLAUDE.md) for the full project brief, target industry, and build phases.
 
-**Status:** Phase 2a complete (listing-to-social skill built, tested, and hardened for sale/rental pricing). Phase 2b in progress — WhatsApp trigger via a Baileys/QR bridge, approach decided, and the gateway pipeline (message → skill → reply) already validated end-to-end via a disposable Telegram bot. Currently blocked on eSIM provisioning for the dedicated WhatsApp bot number; pairing is the only step left once that lands.
+**Status:** Phase 2a and 2b complete. Listing-to-social skill built, tested, and hardened (v0.2.1) for sale/rental pricing and fact-only output. WhatsApp is live via a Baileys/QR bridge paired to a dedicated eSIM number on the WhatsApp Business app — a real listing sent from a personal WhatsApp number was confirmed to produce a correct bilingual Instagram/Facebook/Yad2 reply end-to-end. Next: Phase 3 — security hardening.
 
 ## Structure
 
