@@ -1,0 +1,65 @@
+#cloud-config
+# Provisions a customer's dedicated Hermes instance up to the point where
+# WhatsApp pairing (a manual, interactive step - see module README) is the
+# only thing left. The ingestion secret is deliberately NOT written here -
+# see the null_resource.inject_secret provisioner in main.tf.
+
+write_files:
+  - path: /root/.hermes/.env
+    permissions: '0600'
+    content: |
+      ANTHROPIC_API_KEY=${anthropic_api_key}
+      AUTOESTATE_CUSTOMER_ID=${customer_id}
+      AUTOESTATE_INGESTION_URL=${ingestion_api_url}
+      WHATSAPP_ALLOWED_USERS=${whatsapp_allowed_users}
+      # WHATSAPP_ENABLED and WHATSAPP_MODE are intentionally left unset -
+      # the interactive `hermes whatsapp` pairing wizard sets these itself.
+      # A gateway that starts with WHATSAPP_ENABLED=true but no paired
+      # session hard-fails startup entirely, not just the WhatsApp adapter.
+
+  - path: /root/.hermes/config.yaml
+    permissions: '0644'
+    content: |
+      model:
+        default: anthropic/claude-opus-4.6
+        provider: anthropic
+      plugins:
+        enabled:
+          - sync-to-webapp
+
+  - path: /root/.hermes/skills/real-estate/listing-to-social/SKILL.md
+    permissions: '0644'
+    content: |
+      ${indent(6, skill_content)}
+
+  - path: /root/.hermes/plugins/sync-to-webapp/plugin.yaml
+    permissions: '0644'
+    content: |
+      ${indent(6, plugin_yaml_content)}
+
+  - path: /root/.hermes/plugins/sync-to-webapp/__init__.py
+    permissions: '0644'
+    content: |
+      ${indent(6, plugin_init_content)}
+
+  - path: /root/docker-compose.yml
+    permissions: '0644'
+    content: |
+      services:
+        gateway:
+          image: nousresearch/hermes-agent:latest
+          container_name: hermes
+          restart: unless-stopped
+          volumes:
+            - /root/.hermes:/opt/data
+          command: ["gateway", "run"]
+      # No published ports: the gateway only makes outbound connections
+      # (WhatsApp/Telegram, the ingestion API). Hermes's own dashboard and
+      # API server both stay off (HERMES_DASHBOARD / API_SERVER_ENABLED
+      # unset), so there is nothing to publish.
+
+runcmd:
+  - curl -fsSL https://get.docker.com | sh
+  - systemctl enable --now docker
+  - docker compose -f /root/docker-compose.yml pull
+  - docker compose -f /root/docker-compose.yml up -d
