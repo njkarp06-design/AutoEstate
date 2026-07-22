@@ -1,0 +1,13 @@
+# Copy this file to terraform.tfvars (gitignored) and fill in real values.
+# Never commit terraform.tfvars - it holds real secrets.
+
+hcloud_token       = "REPLACE_ME"    # Hetzner Cloud console -> Security -> API Tokens (project-scoped)
+customer_id        = "REPLACE_ME"    # short slug, e.g. "acme-realty"
+customer_email     = "REPLACE_ME"    # must match the Customer row created in the reporting webapp beforehand
+
+anthropic_api_key  = "REPLACE_ME"
+
+ingestion_api_url      = "REPLACE_ME"  # e.g. https://app.autoestate.example/api/ingest
+whatsapp_allowed_users = "REPLACE_ME"  # customer's WhatsApp number, international format, no + (e.g. 972501234567)
+
+operator_ssh_cidrs = ["REPLACE_ME/32"] # your own current IP - never leave this open

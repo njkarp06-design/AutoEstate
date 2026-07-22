@@ -1,0 +1,14 @@
+# Terraform local cache and state - never committed, may contain secrets in
+# plain text (state files store resource attributes unencrypted, including
+# anything marked `sensitive`). .terraform.lock.hcl is NOT ignored - it
+# pins exact provider versions and should be committed, like a lockfile.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Real per-customer variables - contains real secrets. Only *.tfvars.example
+# files (safe templates, no real values) are committed.
+*.tfvars
+!*.tfvars.example
