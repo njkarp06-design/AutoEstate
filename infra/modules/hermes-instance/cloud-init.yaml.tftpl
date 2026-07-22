@@ -8,10 +8,14 @@ write_files:
   - path: /root/.hermes/.env
     permissions: '0600'
     content: |
-      ANTHROPIC_API_KEY=${anthropic_api_key}
       AUTOESTATE_CUSTOMER_ID=${customer_id}
       AUTOESTATE_INGESTION_URL=${ingestion_api_url}
       WHATSAPP_ALLOWED_USERS=${whatsapp_allowed_users}
+      # ANTHROPIC_API_KEY and AUTOESTATE_INGESTION_SECRET are deliberately
+      # not written here - the null_resource.inject_secrets provisioner in
+      # main.tf injects both post-boot over SSH instead, so either can be
+      # rotated without changing user_data (which would force this whole
+      # server to be recreated, losing the paired WhatsApp session).
       # WHATSAPP_ENABLED and WHATSAPP_MODE are intentionally left unset -
       # the interactive `hermes whatsapp` pairing wizard sets these itself.
       # A gateway that starts with WHATSAPP_ENABLED=true but no paired
@@ -21,7 +25,7 @@ write_files:
     permissions: '0644'
     content: |
       model:
-        default: anthropic/claude-opus-4.6
+        default: ${hermes_model}
         provider: anthropic
       plugins:
         enabled:

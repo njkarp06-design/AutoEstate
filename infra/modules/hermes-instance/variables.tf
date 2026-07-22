@@ -62,3 +62,15 @@ variable "hetzner_image" {
   type        = string
   default     = "ubuntu-24.04"
 }
+
+variable "hermes_model" {
+  description = "Model identifier written to config.yaml's model.default. Override per customer if needed."
+  type        = string
+  default     = "anthropic/claude-opus-4.6"
+}
+
+variable "hermes_image_tag" {
+  description = "Tag for the nousresearch/hermes-agent Docker image. Defaults to \"latest\" (unpinned) - override to pin a specific version once one has been chosen and verified."
+  type        = string
+  default     = "latest"
+}

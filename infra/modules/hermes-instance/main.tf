@@ -30,10 +30,11 @@ resource "hcloud_server" "hermes" {
   firewall_ids = [hcloud_firewall.hermes.id]
 
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    anthropic_api_key      = var.anthropic_api_key
     customer_id            = var.customer_id
     ingestion_api_url      = var.ingestion_api_url
     whatsapp_allowed_users = var.whatsapp_allowed_users
+    hermes_model           = var.hermes_model
+    hermes_image_tag       = var.hermes_image_tag
     skill_content          = file("${path.module}/../../../agent/skills/real-estate/listing-to-social/SKILL.md")
     plugin_yaml_content    = file("${path.module}/../../../agent/plugins/sync-to-webapp/plugin.yaml")
     plugin_init_content    = file("${path.module}/../../../agent/plugins/sync-to-webapp/__init__.py")
@@ -45,15 +46,23 @@ resource "hcloud_server" "hermes" {
   }
 }
 
-# Injects AUTOESTATE_INGESTION_SECRET after boot, separately from the main
-# cloud-init payload, so the secret can be rotated (change the trigger,
-# re-apply) without forcing hcloud_server to recreate the whole instance -
-# changing user_data on an existing server forces a rebuild, which would
-# lose the paired WhatsApp session.
-resource "null_resource" "inject_secret" {
+# Injects AUTOESTATE_INGESTION_SECRET and ANTHROPIC_API_KEY after boot,
+# separately from the main cloud-init payload, so either can be rotated
+# (change the trigger, re-apply) without forcing hcloud_server to recreate
+# the whole instance - changing user_data on an existing server forces a
+# rebuild, which would lose the paired WhatsApp session.
+#
+# `cloud-init status --wait` blocks until cloud-init's write_files stage has
+# actually finished, so this never races the file into existence. The grep
+# step (no longer `|| true`) fails loudly instead of silently producing an
+# empty .env.tmp, and the sentinel check before `mv` confirms the rest of
+# the file's content survived before the live .env is overwritten - a
+# corrupted/empty .env would otherwise wipe ANTHROPIC_API_KEY and friends.
+resource "null_resource" "inject_secrets" {
   triggers = {
-    secret_hash = sha256(random_password.ingestion_secret.result)
-    server_id   = hcloud_server.hermes.id
+    secret_hash  = sha256(random_password.ingestion_secret.result)
+    api_key_hash = sha256(var.anthropic_api_key)
+    server_id    = hcloud_server.hermes.id
   }
 
   connection {
@@ -65,8 +74,12 @@ resource "null_resource" "inject_secret" {
 
   provisioner "remote-exec" {
     inline = [
-      "grep -v '^AUTOESTATE_INGESTION_SECRET=' /root/.hermes/.env > /root/.hermes/.env.tmp || true",
+      "cloud-init status --wait",
+      "test -f /root/.hermes/.env",
+      "grep -v -e '^AUTOESTATE_INGESTION_SECRET=' -e '^ANTHROPIC_API_KEY=' /root/.hermes/.env > /root/.hermes/.env.tmp",
       "echo 'AUTOESTATE_INGESTION_SECRET=${random_password.ingestion_secret.result}' >> /root/.hermes/.env.tmp",
+      "echo 'ANTHROPIC_API_KEY=${var.anthropic_api_key}' >> /root/.hermes/.env.tmp",
+      "grep -q '^AUTOESTATE_CUSTOMER_ID=' /root/.hermes/.env.tmp",
       "mv /root/.hermes/.env.tmp /root/.hermes/.env",
       "docker compose -f /root/docker-compose.yml restart gateway",
     ]
