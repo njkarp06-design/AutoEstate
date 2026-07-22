@@ -45,7 +45,6 @@ model Run {
   startedAt       DateTime
   title           String?
   status          RunStatus    @default(IN_PROGRESS)
-  estimatedCostUsd Decimal?    @db.Decimal(10, 4)
   messages        RunMessage[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -64,6 +63,7 @@ model RunMessage {
   timestamp DateTime
   sortIndex Int      @default(0) // disambiguates ordering when timestamps collide
 
+  @@unique([runId, role, sortIndex])
   @@index([runId, timestamp, sortIndex])
   @@map("run_messages")
 }
