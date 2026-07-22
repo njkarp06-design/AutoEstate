@@ -1,3 +1,4 @@
+import { ClerkProvider, Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -29,20 +30,31 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <header className="border-b border-card-border bg-card">
-          <div className="mx-auto flex w-full max-w-4xl items-center gap-2 px-6 py-4">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-sm font-bold text-white">
-                A
-              </span>
-              <span className="text-lg font-semibold tracking-tight">
-                AutoEstate
-              </span>
-            </Link>
-            <span className="text-sm text-gray-500">Agent Activity</span>
-          </div>
-        </header>
-        {children}
+        <ClerkProvider dynamic>
+          <header className="border-b border-card-border bg-card">
+            <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-2 px-6 py-4">
+              <Link href="/" className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-sm font-bold text-white">
+                  A
+                </span>
+                <span className="text-lg font-semibold tracking-tight">
+                  AutoEstate
+                </span>
+                <span className="text-sm text-gray-500">Agent Activity</span>
+              </Link>
+              <Show when="signed-out">
+                <div className="flex items-center gap-3 text-sm font-medium">
+                  <SignInButton />
+                  <SignUpButton />
+                </div>
+              </Show>
+              <Show when="signed-in">
+                <UserButton />
+              </Show>
+            </div>
+          </header>
+          {children}
+        </ClerkProvider>
       </body>
     </html>
   );
