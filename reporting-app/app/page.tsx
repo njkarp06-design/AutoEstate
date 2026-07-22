@@ -6,8 +6,8 @@ import { formatRelativeDateTime, platformDotClass, platformLabel } from "@/lib/f
 // build-time snapshot of agent activity.
 export const dynamic = "force-dynamic";
 
-export default function Home() {
-  const runs = getRuns();
+export default async function Home() {
+  const runs = await getRuns();
   const completedCount = runs.filter((r) => r.status === "completed").length;
 
   return (
@@ -56,12 +56,15 @@ export default function Home() {
                 </div>
                 <span
                   className={
-                    "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium " +
+                    "flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium " +
                     (run.status === "completed"
                       ? "bg-green-100 text-green-800"
                       : "bg-amber-100 text-amber-800")
                   }
                 >
+                  {run.status === "in_progress" && (
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-600" />
+                  )}
                   {run.status === "completed" ? "Ready to post" : "In progress"}
                 </span>
               </Link>
