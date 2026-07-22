@@ -1,50 +1,57 @@
 import Link from "next/link";
 import { getRuns } from "@/lib/db";
+import { formatRelativeDateTime, platformDotClass, platformLabel } from "@/lib/format";
 
 // Always read the live database - this dashboard must never serve a stale
 // build-time snapshot of agent activity.
 export const dynamic = "force-dynamic";
 
-function formatDateTime(epochSeconds: number): string {
-  return new Date(epochSeconds * 1000).toLocaleString("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-function platformLabel(source: string): string {
-  if (source === "whatsapp") return "WhatsApp";
-  if (source === "telegram") return "Telegram";
-  return source;
-}
-
 export default function Home() {
   const runs = getRuns();
+  const completedCount = runs.filter((r) => r.status === "completed").length;
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
-      <h1 className="text-2xl font-semibold">AutoEstate — Agent Activity</h1>
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-xl font-semibold">Recent activity</h1>
+        {runs.length > 0 && (
+          <p className="text-sm text-gray-500">
+            {completedCount} of {runs.length} listing
+            {runs.length === 1 ? "" : "s"} ready
+          </p>
+        )}
+      </div>
       <p className="mt-1 text-sm text-gray-500">
-        Every listing the agent has turned into ready-to-post content.
+        Every listing sent to the agent, and the content it generated.
       </p>
 
       {runs.length === 0 ? (
-        <p className="mt-10 text-gray-500">No runs yet.</p>
+        <div className="mt-8 rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
+          <p className="font-medium">No activity yet</p>
+          <p className="mt-1 text-sm text-gray-500">
+            Send the agent a listing over WhatsApp or Telegram and it will show up here.
+          </p>
+        </div>
       ) : (
-        <ul className="mt-8 divide-y divide-gray-200 border-t border-b border-gray-200">
+        <ul className="mt-6 space-y-3">
           {runs.map((run) => (
             <li key={run.id}>
               <Link
                 href={`/runs/${run.id}`}
-                className="flex items-center justify-between gap-4 py-4 hover:bg-gray-50"
+                className="flex items-center justify-between gap-4 rounded-xl border border-card-border bg-card p-4 shadow-sm transition hover:border-brand/40 hover:shadow-md"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium">
                     {run.title ?? "Untitled listing"}
                   </p>
-                  <p className="mt-0.5 text-sm text-gray-500">
-                    {formatDateTime(run.startedAt)} · {platformLabel(run.source)}
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-500">
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${platformDotClass(run.source)}`}
+                    />
+                    {platformLabel(run.source)}
                     {run.displayName ? ` · ${run.displayName}` : ""}
+                    {" · "}
+                    {formatRelativeDateTime(run.startedAt)}
                   </p>
                 </div>
                 <span
@@ -55,7 +62,7 @@ export default function Home() {
                       : "bg-amber-100 text-amber-800")
                   }
                 >
-                  {run.status === "completed" ? "Completed" : "In progress"}
+                  {run.status === "completed" ? "Ready to post" : "In progress"}
                 </span>
               </Link>
             </li>
