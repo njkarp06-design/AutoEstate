@@ -1,7 +1,7 @@
 import { ClerkProvider, Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -11,6 +11,11 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+const archivo = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin"],
 });
 
@@ -27,17 +32,17 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ClerkProvider dynamic>
           <header className="border-b border-card-border bg-card">
             <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-2 px-6 py-4">
               <Link href="/" className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-sm font-bold text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-brand text-sm font-bold text-brand-foreground">
                   A
                 </span>
-                <span className="text-lg font-semibold tracking-tight">
+                <span className="font-display text-lg font-bold tracking-tight">
                   AutoEstate
                 </span>
                 <span className="text-sm text-gray-500">Agent Activity</span>
@@ -49,7 +54,12 @@ export default function RootLayout({
                 </div>
               </Show>
               <Show when="signed-in">
-                <UserButton />
+                <div className="flex items-center gap-4 text-sm font-medium">
+                  <Link href="/settings" className="text-gray-500 hover:text-foreground">
+                    Settings
+                  </Link>
+                  <UserButton />
+                </div>
               </Show>
             </div>
           </header>

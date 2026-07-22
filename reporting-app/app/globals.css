@@ -1,11 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8fa;
-  --foreground: #1a1d23;
-  --card: #ffffff;
-  --card-border: #e5e7eb;
-  --brand: #2563eb;
+  --background: #f3ecdc;
+  --foreground: #1c1917;
+  --card: #fbf7ee;
+  --card-border: #ddd0b8;
+  --brand: #c1440e;
+  --brand-foreground: #fbf7ee;
+  --secondary: #2f5d62;
+  --status-done: #3f5f34;
+  --status-done-bg: #e2e8d3;
+  --status-pending: #92620f;
+  --status-pending-bg: #f3e6c4;
+  --status-muted: #6b6255;
 }
 
 @theme inline {
@@ -14,17 +21,32 @@
   --color-card: var(--card);
   --color-card-border: var(--card-border);
   --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-secondary: var(--secondary);
+  --color-status-done: var(--status-done);
+  --color-status-done-bg: var(--status-done-bg);
+  --color-status-pending: var(--status-pending);
+  --color-status-pending-bg: var(--status-pending-bg);
+  --color-status-muted: var(--status-muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-archivo);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0b0d10;
-    --foreground: #e5e7eb;
-    --card: #16181d;
-    --card-border: #2a2d34;
-    --brand: #60a5fa;
+    --background: #1b1712;
+    --foreground: #f1e9da;
+    --card: #241f18;
+    --card-border: #3a3225;
+    --brand: #e2703a;
+    --brand-foreground: #1b1712;
+    --secondary: #6ea1a6;
+    --status-done: #8fae7c;
+    --status-done-bg: #26301f;
+    --status-pending: #d9ac57;
+    --status-pending-bg: #3a2f16;
+    --status-muted: #a89c89;
   }
 }
 
