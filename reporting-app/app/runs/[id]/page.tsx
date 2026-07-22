@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { getRun } from "@/lib/db";
+import { getCurrentCustomer } from "@/lib/customer";
 import { formatRelativeDateTime, platformLabel } from "@/lib/format";
 
 const markdownComponents = {
@@ -32,7 +33,25 @@ export default async function RunPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const run = await getRun(id);
+  const customer = await getCurrentCustomer();
+
+  if (!customer) {
+    return (
+      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+        <Link href="/" className="text-sm text-gray-500 hover:underline">
+          ← All activity
+        </Link>
+        <div className="mt-8 rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
+          <p className="font-medium">Your account isn&apos;t linked yet</p>
+          <p className="mt-1 text-sm text-gray-500">
+            Contact your AutoEstate operator to get your account set up.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const run = await getRun(id, customer);
 
   if (!run) {
     notFound();

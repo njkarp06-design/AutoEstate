@@ -8,7 +8,7 @@ const turnStartedSchema = z.object({
   sessionId: z.string().min(1),
   turnId: z.string().min(1),
   platform: z.enum(["whatsapp", "telegram"]),
-  userMessage: z.string().optional(),
+  userMessage: z.string().nullish(),
   occurredAt: z.string().datetime(),
 });
 
@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
         sortIndex: 1,
       },
     ],
+    skipDuplicates: true,
   });
 
   return NextResponse.json({ ok: true, runId: run.id });

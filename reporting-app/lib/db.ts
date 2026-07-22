@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getCurrentCustomer } from "@/lib/customer";
+import type { Customer } from "@/prisma/generated/prisma/client";
 
 export type RunStatus = "completed" | "in_progress";
 
@@ -10,7 +10,6 @@ export type Run = {
   startedAt: number; // epoch seconds - kept as a number so lib/format.ts needs no changes
   status: RunStatus;
   title: string | null;
-  estimatedCostUsd: number | null;
 };
 
 export type RunMessage = {
@@ -40,11 +39,8 @@ function toRunStatus(status: "IN_PROGRESS" | "COMPLETED"): RunStatus {
 // does get a message stops matching this filter immediately.
 const STALE_IN_PROGRESS_MS = 3 * 60 * 1000;
 
-/** Every run for the logged-in customer. Empty if not signed in or not yet provisioned. */
-export async function getRuns(): Promise<Run[]> {
-  const customer = await getCurrentCustomer();
-  if (!customer) return [];
-
+/** Every run for the given customer. */
+export async function getRuns(customer: Customer): Promise<Run[]> {
   const runs = await prisma.run.findMany({
     where: {
       customerId: customer.id,
@@ -64,15 +60,11 @@ export async function getRuns(): Promise<Run[]> {
     startedAt: toEpochSeconds(run.startedAt),
     status: toRunStatus(run.status),
     title: run.title,
-    estimatedCostUsd: run.estimatedCostUsd ? Number(run.estimatedCostUsd) : null,
   }));
 }
 
-/** A single run's full transcript - null if not found or not owned by the logged-in customer. */
-export async function getRun(id: string): Promise<RunDetail | null> {
-  const customer = await getCurrentCustomer();
-  if (!customer) return null;
-
+/** A single run's full transcript for the given customer - null if not found or not owned by them. */
+export async function getRun(id: string, customer: Customer): Promise<RunDetail | null> {
   const run = await prisma.run.findFirst({
     where: { id, customerId: customer.id },
     include: { messages: { orderBy: [{ timestamp: "asc" }, { sortIndex: "asc" }] } },
@@ -86,7 +78,6 @@ export async function getRun(id: string): Promise<RunDetail | null> {
     startedAt: toEpochSeconds(run.startedAt),
     status: toRunStatus(run.status),
     title: run.title,
-    estimatedCostUsd: run.estimatedCostUsd ? Number(run.estimatedCostUsd) : null,
     messages: run.messages.map((m) => ({
       role: m.role,
       content: m.content,

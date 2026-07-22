@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getRuns } from "@/lib/db";
+import { getCurrentCustomer } from "@/lib/customer";
 import { formatRelativeDateTime, platformDotClass, platformLabel } from "@/lib/format";
 
 // Always read the live database - this dashboard must never serve a stale
@@ -7,7 +8,23 @@ import { formatRelativeDateTime, platformDotClass, platformLabel } from "@/lib/f
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const runs = await getRuns();
+  const customer = await getCurrentCustomer();
+
+  if (!customer) {
+    return (
+      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
+        <h1 className="text-xl font-semibold">Recent activity</h1>
+        <div className="mt-8 rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
+          <p className="font-medium">Your account isn&apos;t linked yet</p>
+          <p className="mt-1 text-sm text-gray-500">
+            Contact your AutoEstate operator to get your account set up.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const runs = await getRuns(customer);
   const completedCount = runs.filter((r) => r.status === "completed").length;
 
   return (
