@@ -1,0 +1,3 @@
+name: sync-to-webapp
+version: "1.0"
+description: Syncs WhatsApp/Telegram conversation turns to the AutoEstate reporting webapp.

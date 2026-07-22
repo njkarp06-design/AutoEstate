@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 const turnStartedSchema = z.object({
   event: z.literal("turn_started"),
   sessionId: z.string().min(1),
+  turnId: z.string().min(1),
   platform: z.enum(["whatsapp", "telegram"]),
   userMessage: z.string().optional(),
   occurredAt: z.string().datetime(),
@@ -14,6 +15,7 @@ const turnStartedSchema = z.object({
 const turnCompletedSchema = z.object({
   event: z.literal("turn_completed"),
   sessionId: z.string().min(1),
+  turnId: z.string().min(1),
   platform: z.enum(["whatsapp", "telegram"]),
   userMessage: z.string().min(1),
   assistantResponse: z.string().min(1),
@@ -60,17 +62,21 @@ export async function POST(request: NextRequest) {
   const body = parsed.data;
   const startedAt = new Date(body.occurredAt);
 
+  // Grouping key is the turn, not the session: Hermes doesn't reset a
+  // WhatsApp/Telegram session between messages, so a session can span many
+  // unrelated listings sent back-to-back. One turn = one Run.
   if (body.event === "turn_started") {
     const run = await prisma.run.upsert({
       where: {
-        customerId_hermesSessionId: {
+        customerId_hermesTurnId: {
           customerId: customer.id,
-          hermesSessionId: body.sessionId,
+          hermesTurnId: body.turnId,
         },
       },
       create: {
         customerId: customer.id,
         hermesSessionId: body.sessionId,
+        hermesTurnId: body.turnId,
         source: body.platform,
         startedAt,
         status: "IN_PROGRESS",
@@ -84,14 +90,15 @@ export async function POST(request: NextRequest) {
   // turn_completed
   const run = await prisma.run.upsert({
     where: {
-      customerId_hermesSessionId: {
+      customerId_hermesTurnId: {
         customerId: customer.id,
-        hermesSessionId: body.sessionId,
+        hermesTurnId: body.turnId,
       },
     },
     create: {
       customerId: customer.id,
       hermesSessionId: body.sessionId,
+      hermesTurnId: body.turnId,
       source: body.platform,
       startedAt,
       status: "COMPLETED",
