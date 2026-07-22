@@ -25,21 +25,32 @@ model Customer {
 }
 
 model Run {
-  id               String       @id @default(cuid())
-  customer         Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerId       String
-  hermesSessionId  String // Hermes's own session_id - not a global PK across instances
-  source           String // "whatsapp" | "telegram"
-  displayName      String?
-  startedAt        DateTime
-  title            String?
-  status           RunStatus    @default(IN_PROGRESS)
-  estimatedCostUsd Decimal?     @db.Decimal(10, 4)
-  messages         RunMessage[]
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id              String       @id @default(cuid())
+  customer        Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId      String
+  // Hermes's own session_id - one continuous WhatsApp/Telegram chat thread.
+  // NOT unique per listing: Hermes doesn't reset sessions between messages
+  // (session_reset: mode: none), so an agent sending several listings in one
+  // sitting shares one session_id across all of them. Kept for reference,
+  // not used for grouping.
+  hermesSessionId String
+  // Hermes's own turn_id - unique per conversational turn. This is the
+  // actual grouping key: one Run per turn, not per session. A listing that
+  // needs a follow-up question spans two turns/two Run rows rather than
+  // being merged into whatever session it happens to share with unrelated
+  // earlier or later listings.
+  hermesTurnId    String
+  source          String // "whatsapp" | "telegram"
+  displayName     String?
+  startedAt       DateTime
+  title           String?
+  status          RunStatus    @default(IN_PROGRESS)
+  estimatedCostUsd Decimal?    @db.Decimal(10, 4)
+  messages        RunMessage[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
-  @@unique([customerId, hermesSessionId])
+  @@unique([customerId, hermesTurnId])
   @@index([customerId, startedAt])
   @@map("runs")
 }

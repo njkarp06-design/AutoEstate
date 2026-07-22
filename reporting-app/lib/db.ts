@@ -31,13 +31,29 @@ function toRunStatus(status: "IN_PROGRESS" | "COMPLETED"): RunStatus {
   return status === "COMPLETED" ? "completed" : "in_progress";
 }
 
+// Real turns complete in ~10-40s (observed). A run still IN_PROGRESS with no
+// messages well past that is an orphaned "ghost" - Hermes's busy_input_mode:
+// interrupt setting can merge a rapid follow-up message into the next turn,
+// and the interrupted turn's own post_llm_call correctly never fires (Hermes
+// won't sync a turn it considers interrupted). Filtering these out keeps the
+// "In progress" badge trustworthy - self-correcting, since a run that later
+// does get a message stops matching this filter immediately.
+const STALE_IN_PROGRESS_MS = 3 * 60 * 1000;
+
 /** Every run for the logged-in customer. Empty if not signed in or not yet provisioned. */
 export async function getRuns(): Promise<Run[]> {
   const customer = await getCurrentCustomer();
   if (!customer) return [];
 
   const runs = await prisma.run.findMany({
-    where: { customerId: customer.id },
+    where: {
+      customerId: customer.id,
+      NOT: {
+        status: "IN_PROGRESS",
+        messages: { none: {} },
+        startedAt: { lt: new Date(Date.now() - STALE_IN_PROGRESS_MS) },
+      },
+    },
     orderBy: { startedAt: "desc" },
   });
 
