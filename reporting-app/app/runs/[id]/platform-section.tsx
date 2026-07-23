@@ -13,6 +13,54 @@ const POST_MODE_LABELS: Record<InstagramPostMode, string> = {
   AUTO_AFTER_EDIT: "Auto-post after edit (coming soon)",
 };
 
+const HEBREW_CHAR_RE = /[֐-׿]/;
+const ENGLISH_WORD_RE = /english/i;
+
+type LanguageSplit =
+  | { matched: true; hebrew: string; english: string }
+  | { matched: false };
+
+// Same header-line test as lib/platform-content.ts's isHeaderLine.
+function isHeaderLine(line: string): boolean {
+  const t = line.trim();
+  return /^#{1,6}\s+\S/.test(t) || /^\*\*[^*]+\*\*:?\s*$/.test(t);
+}
+
+/**
+ * Splits a platform section's content into its Hebrew and English halves so
+ * they can render as mirrored columns, for display only (editing still
+ * works on the whole string). Uses the same structural-header approach as
+ * lib/platform-content.ts's platform split, keyed off Hermes's own "Hebrew
+ * version first... English version second, clearly labeled" convention
+ * (real output labels these "**🇮🇱 עברית:**" / "**🇬🇧 English:**") - NOT
+ * per-paragraph script-majority voting, which mis-files a mixed-script
+ * hashtag line (real Hermes hashtag lines mix Hebrew and English tags) into
+ * the wrong column whenever that particular line happens to have more Latin
+ * characters than Hebrew ones. Falls back to unmatched (render as one
+ * column) if a confident Hebrew-then-English marker pair isn't found.
+ */
+function splitByLanguage(text: string): LanguageSplit {
+  const lines = text.split("\n");
+  let heAt: number | undefined;
+  let enAt: number | undefined;
+
+  lines.forEach((line, i) => {
+    if (!isHeaderLine(line)) return;
+    if (heAt === undefined && HEBREW_CHAR_RE.test(line)) heAt = i;
+    if (enAt === undefined && ENGLISH_WORD_RE.test(line)) enAt = i;
+  });
+
+  if (heAt === undefined || enAt === undefined || !(heAt < enAt)) {
+    return { matched: false };
+  }
+
+  return {
+    matched: true,
+    hebrew: lines.slice(heAt + 1, enAt).join("\n").trim(),
+    english: lines.slice(enAt + 1).join("\n").trim(),
+  };
+}
+
 type Props = {
   platform: PlatformKey;
   content: string;
@@ -41,6 +89,8 @@ export function PlatformSection({
   const [isTogglingPosted, startPostedTransition] = useTransition();
   const [isSaving, startSaveTransition] = useTransition();
   const [isResetting, startResetTransition] = useTransition();
+
+  const languageSplit = splitByLanguage(content);
 
   function handleCopy() {
     navigator.clipboard.writeText(content).then(() => {
@@ -74,31 +124,20 @@ export function PlatformSection({
   }
 
   return (
-    <div className="rounded-xl border border-card-border bg-card p-5">
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="font-display text-sm font-bold uppercase tracking-wide">
+    <div>
+      <div className="flex items-baseline justify-between gap-4">
+        <h3 className="font-display text-lg font-semibold italic">
           {platformDisplayName(platform)}
         </h3>
-        <div className="flex items-center gap-2">
-          {isEdited && (
-            <span className="font-mono text-xs uppercase tracking-wide text-status-muted">
-              Edited
-            </span>
-          )}
-          <span
-            className={
-              "rounded-sm border px-2 py-0.5 font-mono text-xs uppercase tracking-wide " +
-              (posted
-                ? "border-status-done text-status-done"
-                : "border-status-muted text-status-muted")
-            }
-          >
+        <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wide">
+          {isEdited && <span className="text-status-muted">Edited</span>}
+          <span className={posted ? "text-status-done" : "text-status-muted"}>
             {posted ? "Posted" : "Not posted"}
           </span>
         </div>
       </div>
       {posted && postedAt && (
-        <p className="mt-1 font-mono text-xs text-status-muted">
+        <p className="mt-0.5 font-mono text-xs text-status-muted">
           {formatRelativeDateTime(postedAt)}
         </p>
       )}
@@ -112,13 +151,13 @@ export function PlatformSection({
             minLength={1}
             rows={10}
             disabled={isSaving}
-            className="w-full rounded-lg border border-card-border bg-background p-3 text-sm leading-relaxed disabled:opacity-50"
+            className="w-full border border-card-border bg-card p-3 text-sm leading-relaxed disabled:opacity-50"
           />
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex gap-4 font-mono text-xs uppercase tracking-wide">
             <button
               type="submit"
               disabled={isSaving}
-              className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground disabled:opacity-50"
+              className="border-b border-line-strong disabled:opacity-50"
             >
               {isSaving ? "Saving…" : "Save"}
             </button>
@@ -126,37 +165,45 @@ export function PlatformSection({
               type="button"
               onClick={() => setIsEditing(false)}
               disabled={isSaving}
-              className="rounded-md border border-card-border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              className="border-b border-line-strong disabled:opacity-50"
             >
               Cancel
             </button>
           </div>
         </form>
+      ) : languageSplit.matched ? (
+        <div className="mt-3 grid grid-cols-[1fr_1px_1fr] gap-4 border border-card-border p-4">
+          <div className="text-sm leading-relaxed">
+            <ReactMarkdown components={markdownComponents}>
+              {languageSplit.english}
+            </ReactMarkdown>
+          </div>
+          <div className="bg-card-border" />
+          <div dir="rtl" className="text-right text-sm leading-relaxed">
+            <ReactMarkdown components={markdownComponents}>
+              {languageSplit.hebrew}
+            </ReactMarkdown>
+          </div>
+        </div>
       ) : (
-        <div className="mt-3 text-sm leading-relaxed">
+        <div className="mt-3 border border-card-border p-4 text-sm leading-relaxed">
           <ReactMarkdown components={markdownComponents}>{content}</ReactMarkdown>
         </div>
       )}
 
       {!isEditing && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleCopy}
-            className="rounded-md border border-card-border px-3 py-1.5 text-xs font-medium"
-          >
+        <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-card-border pt-3 font-mono text-xs uppercase tracking-wide">
+          <button onClick={handleCopy} className="border-b border-line-strong">
             {copied ? "Copied" : "Copy"}
           </button>
-          <button
-            onClick={() => setIsEditing(true)}
-            className="rounded-md border border-card-border px-3 py-1.5 text-xs font-medium"
-          >
+          <button onClick={() => setIsEditing(true)} className="border-b border-line-strong">
             Edit
           </button>
           {isEdited && (
             <button
               onClick={handleReset}
               disabled={isResetting}
-              className="rounded-md border border-card-border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              className="border-b border-line-strong disabled:opacity-50"
             >
               {isResetting ? "Resetting…" : "Reset to original"}
             </button>
@@ -164,7 +211,7 @@ export function PlatformSection({
           <button
             onClick={handleTogglePosted}
             disabled={isTogglingPosted}
-            className="rounded-md border border-card-border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            className="border-b border-line-strong disabled:opacity-50"
           >
             {posted ? "Mark not posted" : "Mark posted"}
           </button>
@@ -178,7 +225,7 @@ export function PlatformSection({
         </p>
       )}
 
-      <div className="mt-4 border-t border-card-border pt-3">
+      <div className="mt-3">
         {platform === "instagram" ? (
           <p className="font-mono text-xs uppercase tracking-wide text-status-muted">
             Posting: {POST_MODE_LABELS[instagramPostMode ?? "MANUAL"]} ·{" "}
@@ -187,10 +234,8 @@ export function PlatformSection({
             </a>
           </p>
         ) : (
-          <p className="text-xs text-status-muted">
-            Manual only - {platform === "facebook" ? "Meta" : "Yad2"} doesn&apos;t
-            allow automated posting{" "}
-            {platform === "facebook" ? "to groups" : "at all"}.
+          <p className="font-mono text-xs uppercase tracking-wide text-status-muted">
+            {`Manual only - ${platform === "facebook" ? "Meta" : "Yad2"} doesn't allow automated posting ${platform === "facebook" ? "to groups" : "at all"}.`}
           </p>
         )}
       </div>

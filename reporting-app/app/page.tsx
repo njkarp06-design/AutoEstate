@@ -11,13 +11,13 @@ export default async function Home() {
 
   if (!customer) {
     return (
-      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
-        <h1 className="font-display text-xl font-bold tracking-tight">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+        <h1 className="font-display text-2xl font-semibold italic tracking-tight">
           Recent activity
         </h1>
-        <div className="mt-8 rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
-          <p className="font-medium">Your account isn&apos;t linked yet</p>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="mt-8 border border-dashed border-card-border px-6 py-12 text-center">
+          <p className="font-display italic">Your account isn&apos;t linked yet</p>
+          <p className="mt-1 text-sm text-status-muted">
             Contact your AutoEstate operator to get your account set up.
           </p>
         </div>
@@ -28,7 +28,7 @@ export default async function Home() {
   const runs = await getRuns(customer);
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
       <RunList runs={runs} />
     </main>
   );

@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f3ecdc;
-  --foreground: #1c1917;
-  --card: #fbf7ee;
-  --card-border: #ddd0b8;
-  --brand: #c1440e;
-  --brand-foreground: #fbf7ee;
-  --secondary: #2f5d62;
-  --status-done: #3f5f34;
-  --status-done-bg: #e2e8d3;
-  --status-pending: #92620f;
-  --status-pending-bg: #f3e6c4;
-  --status-muted: #6b6255;
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card: #f6f5f2;
+  --card-border: #e4e1d9;
+  --line-strong: #1a1a1a;
+  --brand: #10412f;
+  --brand-foreground: #ffffff;
+  --secondary: #7a3323;
+  --status-done: #10412f;
+  --status-done-bg: transparent;
+  --status-pending: #7a3323;
+  --status-pending-bg: transparent;
+  --status-muted: #57534a;
 }
 
 @theme inline {
@@ -20,6 +21,7 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-border: var(--card-border);
+  --color-line-strong: var(--line-strong);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-secondary: var(--secondary);
@@ -28,25 +30,26 @@
   --color-status-pending: var(--status-pending);
   --color-status-pending-bg: var(--status-pending-bg);
   --color-status-muted: var(--status-muted);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-archivo);
+  --font-sans: var(--font-assistant);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-display: var(--font-fraunces);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #1b1712;
-    --foreground: #f1e9da;
-    --card: #241f18;
-    --card-border: #3a3225;
-    --brand: #e2703a;
-    --brand-foreground: #1b1712;
-    --secondary: #6ea1a6;
-    --status-done: #8fae7c;
-    --status-done-bg: #26301f;
-    --status-pending: #d9ac57;
-    --status-pending-bg: #3a2f16;
-    --status-muted: #a89c89;
+    --background: #17150f;
+    --foreground: #f1ede3;
+    --card: #1e1b14;
+    --card-border: #33301f;
+    --line-strong: #f1ede3;
+    --brand: #57b78e;
+    --brand-foreground: #0e1a14;
+    --secondary: #e08161;
+    --status-done: #57b78e;
+    --status-done-bg: transparent;
+    --status-pending: #e08161;
+    --status-pending-bg: transparent;
+    --status-muted: #c9c2b0;
   }
 }
 
