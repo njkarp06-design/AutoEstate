@@ -16,11 +16,12 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). **Current 
 - `reporting-app/app/listings/page.tsx` + `reporting-app/app/listings/listing-list.tsx` — new. Server-fetch/client-filter split mirroring the existing Activity list pattern exactly. Shows every listing status by default (not just Active), matching a comment already in `app/api/listings/active/route.ts` from PR #19 anticipating this exact page.
 - `reporting-app/app/layout.tsx` — added a "Listings" nav link next to "Settings".
 
-**Also updated this session, both already committed to `main` directly (docs, not part of PR #21):**
+**Also updated this session, on their own dedicated docs branch/PR (matching this repo's established pattern of a separate docs PR per feature, e.g. PR #20 for PR #19) — NOT on `main` yet, NOT part of PR #21's diff:**
 - `CLAUDE.md` — new Section 5 entries: the PR #21 build (plan self-review findings, what shipped, verification), and the full live-WhatsApp-test writeup with the gateway bug investigation.
 - `README.md` — status paragraphs updated to reflect PR #21 (built, not merged) and the gateway bug (found, accepted as known gap).
+- This file (`session-handoff-2026-07-24.md`).
 
-Wait — **check this**: verify whether `CLAUDE.md`/`README.md` changes were committed to `main` or are sitting uncommitted/on the feature branch before continuing; this handoff was written assuming they'd be committed to `main` directly per the project's usual docs-update pattern, but confirm with `git status` and `git log --oneline -3 main` on resume.
+**PR #22 "Document PR #21 and the gateway footer-omission bug" is OPEN, NOT YET MERGED**, branch `docs/update-readme-claude-md-pr21-gateway-bug`. So on resume there are **two open PRs** (#21 code, #22 docs), neither merged, plus the local repo currently checked out on `feat/listings-page`. Confirm current PR states with `gh pr list` before assuming anything's changed since this was written.
 
 **Outside the repo** (local machine state, matters for reproducing on another machine):
 - `%LOCALAPPDATA%\hermes\profiles\autoestate\.env` — `ANTHROPIC_API_KEY` confirmed **dead** (HTTP 400: credit balance too low). The gateway currently works anyway because it auto-detects ambient Claude Code OAuth credentials (`~/.claude/.credentials.json`) on this shared machine/account — see Errors Hit. If that OAuth session is ever unavailable, the gateway has no working fallback. Worth fixing (top up the Console credits) even though it isn't blocking anything today.
