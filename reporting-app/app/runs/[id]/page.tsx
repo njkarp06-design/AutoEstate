@@ -26,7 +26,7 @@ export default async function RunPage({
 
   if (!customer) {
     return (
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
         <Link href="/" className="font-mono text-xs uppercase tracking-wide text-status-muted hover:text-foreground">
           ← All activity
         </Link>
@@ -59,7 +59,7 @@ export default async function RunPage({
   const parsed = assistantMessage ? splitPlatformContent(assistantMessage.content) : null;
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
       <Link href="/" className="font-mono text-xs uppercase tracking-wide text-status-muted hover:text-foreground">
         ← All activity
       </Link>

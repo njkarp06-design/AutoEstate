@@ -11,7 +11,7 @@ export default async function Home() {
 
   if (!customer) {
     return (
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
         <h1 className="font-display text-2xl font-semibold italic tracking-tight">
           Recent activity
         </h1>
