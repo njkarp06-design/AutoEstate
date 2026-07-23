@@ -4,46 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Run } from "@/lib/db";
 import { formatRelativeDateTime, sourceLabel } from "@/lib/format";
+import { StatTile } from "@/lib/stat-tile";
 
 type SourceFilter = "all" | "whatsapp" | "telegram";
 type StatusFilter = "all" | "completed" | "in_progress";
-
-function StatTile({
-  label,
-  value,
-  caption,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  caption?: string;
-  tone?: "done" | "pending";
-}) {
-  return (
-    <div className="flex flex-col gap-1 px-5 py-4">
-      <span className="font-mono text-xs uppercase tracking-wide text-status-muted">
-        {label}
-      </span>
-      <span
-        className={
-          "font-display text-3xl font-semibold tracking-tight " +
-          (tone === "done"
-            ? "text-status-done"
-            : tone === "pending"
-              ? "text-status-pending"
-              : "text-foreground")
-        }
-      >
-        {value}
-      </span>
-      {caption && (
-        <span className="font-mono text-[0.65rem] uppercase tracking-wide text-status-muted">
-          {caption}
-        </span>
-      )}
-    </div>
-  );
-}
 
 export function RunList({ runs }: { runs: Run[] }) {
   const [search, setSearch] = useState("");
