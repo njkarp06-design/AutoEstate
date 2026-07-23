@@ -1,13 +1,15 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// /api/ingest is called by external Hermes instances using their own
-// per-customer bearer-token secret, not a logged-in Clerk session - it must
-// stay outside Clerk's auth.protect() or every real sync request gets
-// rejected before it ever reaches the route's own auth check.
+// /api/ingest and /api/listings/active are called by external Hermes
+// instances using their own per-customer bearer-token secret, not a
+// logged-in Clerk session - they must stay outside Clerk's auth.protect()
+// or every real sync/read request gets rejected before it ever reaches the
+// route's own auth check.
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/ingest",
+  "/api/listings/active",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

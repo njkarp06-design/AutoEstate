@@ -1,7 +1,8 @@
-import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { authenticateIngestRequest } from "@/lib/ingest-auth";
+import { parseListingRecords } from "@/lib/listing-record";
 
 const turnStartedSchema = z.object({
   event: z.literal("turn_started"),
@@ -32,25 +33,14 @@ function deriveTitle(userMessage: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  const secret = authHeader?.match(/^Bearer (.+)$/)?.[1];
-  if (!secret) {
+  const authResult = await authenticateIngestRequest(request);
+  if (!authResult.ok) {
     return NextResponse.json(
-      { ok: false, error: "missing bearer token" },
-      { status: 401 },
+      { ok: false, error: authResult.error },
+      { status: authResult.status },
     );
   }
-
-  const secretHash = createHash("sha256").update(secret).digest("hex");
-  const customer = await prisma.customer.findUnique({
-    where: { ingestionSecretHash: secretHash },
-  });
-  if (!customer) {
-    return NextResponse.json(
-      { ok: false, error: "invalid credentials" },
-      { status: 401 },
-    );
-  }
+  const customer = authResult.customer;
 
   const parsed = bodySchema.safeParse(await request.json());
   if (!parsed.success) {
@@ -135,6 +125,69 @@ export async function POST(request: NextRequest) {
     ],
     skipDuplicates: true,
   });
+
+  // Best-effort Listing tracking, parsed from the "Listing Record" footer
+  // both listing-to-social and listing-status-update append. Wrapped so a
+  // parse/match failure can never fail the request or lose the Run/messages
+  // already recorded above - this is purely additive bookkeeping.
+  try {
+    const records = parseListingRecords(body.assistantResponse);
+    const listingIds: string[] = [];
+
+    for (const record of records) {
+      const roomsKey = Math.round(record.rooms * 10) / 10;
+      const sqmKey = Math.round(record.sqm * 10) / 10;
+
+      const existing = await prisma.listing.findFirst({
+        where: {
+          customerId: customer.id,
+          area: { equals: record.area.trim(), mode: "insensitive" },
+          rooms: roomsKey,
+          sqm: sqmKey,
+          NOT: { status: "SOLD" },
+        },
+      });
+
+      const listing = existing
+        ? await prisma.listing.update({
+            where: { id: existing.id },
+            data: {
+              status: record.status,
+              transactionType: record.transactionType || existing.transactionType,
+              floor: record.floor ?? existing.floor,
+              price: record.price ?? existing.price,
+            },
+          })
+        : await prisma.listing.create({
+            data: {
+              customerId: customer.id,
+              area: record.area.trim(),
+              transactionType: record.transactionType,
+              rooms: roomsKey,
+              sqm: sqmKey,
+              floor: record.floor,
+              price: record.price,
+              status: record.status,
+            },
+          });
+
+      listingIds.push(listing.id);
+    }
+
+    // A single nullable FK on Run can't represent "this turn touched two
+    // listings" (see listing-to-social's mixed-input handling) - only link
+    // when exactly one record was parsed. Both Listing rows are still
+    // correctly created/updated above regardless; only the Run's own
+    // backlink is left null in the rare two-listing case.
+    if (listingIds.length === 1) {
+      await prisma.run.update({
+        where: { id: run.id },
+        data: { listingId: listingIds[0] },
+      });
+    }
+  } catch (err) {
+    console.error("ingest: listing-record linking failed", err);
+  }
 
   return NextResponse.json({ ok: true, runId: run.id });
 }

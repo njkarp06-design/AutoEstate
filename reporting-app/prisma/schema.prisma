@@ -34,15 +34,26 @@ enum PostMode {
   AUTO_AFTER_EDIT
 }
 
+// Lifecycle of a property the customer has advertised through Hermes. Rows
+// are matched/created at ingest time from the "Listing Record" footer both
+// listing-to-social and listing-status-update append to their replies (see
+// lib/listing-record.ts) - not a form the operator fills in.
+enum ListingStatus {
+  ACTIVE
+  UNDER_CONTRACT
+  SOLD
+}
+
 model Customer {
-  id                  String   @id @default(cuid())
-  email               String   @unique // set by the operator at onboarding time
-  clerkUserId         String?  @unique // backfilled on first login
+  id                  String    @id @default(cuid())
+  email               String    @unique // set by the operator at onboarding time
+  clerkUserId         String?   @unique // backfilled on first login
   displayName         String?
-  ingestionSecretHash String   @unique // sha256(secret) - the secret itself is never stored
-  instagramPostMode   PostMode @default(MANUAL)
-  createdAt           DateTime @default(now())
+  ingestionSecretHash String    @unique // sha256(secret) - the secret itself is never stored
+  instagramPostMode   PostMode  @default(MANUAL)
+  createdAt           DateTime  @default(now())
   runs                Run[]
+  listings            Listing[]
 
   @@map("customers")
 }
@@ -70,6 +81,13 @@ model Run {
   status          RunStatus            @default(IN_PROGRESS)
   messages        RunMessage[]
   platformContent RunPlatformContent[]
+  // Set at ingest time when exactly one Listing Record footer is parsed from
+  // this turn's reply. Left null when a turn's reply legitimately mixes two
+  // distinguishable listings (see ingest route) - a single FK can't
+  // represent "this turn touched two listings", but both Listing rows are
+  // still correctly created/updated regardless.
+  listing         Listing?             @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  listingId       String?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
@@ -108,4 +126,37 @@ model RunPlatformContent {
 
   @@unique([runId, platform])
   @@map("run_platform_content")
+}
+
+// One row per property the customer has ever advertised through Hermes.
+// Matched/created at ingest time (see app/api/ingest/route.ts) by parsing the
+// "Listing Record" footer both listing-to-social and listing-status-update
+// append to their replies - not a form the operator fills in (no edit UI in
+// this pass; see app/listings).
+model Listing {
+  id              String        @id @default(cuid())
+  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId      String
+  area            String
+  // "sale" | "rental" normalized where recognizable, else the raw trimmed
+  // footer text - kept as a plain string rather than an enum, same
+  // rationale as Run.source: this value is parsed from a skill's free-text
+  // footer, and an unrecognized value must never hard-fail ingest the way an
+  // invalid Postgres enum value would.
+  transactionType String
+  rooms           Float         // supports Israeli half-room listings, e.g. 3.5
+  sqm             Float
+  floor           Int?
+  // Nullable: listing-status-update's sold/under-contract announcements may
+  // omit price entirely. A null price on update leaves the existing price
+  // untouched; a null price on create shows as unknown rather than a
+  // fabricated 0.
+  price           Int?
+  status          ListingStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  runs            Run[]
+
+  @@index([customerId, status])
+  @@map("listings")
 }

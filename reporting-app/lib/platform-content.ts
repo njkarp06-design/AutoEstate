@@ -22,6 +22,12 @@ const HEADER_KEYWORDS: Record<PlatformKey, RegExp> = {
   yad2: /yad ?2/i,
 };
 
+// Both listing-to-social and listing-status-update append a "Listing Record"
+// footer after the Yad2 section (see lib/listing-record.ts). Without capping
+// the Yad2 slice at this header, the footer's raw labels would leak into the
+// customer-facing Yad2 caption shown/edited/posted in the app.
+export const LISTING_RECORD_HEADER_RE = /^\*\*listing record:?\*\*:?\s*$/i;
+
 // A header line is either an ATX heading ("## ...") or a line that is
 // *entirely* one bold span ("**...**"). Deliberately conservative: matching
 // any line that merely contains the word "Instagram" would false-positive on
@@ -77,13 +83,25 @@ export function splitPlatformContent(raw: string): ParsedPlatformContent {
   const slice = (start: number, end: number) =>
     lines.slice(start + 1, end).join("\n").trim();
 
+  // Cap the Yad2 section at the Listing Record footer, if present, so its
+  // labeled lines don't leak into the customer-facing Yad2 caption. Absent
+  // for older messages and for weekly-digest's footer-less output, in which
+  // case the Yad2 section still runs to the end of the string as before.
+  let footerAt: number | undefined;
+  for (let i = yad2 + 1; i < lines.length; i++) {
+    if (LISTING_RECORD_HEADER_RE.test(lines[i].trim())) {
+      footerAt = i;
+      break;
+    }
+  }
+
   return {
     matched: true,
     multipleListingsDetected: matchCount.instagram > 1 || matchCount.facebook > 1 || matchCount.yad2 > 1,
     sections: {
       instagram: slice(instagram, facebook),
       facebook: slice(facebook, yad2),
-      yad2: slice(yad2, lines.length),
+      yad2: slice(yad2, footerAt ?? lines.length),
     },
   };
 }
