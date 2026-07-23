@@ -1,7 +1,7 @@
 ---
 name: listing-to-social
 description: Use when a real estate agent provides new listing details (facts about a property, and optionally photo descriptions or attached photos) and wants ready-to-post content. Turns raw listing facts into platform-formatted Hebrew and English captions for Instagram, a Facebook group, and Yad2.
-version: 0.3.1
+version: 0.4.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -131,6 +131,33 @@ type, then rooms/size/floor/price, then condition and features, then
 nearby highlights if given. Matches how a serious buyer scans a listing
 site.
 
+**4. Listing Record (footer, after the Yad2 section)**
+Append exactly this block, in this order, as the last thing in your reply —
+nothing after it. This is a real, useful confirmation recap for the agent
+(so they can double-check what was captured), and its exact fixed format is
+also how the reporting system tracks which properties are currently on the
+market:
+
+```
+**Listing Record:**
+Area: <area, as given>
+Type: <Sale | Rental>
+Rooms: <number, e.g. 3.5>
+Size: <number> sqm
+Floor: <number, or N/A>
+Price: <₪ amount, or N/A>
+Status: Active
+```
+
+Always exactly these 7 labeled lines, this order. `Status` is always
+`Active` for this skill (a new listing is always going on the market, never
+sold/under contract — that's `listing-status-update`'s job). Use `N/A` for
+`Floor`/`Price` only if genuinely not being stated — normally both are
+required input, so this should be rare. If a single incoming message
+produces more than one separate, complete listing response (see Never Blend
+Properties above), give each one its own Listing Record footer, immediately
+following that listing's own Yad2 section.
+
 ## Common Pitfalls
 
 1. **Inventing facts.** Never add a price, room count, address detail, or
@@ -160,6 +187,12 @@ site.
    (see Never Blend Properties above). The problem is facts from different
    properties appearing in the same piece of content, not multiple
    listings appearing in the same reply.
+8. **Missing or malformed Listing Record footer.** Every complete response
+   needs its own footer, in the exact 7-line format, immediately after that
+   listing's Yad2 section, with nothing after it. This isn't just cosmetic —
+   a malformed footer can leak its own raw labels into the visible Yad2
+   caption, and a missing one means this listing silently never enters the
+   reporting system's tracking.
 
 ## Verification Checklist
 
@@ -180,3 +213,6 @@ site.
       the same message got its own separate, clearly-labeled response
 - [ ] If a photo was attached, only visibly-true details were used — no
       invented condition/availability claims from the image
+- [ ] Every complete response ends with its own exact 7-line Listing Record
+      footer (`Status: Active`), immediately after that listing's Yad2
+      section, nothing after it

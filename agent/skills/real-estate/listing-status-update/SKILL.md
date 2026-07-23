@@ -1,7 +1,7 @@
 ---
 name: listing-status-update
 description: Use when a real estate agent wants to announce a change to a listing they already advertised — a price drop, a sale, or going under contract/rented — and wants ready-to-post content. Turns the status change plus the listing's core facts into platform-formatted Hebrew and English posts for Instagram, a Facebook group, and Yad2.
-version: 0.1.1
+version: 0.2.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -62,10 +62,12 @@ If the agent's message is missing something on this list, ask a single
 follow-up question batching everything missing — don't generate partial
 content and don't guess.
 
-This skill follows the same one-property-per-response rule as
-`listing-to-social`: if facts for more than one property appear in the same
-request, respond to only the most recent, complete one (see that skill's
-"One Property Per Response" section for why this matters).
+This skill follows the same rule as `listing-to-social`'s "Never Blend
+Properties" section: if facts for more than one property appear in the same
+request, give each complete, distinguishable one its own separate,
+clearly-labeled response (each with its own Listing Record footer, see
+Output Format) — never blend facts from different properties into the same
+piece of content, and never drop one in favor of the other.
 
 ## Output Format
 
@@ -103,6 +105,32 @@ Formal and factual, no emoji, no hashtags — but its role depends on status:
   available") rather than a full re-description, since the property isn't
   actionable anymore.
 
+**4. Listing Record (footer, after the Yad2 section)**
+Append exactly this block, in this order, as the last thing in your reply —
+nothing after it. Same fixed format as `listing-to-social`'s footer (this is
+how the reporting system recognizes it's the same property and transitions
+its status, rather than creating a duplicate):
+
+```
+**Listing Record:**
+Area: <area, as restated>
+Type: <Sale | Rental>
+Rooms: <number, e.g. 3.5>
+Size: <number> sqm
+Floor: <number, or N/A>
+Price: <₪ amount, or N/A>
+Status: <Active | Under Contract | Sold>
+```
+
+`Status` reflects this update: `Active` for a price drop (still on the
+market, just at a new price — use the new price in `Price`), `Under
+Contract` for going under contract, `Sold` for a sale *or* a rental that's
+been taken (both mean "no longer on the market" — don't invent a separate
+status for a completed rental). `Price` is `N/A` when this update doesn't
+require one (sold/under contract with no price shared). If more than one
+property's status is being updated in the same message, give each its own
+complete response and its own Listing Record footer.
+
 ## Common Pitfalls
 
 1. **Inventing facts.** Never add a price, room count, address detail, or
@@ -127,9 +155,14 @@ Formal and factual, no emoji, no hashtags — but its role depends on status:
    the property and the update, not an "ideal" tenant or buyer.
 6. **Wrong units/currency.** Sqm, not sqft. ₪, not $, unless told otherwise.
 7. **Blending two properties into one response.** If facts for more than
-   one property show up in the same request, respond to only the most
-   recent, complete listing (see `listing-to-social`'s "One Property Per
-   Response").
+   one property show up in the same request, give each its own complete,
+   separate response (see `listing-to-social`'s "Never Blend Properties") —
+   don't merge them, and don't drop one in favor of the other.
+8. **Missing or malformed Listing Record footer.** Every complete response
+   needs its own footer, in the exact 7-line format, immediately after that
+   listing's Yad2 section. Without it (or with a wrong `Status`), the
+   reporting system can't recognize this as an update to the *same*
+   property and may create a duplicate instead of transitioning it.
 
 ## Verification Checklist
 
@@ -145,5 +178,10 @@ Formal and factual, no emoji, no hashtags — but its role depends on status:
 - [ ] No fact appears that wasn't in the agent's *current* input, including
       no identity facts silently carried over from earlier in the
       conversation — even ones you could technically recall
-- [ ] Response covers exactly one property
+- [ ] Each distinguishable property got its own complete, separate response
+      if more than one appeared in the request
 - [ ] Numbers use sqm and ₪ (unless told otherwise)
+- [ ] Every complete response ends with its own exact 7-line Listing Record
+      footer, with `Status` matching this update (`Active` for a price
+      drop, `Under Contract`, or `Sold` for sold/rented), immediately after
+      that listing's Yad2 section
