@@ -41,7 +41,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ClerkProvider dynamic>
           <header className="border-b border-card-border">
-            <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-2 px-6 py-5">
+            <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-6 py-5">
               <Link href="/" className="flex items-center gap-2.5">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full border border-card-border font-display text-sm font-semibold italic">
                   Ae

@@ -8,6 +8,43 @@ import { formatRelativeDateTime, sourceLabel } from "@/lib/format";
 type SourceFilter = "all" | "whatsapp" | "telegram";
 type StatusFilter = "all" | "completed" | "in_progress";
 
+function StatTile({
+  label,
+  value,
+  caption,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  caption?: string;
+  tone?: "done" | "pending";
+}) {
+  return (
+    <div className="flex flex-col gap-1 px-5 py-4">
+      <span className="font-mono text-xs uppercase tracking-wide text-status-muted">
+        {label}
+      </span>
+      <span
+        className={
+          "font-display text-3xl font-semibold tracking-tight " +
+          (tone === "done"
+            ? "text-status-done"
+            : tone === "pending"
+              ? "text-status-pending"
+              : "text-foreground")
+        }
+      >
+        {value}
+      </span>
+      {caption && (
+        <span className="font-mono text-[0.65rem] uppercase tracking-wide text-status-muted">
+          {caption}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function RunList({ runs }: { runs: Run[] }) {
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
@@ -25,6 +62,9 @@ export function RunList({ runs }: { runs: Run[] }) {
   });
 
   const completedCount = runs.filter((r) => r.status === "completed").length;
+  const inProgressCount = runs.length - completedCount;
+  const whatsappCount = runs.filter((r) => r.source === "whatsapp").length;
+  const telegramCount = runs.filter((r) => r.source === "telegram").length;
 
   return (
     <div>
@@ -39,6 +79,19 @@ export function RunList({ runs }: { runs: Run[] }) {
       <p className="mt-1.5 text-sm text-status-muted">
         Every listing sent to the agent, and the content it generated.
       </p>
+
+      {runs.length > 0 && (
+        <div className="mt-7 grid grid-cols-2 divide-x divide-card-border border border-card-border bg-card sm:grid-cols-4">
+          <StatTile label="Total listings" value={runs.length} />
+          <StatTile label="Ready" value={completedCount} tone="done" />
+          <StatTile label="In progress" value={inProgressCount} tone="pending" />
+          <StatTile
+            label="By channel"
+            value={`${whatsappCount} / ${telegramCount}`}
+            caption="WhatsApp / Telegram"
+          />
+        </div>
+      )}
 
       {runs.length > 0 && (
         <div className="mt-7 flex flex-wrap gap-6 border-b border-card-border pb-5 font-mono text-xs uppercase tracking-wide">
