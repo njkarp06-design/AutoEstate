@@ -46,8 +46,16 @@ export default async function RunPage({
     notFound();
   }
 
-  const userMessage = run.messages.find((m) => m.role === "user");
-  const assistantMessage = run.messages.find((m) => m.role === "assistant");
+  // A listing that needed a clarifying follow-up spans more than one
+  // user/assistant pair (see lib/run-grouping.ts) - the LAST assistant
+  // message is the one that actually generated the listing (or, if none
+  // did yet, the agent's latest reply); everything before it is shown as a
+  // short transcript so the viewer can see the whole exchange, including
+  // any photo the agent sent.
+  const assistantMessage = [...run.messages].reverse().find((m) => m.role === "assistant");
+  const precursorMessages = assistantMessage
+    ? run.messages.filter((m) => m !== assistantMessage)
+    : run.messages;
   const parsed = assistantMessage ? splitPlatformContent(assistantMessage.content) : null;
 
   return (
@@ -83,14 +91,18 @@ export default async function RunPage({
         </p>
       </div>
 
-      {userMessage && (
-        <div className="mt-4 border border-card-border p-5">
-          <p className="mb-3 font-mono text-xs uppercase tracking-wide text-status-muted">
-            What you sent
-          </p>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">
-            {userMessage.content}
-          </p>
+      {precursorMessages.length > 0 && (
+        <div className="mt-4 space-y-3">
+          {precursorMessages.map((m, i) => (
+            <div key={i} className="border border-card-border p-5">
+              <p className="mb-3 font-mono text-xs uppercase tracking-wide text-status-muted">
+                {m.role === "user" ? "What you sent" : "Agent asked"}
+              </p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {m.content}
+              </p>
+            </div>
+          ))}
         </div>
       )}
 

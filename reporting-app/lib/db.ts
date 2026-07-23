@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Customer } from "@/prisma/generated/prisma/client";
 import type { PlatformKey } from "@/lib/platform-content";
+import { groupRunsIntoListings } from "@/lib/run-grouping";
 
 export type RunStatus = "completed" | "in_progress";
 
@@ -69,49 +70,100 @@ function toRunStatus(status: "IN_PROGRESS" | "COMPLETED"): RunStatus {
 // won't sync a turn it considers interrupted). Filtering these out keeps the
 // "In progress" badge trustworthy - self-correcting, since a run that later
 // does get a message stops matching this filter immediately.
+//
+// Applied identically in getRuns and getRun's session-scoped query: a ghost
+// left out of the list must also be left out of grouping when viewing a
+// sibling run's detail page, or the two would disagree on a merged group's
+// title/messages (a ghost run's own turn_started title can differ from -
+// and predate - the listing that actually went on to complete).
 const STALE_IN_PROGRESS_MS = 3 * 60 * 1000;
 
-/** Every run for the given customer. */
-export async function getRuns(customer: Customer): Promise<Run[]> {
-  const runs = await prisma.run.findMany({
-    where: {
-      customerId: customer.id,
-      NOT: {
-        status: "IN_PROGRESS",
-        messages: { none: {} },
-        startedAt: { lt: new Date(Date.now() - STALE_IN_PROGRESS_MS) },
-      },
+function excludeGhostRuns(customerId: string) {
+  return {
+    customerId,
+    NOT: {
+      status: "IN_PROGRESS" as const,
+      messages: { none: {} },
+      startedAt: { lt: new Date(Date.now() - STALE_IN_PROGRESS_MS) },
     },
-    orderBy: { startedAt: "desc" },
-  });
-
-  return runs.map((run) => ({
-    id: run.id,
-    source: run.source,
-    displayName: run.displayName,
-    startedAt: toEpochSeconds(run.startedAt),
-    status: toRunStatus(run.status),
-    title: run.title,
-  }));
+  };
 }
 
-/** A single run's full transcript for the given customer - null if not found or not owned by them. */
+/**
+ * Every listing for the given customer - one entry per grouped listing, not
+ * per Hermes turn (see run-grouping.ts). A listing that needed the skill's
+ * batched-follow-up-question flow spans multiple turns/Run rows but must
+ * still show up as a single Activity entry.
+ */
+export async function getRuns(customer: Customer): Promise<Run[]> {
+  const runs = await prisma.run.findMany({
+    where: excludeGhostRuns(customer.id),
+    // Ascending: grouping needs chronological order within each session.
+    // Re-sorted for display after grouping, below.
+    orderBy: { startedAt: "asc" },
+    include: {
+      messages: { orderBy: [{ timestamp: "asc" }, { sortIndex: "asc" }] },
+    },
+  });
+
+  const groups = groupRunsIntoListings(runs);
+
+  return groups
+    .map((group) => {
+      const first = group.runs[0];
+      const last = group.runs[group.runs.length - 1];
+      return {
+        // The last (closing, or latest-while-still-open) run's id is what
+        // links point at - it holds the real content, once there is any.
+        id: last.id,
+        source: last.source,
+        displayName: last.displayName,
+        // The first run's startedAt/title - when the listing request
+        // actually began, and what the agent was originally asked.
+        startedAt: toEpochSeconds(first.startedAt),
+        status: toRunStatus(last.status),
+        title: first.title,
+      };
+    })
+    .sort((a, b) => b.startedAt - a.startedAt);
+}
+
+/**
+ * A single listing's full transcript for the given customer - null if not
+ * found or not owned by them. `id` may be any run in the listing's group
+ * (the canonical last-run id from the Activity list, or an older precursor
+ * id); either way this returns the whole group merged, per run-grouping.ts.
+ */
 export async function getRun(id: string, customer: Customer): Promise<RunDetail | null> {
-  const run = await prisma.run.findFirst({
+  const target = await prisma.run.findFirst({
     where: { id, customerId: customer.id },
+    select: { hermesSessionId: true },
+  });
+  if (!target) return null;
+
+  const sessionRuns = await prisma.run.findMany({
+    where: { ...excludeGhostRuns(customer.id), hermesSessionId: target.hermesSessionId },
+    orderBy: { startedAt: "asc" },
     include: {
       messages: { orderBy: [{ timestamp: "asc" }, { sortIndex: "asc" }] },
       platformContent: true,
     },
   });
-  if (!run) return null;
+
+  const group = groupRunsIntoListings(sessionRuns).find((g) =>
+    g.runs.some((r) => r.id === id),
+  );
+  if (!group) return null;
+
+  const first = group.runs[0];
+  const last = group.runs[group.runs.length - 1];
 
   const platformStatus: Record<PlatformKey, RunPlatformStatus> = {
     instagram: EMPTY_PLATFORM_STATUS,
     facebook: EMPTY_PLATFORM_STATUS,
     yad2: EMPTY_PLATFORM_STATUS,
   };
-  for (const row of run.platformContent) {
+  for (const row of last.platformContent) {
     platformStatus[toPlatformKey(row.platform)] = {
       editedContent: row.editedContent,
       posted: row.posted,
@@ -120,17 +172,19 @@ export async function getRun(id: string, customer: Customer): Promise<RunDetail 
   }
 
   return {
-    id: run.id,
-    source: run.source,
-    displayName: run.displayName,
-    startedAt: toEpochSeconds(run.startedAt),
-    status: toRunStatus(run.status),
-    title: run.title,
-    messages: run.messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-      timestamp: toEpochSeconds(m.timestamp),
-    })),
+    id: last.id,
+    source: last.source,
+    displayName: last.displayName,
+    startedAt: toEpochSeconds(first.startedAt),
+    status: toRunStatus(last.status),
+    title: first.title,
+    messages: group.runs.flatMap((r) =>
+      r.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        timestamp: toEpochSeconds(m.timestamp),
+      })),
+    ),
     platformStatus,
   };
 }
