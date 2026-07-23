@@ -2,7 +2,7 @@
 
 Next.js dashboard for a non-technical client to review what the AutoEstate agent has generated — one entry per WhatsApp/Telegram listing, the raw facts sent in, and the generated Instagram/Facebook/Yad2 content split into independently reviewable, editable sections. Not purely read-only: an agent can edit generated content, mark a platform as posted, and set an Instagram posting-mode preference (manual / auto-post immediately / auto-post after edit — the auto options are stored but inert pending a real Meta integration).
 
-**Status (2026-07-23):** the redesigned UI/feature set is built and verified against real data but only merged into `main` via PR #13 once approved — check whether that's landed before assuming this description matches `main`. Only ever run locally so far (`npm run dev`); not deployed to Vercel Pro.
+**Status (2026-07-23):** the redesigned UI/feature set (PR #13) is merged into `main`. Only ever run locally so far (`npm run dev`); not deployed to Vercel Pro.
 
 ## Data source
 
