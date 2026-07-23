@@ -3,26 +3,15 @@ import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { getRun } from "@/lib/db";
 import { getCurrentCustomer } from "@/lib/customer";
-import { formatRelativeDateTime, platformLabel } from "@/lib/format";
-
-const markdownComponents = {
-  h2: (props: React.ComponentPropsWithoutRef<"h2">) => (
-    <h2
-      className="mt-6 mb-2 border-t border-blue-100 pt-4 text-base font-semibold first:mt-0 first:border-t-0 first:pt-0"
-      {...props}
-    />
-  ),
-  ul: (props: React.ComponentPropsWithoutRef<"ul">) => (
-    <ul className="my-2 list-disc space-y-1 pl-5" {...props} />
-  ),
-  strong: (props: React.ComponentPropsWithoutRef<"strong">) => (
-    <strong className="font-semibold" {...props} />
-  ),
-  hr: () => null, // section breaks are handled by the h2 top border instead
-  p: (props: React.ComponentPropsWithoutRef<"p">) => (
-    <p className="mb-2 last:mb-0" {...props} />
-  ),
-};
+import { formatRelativeDateTime, sourceLabel } from "@/lib/format";
+import { markdownComponents } from "@/lib/markdown-components";
+import { splitPlatformContent, PLATFORM_KEYS } from "@/lib/platform-content";
+import { PlatformSection } from "./platform-section";
+import {
+  savePlatformContentAction,
+  resetPlatformContentAction,
+  setPlatformPostedAction,
+} from "./actions";
 
 // Always read the live database - never serve a stale build-time snapshot.
 export const dynamic = "force-dynamic";
@@ -38,12 +27,12 @@ export default async function RunPage({
   if (!customer) {
     return (
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
-        <Link href="/" className="text-sm text-gray-500 hover:underline">
+        <Link href="/" className="font-mono text-xs uppercase tracking-wide text-status-muted hover:text-foreground">
           ← All activity
         </Link>
-        <div className="mt-8 rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
-          <p className="font-medium">Your account isn&apos;t linked yet</p>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="mt-8 border border-dashed border-card-border px-6 py-12 text-center">
+          <p className="font-display italic">Your account isn&apos;t linked yet</p>
+          <p className="mt-1 text-sm text-status-muted">
             Contact your AutoEstate operator to get your account set up.
           </p>
         </div>
@@ -57,64 +46,105 @@ export default async function RunPage({
     notFound();
   }
 
+  const userMessage = run.messages.find((m) => m.role === "user");
+  const assistantMessage = run.messages.find((m) => m.role === "assistant");
+  const parsed = assistantMessage ? splitPlatformContent(assistantMessage.content) : null;
+
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
-      <Link href="/" className="text-sm text-gray-500 hover:underline">
+      <Link href="/" className="font-mono text-xs uppercase tracking-wide text-status-muted hover:text-foreground">
         ← All activity
       </Link>
 
-      <div className="mt-4 flex items-start justify-between gap-4">
-        <h1 className="text-xl font-semibold">
-          {run.title ?? "Untitled listing"}
-        </h1>
-        <span
-          className={
-            "flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium " +
-            (run.status === "completed"
-              ? "bg-green-100 text-green-800"
-              : "bg-amber-100 text-amber-800")
-          }
-        >
-          {run.status === "in_progress" && (
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-600" />
-          )}
-          {run.status === "completed" ? "Ready to post" : "In progress"}
-        </span>
-      </div>
-
-      <p className="mt-1 text-sm text-gray-500">
-        {formatRelativeDateTime(run.startedAt)} · {platformLabel(run.source)}
-        {run.displayName ? ` · ${run.displayName}` : ""}
-      </p>
-
-      <div className="mt-8 space-y-4">
-        {run.messages.map((message, i) => (
-          <div
-            key={i}
+      <div className="mt-5 border border-card-border bg-card p-5">
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="font-display text-lg font-semibold">
+            {run.title ?? "Untitled listing"}
+          </h1>
+          <span
             className={
-              "rounded-xl border p-5 " +
-              (message.role === "user"
-                ? "border-card-border bg-card"
-                : "border-blue-100 bg-blue-50")
+              "flex shrink-0 items-center gap-1.5 border px-2.5 py-1 font-mono text-xs uppercase tracking-wide " +
+              (run.status === "completed"
+                ? "border-status-done text-status-done"
+                : "border-status-pending text-status-pending")
             }
           >
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
-              {message.role === "user" ? "What you sent" : "Ready-to-post content"}
+            {run.status === "in_progress" && (
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-status-pending" />
+            )}
+            {run.status === "completed" ? "Ready" : "In progress"}
+          </span>
+        </div>
+        <p className="mt-3 border-t border-card-border pt-3 font-mono text-xs uppercase tracking-wide text-status-muted">
+          {sourceLabel(run.source)}
+          {run.displayName ? ` · ${run.displayName}` : ""}
+          {" · "}
+          {formatRelativeDateTime(run.startedAt)}
+        </p>
+      </div>
+
+      {userMessage && (
+        <div className="mt-4 border border-card-border p-5">
+          <p className="mb-3 font-mono text-xs uppercase tracking-wide text-status-muted">
+            What you sent
+          </p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            {userMessage.content}
+          </p>
+        </div>
+      )}
+
+      {assistantMessage && parsed && (
+        <div className="mt-8 space-y-6">
+          {parsed.matched && parsed.multipleListingsDetected && (
+            <p className="border-l-2 border-secondary py-1 pl-4 text-sm text-secondary">
+              Hermes&apos;s reply included more than one listing (a rapid
+              back-to-back message can merge into the same response) -
+              showing the content for this listing; double-check it before
+              posting.
             </p>
-            {message.role === "assistant" ? (
+          )}
+          {parsed.matched ? (
+            PLATFORM_KEYS.map((platform) => {
+              const status = run.platformStatus[platform];
+              const displayContent = status.editedContent ?? parsed.sections[platform];
+              const isEdited = status.editedContent != null;
+              return (
+                <PlatformSection
+                  key={platform}
+                  platform={platform}
+                  content={displayContent}
+                  isEdited={isEdited}
+                  posted={status.posted}
+                  postedAt={status.postedAt}
+                  instagramPostMode={
+                    platform === "instagram" ? customer.instagramPostMode : undefined
+                  }
+                  saveAction={savePlatformContentAction.bind(null, run.id, platform)}
+                  resetAction={resetPlatformContentAction.bind(null, run.id, platform)}
+                  setPostedAction={setPlatformPostedAction.bind(null, run.id, platform)}
+                />
+              );
+            })
+          ) : (
+            <div className="border border-card-border p-5">
+              <p className="mb-3 font-mono text-xs uppercase tracking-wide text-status-muted">
+                Full response
+              </p>
+              <p className="mb-3 text-xs text-status-muted">
+                Couldn&apos;t automatically split this into separate
+                Instagram/Facebook/Yad2 sections, so showing the full response
+                below instead.
+              </p>
               <div className="text-sm leading-relaxed">
                 <ReactMarkdown components={markdownComponents}>
-                  {message.content}
+                  {assistantMessage.content}
                 </ReactMarkdown>
               </div>
-            ) : (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                {message.content}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
     </main>
   );
 }

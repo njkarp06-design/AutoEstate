@@ -1,7 +1,38 @@
 import { prisma } from "@/lib/prisma";
 import type { Customer } from "@/prisma/generated/prisma/client";
+import type { PlatformKey } from "@/lib/platform-content";
 
 export type RunStatus = "completed" | "in_progress";
+
+// DB-facing platform value, kept as an inline literal union rather than an
+// import of Prisma's generated `Platform` type - same decoupling convention
+// as toRunStatus below, which doesn't import the generated `RunStatus` type
+// either even though one exists.
+type DbPlatform = "INSTAGRAM" | "FACEBOOK" | "YAD2";
+
+function toPlatformKey(platform: DbPlatform): PlatformKey {
+  if (platform === "INSTAGRAM") return "instagram";
+  if (platform === "FACEBOOK") return "facebook";
+  return "yad2";
+}
+
+function toPlatformEnum(key: PlatformKey): DbPlatform {
+  if (key === "instagram") return "INSTAGRAM";
+  if (key === "facebook") return "FACEBOOK";
+  return "YAD2";
+}
+
+export type RunPlatformStatus = {
+  editedContent: string | null;
+  posted: boolean;
+  postedAt: number | null; // epoch seconds
+};
+
+const EMPTY_PLATFORM_STATUS: RunPlatformStatus = {
+  editedContent: null,
+  posted: false,
+  postedAt: null,
+};
 
 export type Run = {
   id: string;
@@ -20,6 +51,7 @@ export type RunMessage = {
 
 export type RunDetail = Run & {
   messages: RunMessage[];
+  platformStatus: Record<PlatformKey, RunPlatformStatus>;
 };
 
 function toEpochSeconds(date: Date): number {
@@ -67,9 +99,25 @@ export async function getRuns(customer: Customer): Promise<Run[]> {
 export async function getRun(id: string, customer: Customer): Promise<RunDetail | null> {
   const run = await prisma.run.findFirst({
     where: { id, customerId: customer.id },
-    include: { messages: { orderBy: [{ timestamp: "asc" }, { sortIndex: "asc" }] } },
+    include: {
+      messages: { orderBy: [{ timestamp: "asc" }, { sortIndex: "asc" }] },
+      platformContent: true,
+    },
   });
   if (!run) return null;
+
+  const platformStatus: Record<PlatformKey, RunPlatformStatus> = {
+    instagram: EMPTY_PLATFORM_STATUS,
+    facebook: EMPTY_PLATFORM_STATUS,
+    yad2: EMPTY_PLATFORM_STATUS,
+  };
+  for (const row of run.platformContent) {
+    platformStatus[toPlatformKey(row.platform)] = {
+      editedContent: row.editedContent,
+      posted: row.posted,
+      postedAt: row.postedAt ? toEpochSeconds(row.postedAt) : null,
+    };
+  }
 
   return {
     id: run.id,
@@ -83,5 +131,67 @@ export async function getRun(id: string, customer: Customer): Promise<RunDetail 
       content: m.content,
       timestamp: toEpochSeconds(m.timestamp),
     })),
+    platformStatus,
   };
+}
+
+/**
+ * Ownership-checked mutation helpers for per-run, per-platform state Hermes
+ * doesn't know about. Each re-derives the owning run from (runId, customer)
+ * and no-ops if the run isn't found or isn't owned by this customer - same
+ * pattern as getRun, and the shape the Next.js docs recommend for a Data
+ * Access Layer backing Server Actions (take the change + an id, re-check
+ * ownership server-side, never trust a client-supplied ownership claim).
+ */
+
+async function findOwnedRun(runId: string, customer: Customer) {
+  return prisma.run.findFirst({ where: { id: runId, customerId: customer.id } });
+}
+
+export async function setPlatformEditedContent(
+  runId: string,
+  customer: Customer,
+  platform: PlatformKey,
+  content: string,
+): Promise<void> {
+  const run = await findOwnedRun(runId, customer);
+  if (!run) return;
+
+  await prisma.runPlatformContent.upsert({
+    where: { runId_platform: { runId, platform: toPlatformEnum(platform) } },
+    create: { runId, platform: toPlatformEnum(platform), editedContent: content },
+    update: { editedContent: content },
+  });
+}
+
+/** Clears an edit override back to Hermes's original text. Does not touch posted/postedAt - editing and posting are independent. */
+export async function resetPlatformEditedContent(
+  runId: string,
+  customer: Customer,
+  platform: PlatformKey,
+): Promise<void> {
+  const run = await findOwnedRun(runId, customer);
+  if (!run) return;
+
+  await prisma.runPlatformContent.upsert({
+    where: { runId_platform: { runId, platform: toPlatformEnum(platform) } },
+    create: { runId, platform: toPlatformEnum(platform), editedContent: null },
+    update: { editedContent: null },
+  });
+}
+
+export async function setPlatformPosted(
+  runId: string,
+  customer: Customer,
+  platform: PlatformKey,
+  posted: boolean,
+): Promise<void> {
+  const run = await findOwnedRun(runId, customer);
+  if (!run) return;
+
+  await prisma.runPlatformContent.upsert({
+    where: { runId_platform: { runId, platform: toPlatformEnum(platform) } },
+    create: { runId, platform: toPlatformEnum(platform), posted, postedAt: posted ? new Date() : null },
+    update: { posted, postedAt: posted ? new Date() : null },
+  });
 }

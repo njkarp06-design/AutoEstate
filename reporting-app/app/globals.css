@@ -1,11 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8fa;
-  --foreground: #1a1d23;
-  --card: #ffffff;
-  --card-border: #e5e7eb;
-  --brand: #2563eb;
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card: #f6f5f2;
+  --card-border: #e4e1d9;
+  --line-strong: #1a1a1a;
+  --brand: #10412f;
+  --brand-foreground: #ffffff;
+  --secondary: #7a3323;
+  --status-done: #10412f;
+  --status-done-bg: transparent;
+  --status-pending: #7a3323;
+  --status-pending-bg: transparent;
+  --status-muted: #57534a;
 }
 
 @theme inline {
@@ -13,18 +21,35 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-border: var(--card-border);
+  --color-line-strong: var(--line-strong);
   --color-brand: var(--brand);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-secondary: var(--secondary);
+  --color-status-done: var(--status-done);
+  --color-status-done-bg: var(--status-done-bg);
+  --color-status-pending: var(--status-pending);
+  --color-status-pending-bg: var(--status-pending-bg);
+  --color-status-muted: var(--status-muted);
+  --font-sans: var(--font-assistant);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-display: var(--font-fraunces);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0b0d10;
-    --foreground: #e5e7eb;
-    --card: #16181d;
-    --card-border: #2a2d34;
-    --brand: #60a5fa;
+    --background: #17150f;
+    --foreground: #f1ede3;
+    --card: #1e1b14;
+    --card-border: #33301f;
+    --line-strong: #f1ede3;
+    --brand: #57b78e;
+    --brand-foreground: #0e1a14;
+    --secondary: #e08161;
+    --status-done: #57b78e;
+    --status-done-bg: transparent;
+    --status-pending: #e08161;
+    --status-pending-bg: transparent;
+    --status-muted: #c9c2b0;
   }
 }
 

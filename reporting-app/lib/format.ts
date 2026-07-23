@@ -27,14 +27,8 @@ export function formatRelativeDateTime(epochSeconds: number): string {
   });
 }
 
-export function platformLabel(source: string): string {
+export function sourceLabel(source: string): string {
   if (source === "whatsapp") return "WhatsApp";
   if (source === "telegram") return "Telegram";
   return source;
-}
-
-export function platformDotClass(source: string): string {
-  if (source === "whatsapp") return "bg-emerald-500";
-  if (source === "telegram") return "bg-sky-500";
-  return "bg-gray-400";
 }

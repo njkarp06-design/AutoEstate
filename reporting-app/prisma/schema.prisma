@@ -12,12 +12,35 @@ enum RunStatus {
   COMPLETED
 }
 
+// The social network a piece of generated listing content targets - distinct
+// from Run.source (the messaging channel, WhatsApp/Telegram) the listing
+// facts arrived through. Keep these concepts separate; see lib/format.ts.
+enum Platform {
+  INSTAGRAM
+  FACEBOOK
+  YAD2
+}
+
+// How a customer wants a platform's content handled once generated.
+// AUTO_IMMEDIATE/AUTO_AFTER_EDIT are stored preferences only - real
+// auto-posting requires a Meta Business-verified app that doesn't exist yet,
+// so these currently behave like MANUAL in the UI (labeled "coming soon").
+// Facebook/Yad2 have no corresponding field: neither platform's API allows
+// third-party posting at all (Meta retired Groups posting in 2024; Yad2 has
+// no posting API), so there is no real preference to store for them.
+enum PostMode {
+  MANUAL
+  AUTO_IMMEDIATE
+  AUTO_AFTER_EDIT
+}
+
 model Customer {
   id                  String   @id @default(cuid())
   email               String   @unique // set by the operator at onboarding time
   clerkUserId         String?  @unique // backfilled on first login
   displayName         String?
   ingestionSecretHash String   @unique // sha256(secret) - the secret itself is never stored
+  instagramPostMode   PostMode @default(MANUAL)
   createdAt           DateTime @default(now())
   runs                Run[]
 
@@ -44,10 +67,11 @@ model Run {
   displayName     String?
   startedAt       DateTime
   title           String?
-  status          RunStatus    @default(IN_PROGRESS)
+  status          RunStatus            @default(IN_PROGRESS)
   messages        RunMessage[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  platformContent RunPlatformContent[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   @@unique([customerId, hermesTurnId])
   @@index([customerId, startedAt])
@@ -66,4 +90,22 @@ model RunMessage {
   @@unique([runId, role, sortIndex])
   @@index([runId, timestamp, sortIndex])
   @@map("run_messages")
+}
+
+// App-owned per-platform state Hermes doesn't know about: an operator's edit
+// override and whether they've actually posted it. Created lazily (upserted
+// on first edit/mark-posted action) - most runs will have 0-3 rows, never
+// created eagerly by the ingest route.
+model RunPlatformContent {
+  id            String    @id @default(cuid())
+  run           Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId         String
+  platform      Platform
+  editedContent String?   @db.Text // null = show Hermes's original parsed text
+  posted        Boolean   @default(false)
+  postedAt      DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([runId, platform])
+  @@map("run_platform_content")
 }
