@@ -2,13 +2,15 @@
 
 ### Task Overview
 
-Building **AutoEstate**: a productized marketing-automation service for independent real estate agents in Tel Aviv, per [CLAUDE.md](CLAUDE.md) (source of truth — read it first on resume, especially the last few paragraphs of Section 5). This session picked up the two items explicitly deferred from PR #19 (2026-07-23): the reporting-app read-only Listings page ("PR-2"), and a live WhatsApp end-to-end test of the Listing-tracking pipeline. The first is done; the second surfaced a real, unresolved bug.
+Building **AutoEstate**: a productized marketing-automation service for independent real estate agents in Tel Aviv, per [CLAUDE.md](CLAUDE.md) (source of truth — read it first on resume, especially the last few paragraphs of Section 5). This session picked up the two items explicitly deferred from PR #19 (2026-07-23): the reporting-app read-only Listings page ("PR-2"), and a live WhatsApp end-to-end test of the Listing-tracking pipeline. The first is done and merged; the second surfaced a real, unresolved bug that's the intended focus of the *next* session.
 
-GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). **Current branch: `feat/listings-page`** (not `main` — working tree is clean, nothing uncommitted). **PR #21 "Add read-only Listings page to reporting app" is OPEN and MERGEABLE, NOT YET MERGED** — per the user's standing rule (never auto-merge), it needs their explicit go-ahead.
+GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). **Repo is on `main`, clean, up to date with origin. Both PR #21 (Listings page code) and PR #22 (docs) are MERGED** — merged with the user's explicit go-ahead at the end of this session, feature branches deleted both locally and remotely, stale remote-tracking refs pruned. Nothing is pending review; `main` has everything described in this handoff.
+
+**Explicit intent for the next session (stated by the user): resume debugging the gateway footer-omission bug** (see Errors Hit / Debugging Journey below and [[project_gateway_footer_omission_bug]] in memory) — this was accepted as a "known gap" at the end of this session, but the user wants to pick the investigation back up rather than leave it parked. Start there.
 
 ### Files Modified
 
-**In the git repo**, all on branch `feat/listings-page` (PR #21):
+**In the git repo, all now merged to `main` via PR #21** (`feat/listings-page`, branch deleted post-merge):
 - `reporting-app/lib/stat-tile.tsx` — new. `StatTile` extracted out of `run-list.tsx` (was duplicated verbatim) — lives in `lib/` matching the existing `lib/markdown-components.tsx` precedent for shared JSX, not a new `app/components/` directory.
 - `reporting-app/app/run-list.tsx` — now imports `StatTile` from `lib/stat-tile.tsx` instead of defining it inline.
 - `reporting-app/lib/listings.ts` — new. `getListings(customer)` — read-only, no mutation helpers, matches the schema's own "no edit UI in this pass" comment on the `Listing` model.
@@ -16,12 +18,12 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). **Current 
 - `reporting-app/app/listings/page.tsx` + `reporting-app/app/listings/listing-list.tsx` — new. Server-fetch/client-filter split mirroring the existing Activity list pattern exactly. Shows every listing status by default (not just Active), matching a comment already in `app/api/listings/active/route.ts` from PR #19 anticipating this exact page.
 - `reporting-app/app/layout.tsx` — added a "Listings" nav link next to "Settings".
 
-**Also updated this session, on their own dedicated docs branch/PR (matching this repo's established pattern of a separate docs PR per feature, e.g. PR #20 for PR #19) — NOT on `main` yet, NOT part of PR #21's diff:**
+**Also merged to `main` via PR #22** (`docs/update-readme-claude-md-pr21-gateway-bug`, branch deleted post-merge) — matching this repo's established pattern of a separate docs PR per feature (e.g. PR #20 for PR #19):
 - `CLAUDE.md` — new Section 5 entries: the PR #21 build (plan self-review findings, what shipped, verification), and the full live-WhatsApp-test writeup with the gateway bug investigation.
-- `README.md` — status paragraphs updated to reflect PR #21 (built, not merged) and the gateway bug (found, accepted as known gap).
+- `README.md` — status paragraphs updated to reflect PR #21 (merged) and the gateway bug (found, accepted as known gap, revisit planned next session).
 - This file (`session-handoff-2026-07-24.md`).
 
-**PR #22 "Document PR #21 and the gateway footer-omission bug" is OPEN, NOT YET MERGED**, branch `docs/update-readme-claude-md-pr21-gateway-bug`. So on resume there are **two open PRs** (#21 code, #22 docs), neither merged, plus the local repo currently checked out on `feat/listings-page`. Confirm current PR states with `gh pr list` before assuming anything's changed since this was written.
+Both PRs merged in sequence (#21 then #22, no conflicts — they touched disjoint files) with the user's explicit go-ahead. `git fetch --prune` run afterward; no stale branches remain locally or on origin besides `main`.
 
 **Outside the repo** (local machine state, matters for reproducing on another machine):
 - `%LOCALAPPDATA%\hermes\profiles\autoestate\.env` — `ANTHROPIC_API_KEY` confirmed **dead** (HTTP 400: credit balance too low). The gateway currently works anyway because it auto-detects ambient Claude Code OAuth credentials (`~/.claude/.credentials.json`) on this shared machine/account — see Errors Hit. If that OAuth session is ever unavailable, the gateway has no working fallback. Worth fixing (top up the Console credits) even though it isn't blocking anything today.
@@ -53,21 +55,20 @@ Theories tested and ruled out, each with direct evidence (not assumed):
 
 ### Current State
 
-- **PR #21 open, not merged.** Built and verified (lint/build clean, data layer checked against the real dev database with a throwaway customer). Browser verification not done — same known Clerk headless-auth limitation as PR #17 (documented, not a regression).
-- **The real customer's `Listing` table is empty**, confirmed directly against the dev database (not assumed) — because of the gateway bug above, not because of anything wrong in PR #21 itself.
-- **CLAUDE.md/README.md updated** with full detail on both the PR #21 work and the bug investigation — read those directly rather than trusting this summary if anything seems inconsistent.
-- **Memory updated:** new `project_gateway_footer_omission_bug.md` (full evidence trail), `project_listing_memory_digest.md` amended (PR-2 done, live test done, links to the bug memory), `project_reporting_app_activity_layout.md` corrected (a stale claim about `app/page.tsx`'s width), `MEMORY.md` index updated.
+- **PR #21 and PR #22 both merged to `main`.** Local repo is on `main`, clean, up to date, no leftover branches. Listings page verified (lint/build clean, data layer checked against the real dev database with a throwaway customer). Browser verification not done — same known Clerk headless-auth limitation as PR #17 (documented, not a regression).
+- **The real customer's `Listing` table is empty**, confirmed directly against the dev database (not assumed) — because of the gateway bug below, not because of anything wrong in PR #21 itself.
+- **CLAUDE.md/README.md are up to date on `main`** with full detail on both the PR #21 work and the bug investigation — read those directly rather than trusting this summary if anything seems inconsistent.
+- **Memory updated:** new `project_gateway_footer_omission_bug.md` (full evidence trail), `project_listing_memory_digest.md` amended (PR-2 done, live test done, links to the bug memory, notes both PRs merged), `project_reporting_app_activity_layout.md` corrected (a stale claim about `app/page.tsx`'s width), `MEMORY.md` index updated and de-staled.
 - **Gateway is running normally** (non-verbose logging) — the live service is up and working correctly for everything except footer/Listing-tracking on real WhatsApp turns.
 - **Dev server is stopped.** Nothing bound to port 4127 as of end of session.
 
 ### Next Step
 
-Three open decisions, none yet made — surface these to the user rather than assuming an answer:
-1. **Merge PR #21?** It's ready (`gh pr view 21` confirms MERGEABLE), just needs explicit sign-off per the user's standing "never auto-merge" rule.
-2. **How to get real data onto the Listings page** given the gateway bug: manually enter a few real listings by hand (a real `Listing` row via a script, using facts the user actually sent), or leave it empty until the gateway bug is understood/fixed, or something else.
-3. **Whether to pursue the gateway bug further** — it was explicitly parked, but the user may want to revisit, especially since it currently blocks the entire Listing-tracking feature (PR #19 + PR #21) from working on real traffic.
+**Primary, per the user's explicit statement at the end of this session: resume debugging the gateway footer-omission bug.** It was accepted as a "known gap" for this session's purposes, but the user wants to continue the investigation, not leave it permanently parked. Start from the evidence trail in Errors Hit above (or the fuller memory `project_gateway_footer_omission_bug.md`) — six theories are already ruled out with direct evidence, so don't re-test those; the open thread is Hermes's own `gateway/run.py` system-prompt/context assembly for `platform=whatsapp` specifically. Useful next moves not yet tried: diff the exact system-prompt text sent by a real gateway turn against the exact system-prompt text sent by an equivalent CLI turn (both were captured in this session's debug logs, but not diffed against each other line-by-line — only the model name and `finish_reason` were checked); or reach out to Nous Research/check Hermes's own issue tracker for a similar report.
 
-Beyond those: the roadmap's next item after this feature is **re-engagement/just-sold posts** (before the larger-scope buyer-inquiry auto-reply), per the explicit build order the user confirmed on 2026-07-23 (see `project_marketing_automation_roadmap` memory).
+Two smaller open decisions, not yet made — surface these rather than assuming an answer:
+1. **How to get real data onto the Listings page** given the gateway bug: manually enter a few real listings by hand (a real `Listing` row via a script, using facts the user actually sent), or leave it empty until the gateway bug is fixed, or something else.
+2. Once the gateway bug is resolved or parked again: the roadmap's next feature item is **re-engagement/just-sold posts** (before the larger-scope buyer-inquiry auto-reply), per the explicit build order the user confirmed on 2026-07-23 (see `project_marketing_automation_roadmap` memory).
 
 ### How to Resume
 
