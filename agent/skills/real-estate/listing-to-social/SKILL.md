@@ -1,7 +1,7 @@
 ---
 name: listing-to-social
 description: Use when a real estate agent provides new listing details (facts about a property, and optionally photo descriptions or attached photos) and wants ready-to-post content. Turns raw listing facts into platform-formatted Hebrew and English captions for Instagram, a Facebook group, and Yad2.
-version: 0.3.0
+version: 0.3.1
 author: AutoEstate
 license: MIT
 metadata:
@@ -66,23 +66,32 @@ generic and not written for real estate listings. A photo is a source of
 concrete facts like any other — it doesn't license condition or
 availability claims the agent didn't make (see Common Pitfalls).
 
-## One Property Per Response
+## Never Blend Properties
 
-Every response covers exactly one property. Because agent messages can
-arrive as several rapid consecutive WhatsApp/Telegram messages, facts
-belonging to two different properties can end up looking like a single
-request — either because a second listing's facts arrive after you already
-answered an earlier one in this conversation, or because two properties'
-facts are already mixed together within the same incoming message before
-you've responded to either.
+A response must never mix facts from more than one property into the same
+piece of content. Because agent messages can arrive as several rapid
+consecutive WhatsApp/Telegram messages, facts belonging to two different
+properties can end up looking like a single request — either because a
+second listing's facts arrive after you already answered an earlier one in
+this conversation, or because two properties' facts are already mixed
+together within the same incoming message before you've responded to
+either.
 
-In either case: identify the most recent, complete set of facts as the
-current listing and respond to that one only. Don't blend, append, or
-carry over facts from a different property into the same response. Leave
-out any facts that belong to another property — the agent can resend them
-as a separate request. If the current listing's own facts are incomplete,
-ask the normal batched follow-up (see above) rather than filling the gap
-with details that actually belong to the other property.
+- **A new listing arrives after you've already answered an earlier one:**
+  treat it as its own fresh response using only its own facts — don't
+  reference or carry over facts from the earlier, already-answered
+  listing.
+- **Two properties' facts are mixed within a single incoming message:**
+  treat each complete, distinguishable set of facts as its own separate
+  listing, and produce a separate, clearly-labeled, complete response for
+  each one (its own full three-platform, two-language output) rather than
+  trying to merge them into one. The failure this rule exists to prevent
+  is a *single platform's content* citing facts from more than one
+  property (e.g. one Instagram caption with property A's rooms and
+  property B's price) — not the presence of more than one listing in a
+  reply. If any one property's own facts are incomplete on their own, ask
+  the normal batched follow-up for that property specifically, rather than
+  filling the gap with another property's details.
 
 ## Output Format
 
@@ -144,11 +153,13 @@ site.
 6. **Conflating sale and rental pricing.** A rental price is monthly; a sale
    price is a total. Don't infer which one applies — if the agent didn't say,
    it's part of the required batched follow-up, not a guess.
-7. **Blending two properties into one response.** If facts for more than
-   one property show up in the same request — a known consequence of rapid
-   consecutive messages — respond to only the most recent, complete
-   listing. Never combine facts across properties (see One Property Per
-   Response above).
+7. **Blending facts across properties.** If facts for more than one
+   property show up in the same request — a known consequence of rapid
+   consecutive messages — give each property its own complete,
+   clearly-labeled response rather than combining their facts together
+   (see Never Blend Properties above). The problem is facts from different
+   properties appearing in the same piece of content, not multiple
+   listings appearing in the same reply.
 
 ## Verification Checklist
 
@@ -164,8 +175,8 @@ site.
 - [ ] Numbers use sqm and ₪ (unless told otherwise)
 - [ ] Sale vs. rental is clear, and price phrasing (total vs. monthly)
       matches it
-- [ ] Response covers exactly one property — no facts blended in from a
-      different listing that appeared earlier in the conversation or mixed
-      into the same message
+- [ ] No response's content blends facts from more than one property —
+      each listing that appeared earlier in the conversation or mixed into
+      the same message got its own separate, clearly-labeled response
 - [ ] If a photo was attached, only visibly-true details were used — no
       invented condition/availability claims from the image

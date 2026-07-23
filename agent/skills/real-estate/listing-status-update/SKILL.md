@@ -1,7 +1,7 @@
 ---
 name: listing-status-update
 description: Use when a real estate agent wants to announce a change to a listing they already advertised — a price drop, a sale, or going under contract/rented — and wants ready-to-post content. Turns the status change plus the listing's core facts into platform-formatted Hebrew and English posts for Instagram, a Facebook group, and Yad2.
-version: 0.1.0
+version: 0.1.1
 author: AutoEstate
 license: MIT
 metadata:
@@ -40,7 +40,14 @@ never invent it, and never assume it from earlier in the conversation):
 - **Area / neighborhood**, **rooms**, and **size in sqm** — the same core
   identity facts as the original listing, restated. A status post needs to
   stand alone as marketing copy (it's often posted days or weeks after the
-  original), so don't rely on conversation memory to fill these in.
+  original), so don't rely on conversation memory to fill these in — this
+  applies even if you can actually recall these facts from earlier in this
+  same conversation (e.g. an earlier `listing-to-social` exchange). If the
+  agent's current message doesn't restate them itself, treat them as
+  missing and ask, even though you technically know them. The point isn't
+  that the facts are unknown to you — it's that the agent must actively
+  confirm them for this specific post, so a stale or misremembered detail
+  can't slip through uncaught.
 - **Status type** — price drop / sold / under contract (or rented, for a
   rental) — never assume which one; ask if it's ambiguous.
 - Status-specific facts:
@@ -103,7 +110,12 @@ Formal and factual, no emoji, no hashtags — but its role depends on status:
    assume — this includes the status type itself.
 2. **Assuming identity facts from earlier in the conversation.** Area,
    rooms, and size must be restated for this request, not carried over
-   silently — the post needs to stand alone.
+   silently — the post needs to stand alone. This includes cases where you
+   can technically recall the facts from earlier in this same conversation
+   (e.g. the original `listing-to-social` exchange): recalling them is not
+   the same as the agent restating them, and only the latter satisfies this
+   requirement. If the current message doesn't restate them, ask — don't
+   fill the gap from memory just because you happen to have it.
 3. **Skipping a language or platform.** All three platforms, both
    languages, every time — including a full Yad2 section for a "sold"
    status (see Output Format), just with a different role than a price
@@ -130,7 +142,8 @@ Formal and factual, no emoji, no hashtags — but its role depends on status:
       (see Output Format)
 - [ ] Yad2 section matches the status: full updated description for a
       price drop, short factual status note for sold/under contract
-- [ ] No fact appears that wasn't in the agent's input, including no
-      identity facts silently carried over from earlier in the conversation
+- [ ] No fact appears that wasn't in the agent's *current* input, including
+      no identity facts silently carried over from earlier in the
+      conversation — even ones you could technically recall
 - [ ] Response covers exactly one property
 - [ ] Numbers use sqm and ₪ (unless told otherwise)
