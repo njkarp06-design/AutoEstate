@@ -91,21 +91,6 @@ export default async function RunPage({
         </p>
       </div>
 
-      {precursorMessages.length > 0 && (
-        <div className="mt-4 space-y-3">
-          {precursorMessages.map((m, i) => (
-            <div key={i} className="border border-card-border p-5">
-              <p className="mb-3 font-mono text-xs uppercase tracking-wide text-status-muted">
-                {m.role === "user" ? "What you sent" : "Agent asked"}
-              </p>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                {m.content}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-
       {assistantMessage && parsed && (
         <div className="mt-8 space-y-6">
           {parsed.matched && parsed.multipleListingsDetected && (
@@ -156,6 +141,24 @@ export default async function RunPage({
             </div>
           )}
         </div>
+      )}
+
+      {precursorMessages.length > 0 && (
+        <details className="mt-10 border-t border-card-border pt-3">
+          <summary className="cursor-pointer font-mono text-xs uppercase tracking-wide text-status-muted">
+            Original request
+          </summary>
+          <div className="mt-3 space-y-3 text-xs leading-relaxed text-status-muted">
+            {precursorMessages.map((m, i) => (
+              <p key={i} className="whitespace-pre-wrap">
+                <span className="font-mono uppercase">
+                  {m.role === "user" ? "You: " : "Agent: "}
+                </span>
+                {m.content}
+              </p>
+            ))}
+          </div>
+        </details>
       )}
     </main>
   );

@@ -118,11 +118,13 @@ export async function getRuns(customer: Customer): Promise<Run[]> {
         id: last.id,
         source: last.source,
         displayName: last.displayName,
-        // The first run's startedAt/title - when the listing request
-        // actually began, and what the agent was originally asked.
+        // The first run's startedAt - when the listing request actually
+        // began. Title prefers the group's clean, generated-content-derived
+        // title (see run-grouping.ts); falls back to the first run's raw,
+        // agent-message-derived title while still waiting on a reply.
         startedAt: toEpochSeconds(first.startedAt),
         status: toRunStatus(last.status),
-        title: first.title,
+        title: group.listingTitle ?? first.title,
       };
     })
     .sort((a, b) => b.startedAt - a.startedAt);
@@ -177,7 +179,7 @@ export async function getRun(id: string, customer: Customer): Promise<RunDetail 
     displayName: last.displayName,
     startedAt: toEpochSeconds(first.startedAt),
     status: toRunStatus(last.status),
-    title: first.title,
+    title: group.listingTitle ?? first.title,
     messages: group.runs.flatMap((r) =>
       r.messages.map((m) => ({
         role: m.role,

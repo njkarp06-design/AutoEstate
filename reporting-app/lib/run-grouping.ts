@@ -1,4 +1,4 @@
-import { splitPlatformContent } from "@/lib/platform-content";
+import { splitPlatformContent, deriveListingTitle } from "@/lib/platform-content";
 
 // A minimal structural shape, not an import of Prisma's generated Run/
 // RunMessage types - same decoupling convention as lib/db.ts's DbPlatform.
@@ -25,6 +25,12 @@ export type RunGroup<T extends GroupableRun = GroupableRun> = {
   // first turn, group.runs.at(-1) is the turn that either produced the real
   // generated content or is the latest turn while still waiting on a reply.
   runs: T[];
+  // A clean one-line title derived from the closing run's generated Yad2
+  // content (see deriveListingTitle) - null if the group hasn't produced
+  // real content yet (still waiting on a reply) or the content didn't
+  // split as expected, in which case callers should fall back to the first
+  // run's own raw-derived title.
+  listingTitle: string | null;
 };
 
 function latestAssistantMessage<M extends GroupableMessage>(run: GroupableRun<M>): M | undefined {
@@ -33,10 +39,11 @@ function latestAssistantMessage<M extends GroupableMessage>(run: GroupableRun<M>
     .findLast((m) => m.role === "assistant");
 }
 
-function isCompletedListing(run: GroupableRun): boolean {
+function matchedContent(run: GroupableRun) {
   const assistantMessage = latestAssistantMessage(run);
-  if (!assistantMessage) return false;
-  return splitPlatformContent(assistantMessage.content).matched;
+  if (!assistantMessage) return null;
+  const parsed = splitPlatformContent(assistantMessage.content);
+  return parsed.matched ? parsed : null;
 }
 
 /**
@@ -72,13 +79,15 @@ export function groupRunsIntoListings<T extends GroupableRun>(runs: T[]): RunGro
   for (const run of runs) {
     let group = openGroupBySession.get(run.hermesSessionId);
     if (!group) {
-      group = { runs: [] };
+      group = { runs: [], listingTitle: null };
       groups.push(group);
       openGroupBySession.set(run.hermesSessionId, group);
     }
     group.runs.push(run);
 
-    if (isCompletedListing(run)) {
+    const parsed = matchedContent(run);
+    if (parsed) {
+      group.listingTitle = deriveListingTitle(parsed.sections.yad2);
       openGroupBySession.delete(run.hermesSessionId);
     }
   }

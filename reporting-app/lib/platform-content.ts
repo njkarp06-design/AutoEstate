@@ -87,3 +87,74 @@ export function splitPlatformContent(raw: string): ParsedPlatformContent {
     },
   };
 }
+
+const HEBREW_CHAR_RE = /[֐-׿]/;
+const ENGLISH_WORD_RE = /english/i;
+
+export type LanguageSplit =
+  | { matched: true; hebrew: string; english: string }
+  | { matched: false };
+
+/**
+ * Splits a platform section's content into its Hebrew and English halves,
+ * keyed off Hermes's own "Hebrew version first... English version second,
+ * clearly labeled" convention (real output labels these "**🇮🇱 עברית:**" /
+ * "**🇬🇧 English:**") - NOT per-paragraph script-majority voting, which
+ * mis-files a mixed-script hashtag line (real Hermes hashtag lines mix
+ * Hebrew and English tags) into the wrong half whenever that particular
+ * line happens to have more Latin characters than Hebrew ones. Falls back
+ * to unmatched if a confident Hebrew-then-English marker pair isn't found.
+ */
+export function splitByLanguage(text: string): LanguageSplit {
+  const lines = text.split("\n");
+  let heAt: number | undefined;
+  let enAt: number | undefined;
+
+  lines.forEach((line, i) => {
+    if (!isHeaderLine(line)) return;
+    if (heAt === undefined && HEBREW_CHAR_RE.test(line)) heAt = i;
+    if (enAt === undefined && ENGLISH_WORD_RE.test(line)) enAt = i;
+  });
+
+  if (heAt === undefined || enAt === undefined || !(heAt < enAt)) {
+    return { matched: false };
+  }
+
+  return {
+    matched: true,
+    hebrew: lines.slice(heAt + 1, enAt).join("\n").trim(),
+    english: lines.slice(enAt + 1).join("\n").trim(),
+  };
+}
+
+const MAX_TITLE_LENGTH = 70;
+
+/**
+ * A clean one-line listing title (e.g. "3-room apartment for sale in
+ * Florentin, Tel Aviv.") derived from a completed listing's Yad2 content -
+ * the skill's most consistently factual platform, whose first line is
+ * always "location and property type" per listing-to-social's SKILL.md
+ * Output Format spec (same convention in listing-status-update). Prefers
+ * this over the raw first line of whatever the agent originally typed,
+ * which is often a long comma-separated fact dump or, when a photo was
+ * sent, a multi-paragraph auto-generated image description.
+ *
+ * Returns null if the Yad2 content doesn't split into Hebrew/English halves
+ * (unexpected format drift) - callers should fall back to a raw-derived
+ * title in that case rather than show a garbled or Hebrew-first line.
+ */
+export function deriveListingTitle(yad2Content: string): string | null {
+  const split = splitByLanguage(yad2Content);
+  if (!split.matched) return null;
+
+  const firstLine = split.english
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
+  if (!firstLine) return null;
+
+  const title = firstLine.replace(/\.$/, "");
+  return title.length > MAX_TITLE_LENGTH
+    ? title.slice(0, MAX_TITLE_LENGTH - 1).trimEnd() + "…"
+    : title;
+}

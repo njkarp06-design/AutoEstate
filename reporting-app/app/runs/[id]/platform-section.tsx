@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import ReactMarkdown from "react-markdown";
 import { markdownComponents } from "@/lib/markdown-components";
 import { formatRelativeDateTime } from "@/lib/format";
-import { platformDisplayName, type PlatformKey } from "@/lib/platform-content";
+import { platformDisplayName, splitByLanguage, type PlatformKey } from "@/lib/platform-content";
 import type { InstagramPostMode } from "@/lib/customer";
 
 const POST_MODE_LABELS: Record<InstagramPostMode, string> = {
@@ -12,54 +12,6 @@ const POST_MODE_LABELS: Record<InstagramPostMode, string> = {
   AUTO_IMMEDIATE: "Auto-post immediately (coming soon)",
   AUTO_AFTER_EDIT: "Auto-post after edit (coming soon)",
 };
-
-const HEBREW_CHAR_RE = /[֐-׿]/;
-const ENGLISH_WORD_RE = /english/i;
-
-type LanguageSplit =
-  | { matched: true; hebrew: string; english: string }
-  | { matched: false };
-
-// Same header-line test as lib/platform-content.ts's isHeaderLine.
-function isHeaderLine(line: string): boolean {
-  const t = line.trim();
-  return /^#{1,6}\s+\S/.test(t) || /^\*\*[^*]+\*\*:?\s*$/.test(t);
-}
-
-/**
- * Splits a platform section's content into its Hebrew and English halves so
- * they can render as mirrored columns, for display only (editing still
- * works on the whole string). Uses the same structural-header approach as
- * lib/platform-content.ts's platform split, keyed off Hermes's own "Hebrew
- * version first... English version second, clearly labeled" convention
- * (real output labels these "**🇮🇱 עברית:**" / "**🇬🇧 English:**") - NOT
- * per-paragraph script-majority voting, which mis-files a mixed-script
- * hashtag line (real Hermes hashtag lines mix Hebrew and English tags) into
- * the wrong column whenever that particular line happens to have more Latin
- * characters than Hebrew ones. Falls back to unmatched (render as one
- * column) if a confident Hebrew-then-English marker pair isn't found.
- */
-function splitByLanguage(text: string): LanguageSplit {
-  const lines = text.split("\n");
-  let heAt: number | undefined;
-  let enAt: number | undefined;
-
-  lines.forEach((line, i) => {
-    if (!isHeaderLine(line)) return;
-    if (heAt === undefined && HEBREW_CHAR_RE.test(line)) heAt = i;
-    if (enAt === undefined && ENGLISH_WORD_RE.test(line)) enAt = i;
-  });
-
-  if (heAt === undefined || enAt === undefined || !(heAt < enAt)) {
-    return { matched: false };
-  }
-
-  return {
-    matched: true,
-    hebrew: lines.slice(heAt + 1, enAt).join("\n").trim(),
-    english: lines.slice(enAt + 1).join("\n").trim(),
-  };
-}
 
 type Props = {
   platform: PlatformKey;
