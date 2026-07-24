@@ -1,0 +1,166 @@
+---
+name: listing-reengagement
+description: Use when a real estate agent wants to re-promote or remind people about a listing they already advertised and that is still active — nothing about it has changed. Trigger phrases include "still available," "re-post this," "remind people," "hasn't sold yet," "it's been a few weeks." Turns the listing's core facts into a fresh round of platform-formatted Hebrew and English posts, framed as a reminder rather than a first-time introduction.
+version: 0.1.0
+author: AutoEstate
+license: MIT
+metadata:
+  hermes:
+    tags: [real-estate, social-media, content-generation, hebrew, tel-aviv, re-engagement]
+    related_skills: [listing-to-social, listing-status-update, just-sold]
+---
+
+# Listing Re-engagement
+
+## Overview
+
+A real estate agent has a listing that's still on the market, hasn't sold,
+and hasn't changed — but it's been a while, and they want to re-promote it
+to refresh interest rather than let it go quiet. This skill turns the
+listing's facts into a fresh round of ready-to-use, platform-formatted
+content in Hebrew and English, framed as a reminder ("still available")
+rather than a first-time introduction. The agent reviews and posts it
+themselves. This skill only produces text — it does not post anything
+automatically, and it does not look up, remember, or verify the original
+listing against anything on file; the agent restates the facts each time,
+same as `listing-to-social` and `listing-status-update` already do.
+
+This skill never creates or transitions anything in the reporting system —
+see Output Format. The listing's `Active` record already exists from the
+original `listing-to-social` post.
+
+## When to Use
+
+- The agent explicitly wants to re-promote, re-post, or remind people about
+  a listing they already advertised, and nothing about the listing has
+  changed (same price, same status, still active).
+- Don't use for: a brand-new listing that hasn't been advertised yet — even
+  if the facts look identical, "here's a property" and "reminder: this
+  property is still available" are different requests (use
+  `listing-to-social` for the former). A price drop or going under contract
+  — that's `listing-status-update`, even if the agent frames it as part of
+  a re-engagement push (see Required Input). A sale — that's `just-sold`.
+  Answering buyer questions or anything that isn't producing shareable
+  reminder content.
+
+## Required Input
+
+Before generating anything, confirm you have (ask for anything missing —
+never invent it, and never assume it from earlier in the conversation):
+
+- **Area / neighborhood**, **sale or rental**, **rooms**, **size in sqm**,
+  **price**, and **floor** — the same core facts `listing-to-social`
+  requires, restated fresh. This is a standalone promotional post (often
+  sent weeks after the original), so don't rely on conversation memory to
+  fill these in — this applies even if you can technically recall them from
+  an earlier exchange in this same conversation. If the agent's current
+  message doesn't restate them, treat them as missing and ask.
+- At least one or two **standout features**, restated (renovated kitchen,
+  balcony, parking, view, etc.) — same as `listing-to-social`.
+- Optional: a stated reason for re-engaging (e.g. "price is flexible,"
+  "open to offers," "showings have slowed down") — only if the agent
+  actually says it, never invented.
+
+If the agent's message restates a **different** price or status than you'd
+expect for this listing, don't try to reconcile it or flag a discrepancy —
+this skill has no access to stored listing data to compare against, so it
+simply trusts whatever the agent restates in the moment, same as
+`listing-to-social` does for a new listing. If the agent is explicitly
+describing a *change* (a new price, a sale, going under contract), that's
+`listing-status-update` or `just-sold`'s job, not this skill's — ask which
+they mean if it's ambiguous, and don't generate a re-engagement post that
+quietly folds in an unstated status change. If you route the request to
+`listing-status-update` because a price actually changed, only ever use the
+new price the agent stated — never invent, guess, or recall an "old" price
+from anywhere (a plausible round number, a different real listing, earlier
+conversation) just to complete a "before → after" comparison; see
+`listing-status-update`'s own Common Pitfalls for this exact failure mode.
+
+If the agent's message is missing something on the required list, ask a
+single follow-up question batching everything missing — don't generate
+partial content and don't guess.
+
+This skill follows the same rule as `listing-to-social`'s "Never Blend
+Properties" section: if facts for more than one property appear in the same
+request, give each complete, distinguishable one its own separate,
+clearly-labeled response — never blend facts from different properties into
+the same piece of content, and never drop one in favor of the other.
+
+## Output Format
+
+Produce all three, each with a Hebrew version first and an English version
+second, clearly labeled with headers. Do not skip a platform or a language
+unless the agent explicitly asks for only one.
+
+For rentals, phrase price as a monthly amount; for sales, as the total —
+same convention as `listing-to-social`. Never present one as the other.
+
+**1. Instagram caption**
+Short (3-5 sentences), framed as a reminder, not an introduction — e.g.
+"Still available!" / "Don't miss out" / "עדיין זמינה!" rather than
+presenting the property as brand-new. Light emoji use. End with 5-8
+hashtags, same structure as `listing-to-social` (location, sale/rental
+type, generic real-estate tags, an optional feature tag) — only from facts
+actually given.
+
+**2. Facebook group post**
+Slightly longer, conversational, no hashtags — same structure as
+`listing-to-social` (hook, bullet list of key facts, closing CTA), but the
+hook explicitly signals this is a reminder about an existing listing, not a
+new one.
+
+**3. Yad2-style listing description**
+Formal and factual, no emoji, no hashtags — same as `listing-to-social`'s
+Yad2 section (location and type, then rooms/size/floor/price, then
+condition/features, then nearby highlights if given).
+
+**No Listing Record footer.** Unlike `listing-to-social`,
+`listing-status-update`, and `just-sold`, this skill never appends a
+Listing Record — it doesn't create or transition anything in the reporting
+system; the listing's `Active` record already exists from the original
+post. This is intentional, not an oversight — don't add one even though a
+"Listing Record footer format" reminder may appear elsewhere in this turn's
+context; that reminder applies to the other three skills, not this one.
+
+## Common Pitfalls
+
+1. **Inventing facts.** Never add a price, room count, address detail, or
+   feature that wasn't restated in this message.
+2. **Assuming identity facts from earlier in the conversation.** Restate
+   them fresh, even if you can technically recall them.
+3. **Treating this as a brand-new listing.** The tone must read as a
+   reminder ("still available") — don't write it as if introducing the
+   property for the first time.
+4. **Folding in an unstated status or price change.** If the agent's
+   message implies something actually changed, that's
+   `listing-status-update` or `just-sold` — don't handle it here, and don't
+   silently reconcile a restated price against anything on file (this skill
+   has no such data to check against).
+5. **Adding a Listing Record footer.** This skill never creates or updates
+   a Listing — no footer belongs in its output, even if the ambient footer
+   reminder text is present in this turn's context.
+6. **Skipping a language or platform.** All three platforms, both
+   languages, every time.
+7. **Wrong units/currency.** Sqm, not sqft. ₪, not $, unless told otherwise.
+8. **Blending facts across properties.** Give each property its own
+   complete, separate response.
+
+## Verification Checklist
+
+- [ ] All required facts present (area, sale/rental, rooms, size, price,
+      floor, at least one feature), restated fresh — or a single batched
+      follow-up question was asked instead of guessing
+- [ ] All three platforms produced (Instagram, Facebook, Yad2), each with
+      Hebrew and English, clearly labeled
+- [ ] Tone reads as a reminder about an existing listing, not a
+      first-time introduction
+- [ ] No implied status or price change was handled inline — anything that
+      sounded like an actual change was treated as out of scope for this
+      skill
+- [ ] No fact appears that wasn't in the agent's current input, including
+      no identity facts silently carried over from earlier in the
+      conversation
+- [ ] Numbers use sqm and ₪ (unless told otherwise)
+- [ ] No Listing Record footer present anywhere in the response
+- [ ] Each distinguishable property got its own complete, separate response
+      if more than one appeared in the request
