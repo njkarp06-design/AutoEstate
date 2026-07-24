@@ -64,6 +64,20 @@ The reporting app has a per-platform Instagram post-action preference, but the a
 
 ---
 
+## 🧰 Repo tooling / docs automation
+
+### 9. End-of-session hook that updates README.md
+Wanted 2026-07-25. The doc-sync hook keeps `CLAUDE.md`, `TODO.md` and the session-handoff file current *during* a session, but `README.md` is untouched by it and drifts. Goal: refresh the README properly when a session ends.
+
+- [ ] Confirm the mechanism. A `Stop` hook is the likely fit (fires when a session finishes) — check the current Claude Code hooks reference via `/hooks` rather than assuming, since `UserPromptSubmit` (what doc-sync uses) is the wrong event for this.
+- [ ] Resolve the core design problem before building: a hook runs a **shell command**, so it cannot write good prose by itself. It must either (a) feed instructions back to the model and let it make the edit, or (b) run a deterministic script that regenerates only mechanical sections. Pick one — (b) is more reliable, (a) is more useful.
+- [ ] Decide what "properly" means, i.e. which README sections are hook-owned vs. hand-written. README is the **public-facing** description; CLAUDE.md is the internal brief. Blindly syncing internal state into it would leak working detail and make it worse, not better.
+- [ ] Decide churn tolerance — a README rewritten every session makes noisy diffs in a history that is otherwise meaningful PRs. Consider firing only when something user-visible actually changed.
+- [ ] Make it respect the branch-and-PR workflow (never commit straight to `main`), same as the doc-sync hook.
+- [ ] Verify it fails open — a `Stop` hook that errors or blocks makes ending a session painful.
+
+---
+
 ## 🐛 Known small issues / awareness (not blocking, no owner yet)
 
 - [ ] **Batched-follow-up rule occasionally violated:** the agent sometimes asks for missing facts (e.g. rooms, then sqm) as separate single-field questions instead of one batched question. Pre-existing, flagged in PR #26, unrelated to the locator feature.
