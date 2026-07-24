@@ -29,6 +29,16 @@ missed keyword match would silently omit the reminder on a genuine listing
 turn - the same silent-failure shape as the original bug. Costing a few
 dozen extra tokens on unrelated messages is cheap next to another
 silently-untracked listing.
+
+The reminder also carries the no-locator confirmation-deferral rule for
+status-mutating footers (PR #26's design). It originally lived only in
+listing-status-update/just-sold's SKILL.md - which a long-lived session
+never reloads (the same compliance gap above), so the first real live test
+of that path emitted a Sold footer immediately, mutating the Listing table
+with no confirmation: the model followed this plugin's then-unconditional
+"the footer is not optional" text, the only instruction actually in its
+context. The rule has to live here, in the channel the model demonstrably
+obeys, not only in the skill file.
 """
 
 SYNCED_PLATFORMS = {"whatsapp", "telegram"}
@@ -57,6 +67,34 @@ LISTING_RECORD_REMINDER = (
     "For a COMPLETED SALE (just-sold), same 7-line format in the same "
     "position, but Status is Sold - just-sold is the only skill that ever "
     "sets Status: Sold.\n\n"
+    "EXCEPTION - status change or sale with no stated identity: if the "
+    "message announcing a status change or completed sale neither restates "
+    "the listing's identity facts (area + rooms + size) nor names a locator "
+    "(street, neighborhood, or nickname identifying which listing), do NOT "
+    "append the Listing Record footer this turn - even if the active "
+    "listings context shows exactly one listing. This footer updates the "
+    "tracking database the moment it is sent, with no undo, so it needs a "
+    "confirmed identity first. START your reply with a short, friendly "
+    "intro - the very first thing in the message, before the post content, "
+    "so it can't be missed - not a soft sign-off buried at the end. In two "
+    "or three plain-language lines it should: (1) say what is below - the "
+    "draft post for this status change or sale, naming the listing's "
+    "identity facts (area + rooms + sqm) so a wrong match is obvious; (2) "
+    "explain that replying to confirm will record this update to their "
+    "AutoEstate dashboard (the reporting website where their listings and "
+    "activity are tracked) - NOT post it to Instagram/Facebook/Yad2, which "
+    "they still do themselves; and (3) tell them exactly how to confirm. "
+    "Then a divider, then the post content as normal. Use this shape "
+    "(adapt the wording naturally, keep the substance):\n"
+    "\"📋 Here's your draft SOLD post for the <area> listing (<rooms> "
+    "rooms, <sqm> sqm) - review it below. Reply *yes* to confirm it's the "
+    "right listing and I'll log this sale in your AutoEstate dashboard "
+    "(you still post the content yourself).\\n---\\n"
+    "<the post content follows here>\"\n"
+    "Do NOT append the Listing Record footer this turn; add it only in the "
+    "follow-up turn after the sender confirms. This exception never applies "
+    "to a NEW listing (listing-to-social) - its facts are stated in the "
+    "message itself, so its footer is always appended immediately.\n\n"
     "A re-engagement / \"still available\" post (listing-reengagement) "
     "gets NO footer at all - it doesn't change the listing's status, so "
     "don't add one just because this reminder is present.\n\n"
