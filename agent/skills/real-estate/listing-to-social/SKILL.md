@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [real-estate, social-media, content-generation, hebrew, tel-aviv]
-    related_skills: [listing-status-update]
+    related_skills: [listing-status-update, just-sold, listing-reengagement]
 ---
 
 # Listing-to-Social Pipeline
@@ -27,6 +27,9 @@ does not edit or select photos.
   condition, standout features) for a property they want to advertise.
 - Don't use for: answering buyer questions, drafting private replies to a
   lead, or anything that isn't producing shareable listing content.
+  Re-promoting a listing that's already been advertised and hasn't changed
+  — that's `listing-reengagement`, even if the restated facts look
+  identical to a first-time listing.
 
 ## Required Input
 
