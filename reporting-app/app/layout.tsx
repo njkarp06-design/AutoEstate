@@ -63,6 +63,9 @@ export default function RootLayout({
               </Show>
               <Show when="signed-in">
                 <div className="flex items-center gap-4 font-mono text-xs uppercase tracking-wide">
+                  <Link href="/" className="text-status-muted hover:text-foreground">
+                    Activity
+                  </Link>
                   <Link href="/listings" className="text-status-muted hover:text-foreground">
                     Listings
                   </Link>

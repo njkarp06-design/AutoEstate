@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { Listing, ListingStatus } from "@/lib/listings";
 import {
   formatPrice,
@@ -102,34 +103,50 @@ export function ListingList({ listings }: { listings: Listing[] }) {
         </div>
       ) : (
         <ul>
-          {filtered.map((listing) => (
-            <li
-              key={listing.id}
-              className="flex items-center justify-between gap-4 border-b border-card-border py-4"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-display text-[1.05rem] font-semibold">
-                  {listing.rooms}-room {transactionTypeLabel(listing.transactionType).toLowerCase()} in {listing.area}
-                </p>
-                <p className="mt-1 font-mono text-xs uppercase tracking-wide text-status-muted">
-                  {listing.sqm} sqm
-                  {listing.floor !== null ? ` · Floor ${listing.floor}` : ""}
-                  {" · "}
-                  {formatPrice(listing.price)}
-                  {" · Updated "}
-                  {formatRelativeDateTime(listing.updatedAt)}
-                </p>
-              </div>
-              <span
-                className={
-                  "flex shrink-0 items-center border px-2.5 py-1 font-mono text-xs uppercase tracking-wide " +
-                  statusToneClasses(listing.status)
-                }
-              >
-                {statusLabel(listing.status)}
-              </span>
-            </li>
-          ))}
+          {filtered.map((listing) => {
+            const rowContent = (
+              <>
+                <div className="min-w-0">
+                  <p className="truncate font-display text-[1.05rem] font-semibold">
+                    {listing.rooms}-room {transactionTypeLabel(listing.transactionType).toLowerCase()} in {listing.area}
+                  </p>
+                  <p className="mt-1 font-mono text-xs uppercase tracking-wide text-status-muted">
+                    {listing.sqm} sqm
+                    {listing.floor !== null ? ` · Floor ${listing.floor}` : ""}
+                    {" · "}
+                    {formatPrice(listing.price)}
+                    {" · Updated "}
+                    {formatRelativeDateTime(listing.updatedAt)}
+                  </p>
+                </div>
+                <span
+                  className={
+                    "flex shrink-0 items-center border px-2.5 py-1 font-mono text-xs uppercase tracking-wide " +
+                    statusToneClasses(listing.status)
+                  }
+                >
+                  {statusLabel(listing.status)}
+                </span>
+              </>
+            );
+
+            return (
+              <li key={listing.id} className="border-b border-card-border">
+                {listing.latestRunId ? (
+                  <Link
+                    href={`/runs/${listing.latestRunId}`}
+                    className="flex items-center justify-between gap-4 py-4 transition hover:bg-card"
+                  >
+                    {rowContent}
+                  </Link>
+                ) : (
+                  <div className="flex items-center justify-between gap-4 py-4">
+                    {rowContent}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
