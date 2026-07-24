@@ -24,6 +24,13 @@ export type Listing = {
   price: number | null;
   status: ListingStatus;
   updatedAt: number; // epoch seconds - same convention as lib/db.ts's Run
+  // The Run whose generated posts (Instagram/Facebook/Yad2) this listing
+  // came from, most-recent first - lets the UI link out to /runs/[id].
+  // Null when no Run points at this listing: Run.listingId is left null for
+  // a turn that mixed two distinguishable listings (see the Run model
+  // comment and app/api/ingest/route.ts) - both Listing rows are still
+  // created/updated correctly, they just have no single Run to link back to.
+  latestRunId: string | null;
 };
 
 /**
@@ -38,6 +45,13 @@ export async function getListings(customer: Customer): Promise<Listing[]> {
   const listings = await prisma.listing.findMany({
     where: { customerId: customer.id },
     orderBy: { updatedAt: "desc" },
+    include: {
+      runs: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { id: true },
+      },
+    },
   });
 
   return listings.map((l) => ({
@@ -50,5 +64,6 @@ export async function getListings(customer: Customer): Promise<Listing[]> {
     price: l.price,
     status: toListingStatus(l.status),
     updatedAt: Math.floor(l.updatedAt.getTime() / 1000),
+    latestRunId: l.runs[0]?.id ?? null,
   }));
 }
