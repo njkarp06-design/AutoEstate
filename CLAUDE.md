@@ -25,6 +25,12 @@ I'm a full-stack engineer: JS/TS, Node/Express, Next.js, Python, PostgreSQL, AWS
 **My git workflow (follow it exactly):**
 `git checkout main` → `git pull` → `git checkout -b feat/<task>` (existing branch: drop the `-b`) → work → `git add .` → `git commit -m "..."` → `git push -u origin feat/<task>` → open a PR into main. One feature branch per task.
 
+**Doc-sync hook (added 2026-07-25).** `.claude/settings.json` holds a `UserPromptSubmit` hook that injects a standing reminder on every prompt: keep this file, `TODO.md` and the current `session-handoff-YYYY-MM-DD.md` equal to the complete current truth, updating them *at the moment* something changes rather than at end of turn. It enumerates what counts as a change (TODO item and phase status, Hermes or infra or reporting-app changes, outside news reported by me, decisions and deferrals with their reasoning) and requires absolute dates and correcting stale statements rather than appending to them. It carries the three-way routing exactly as `TODO.md` states it — brief/architecture here, task status there, stopping point in the handoff file — and tells sessions not to duplicate task status into this file. Review or disable via `/hooks`.
+
+It is tracked deliberately — `.gitignore` narrows the old blanket `.claude/` exclusion to `.claude/*` plus a negation, so this one file versions while worktrees and any `settings.local.json` stay local.
+
+Two limits worth knowing. It only sees what happens inside a Claude Code session, so anything changed elsewhere reaches the docs only when I mention it. And it keeps the docs *current*, not *correct* — it cannot tell whether an entry was true when written. In a sibling project a fabricated claim about a document a client had supposedly sent survived in CLAUDE.md as established fact across several sessions and drove real work before being caught. Hence the hook's instruction to verify system facts by running something, and to confirm claims about what a person said before acting on them.
+
 ## 4. Verify the ground truth before building
 I'm working partly from second-hand sources about Hermes, so **before writing any code**, find and read the **official Hermes documentation** and confirm:
 - what Hermes actually is and who maintains it,

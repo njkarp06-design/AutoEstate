@@ -43,11 +43,13 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). **Repo is 
 - Direct Listing row via Prisma: a throwaway `.mts` in `reporting-app/` importing `./lib/prisma`, run with `npx tsx --env-file=.env.local <file>.mts` (NOT `@prisma/client` directly — the generated client is at `@/prisma/generated/prisma/client`, and env must be loaded via `--env-file=.env.local` or the pg adapter throws "client password must be a string").
 - Live session transcript / injected context: `~/hermes/profiles/autoestate/state.db`, `messages` table. The **`api_content`** column is the literal text sent to the model (includes plugin-injected context); the **`content`** column is the persisted assistant reply. Columns are `timestamp` (float epoch), not `created_at`.
 
-### Next Step — ordered
+### Next Step
 
-1. **(Optional, ~2 min) Fully close PR #28's turn-two verification** — see Verification status above. Not blocking anything; the fix is merged and turn one is proven.
-2. **Next roadmap item: buyer-inquiry auto-reply** (see `project_marketing_automation_roadmap` memory). Deliberately last on the roadmap — inbound, not outbound: a new sender/allowlist model and a materially different trust surface than the existing operator-only allowlist. Biggest lift, most differentiated pitch value. Nothing blocks starting it.
-3. **Longer-standing deferred items** (unchanged, still outstanding, not blocking): `terraform apply` to a real Hetzner account (infra module written + validated, never applied — no Hetzner account exists yet) and a Vercel Pro deployment of the reporting app (still `npm run dev`-only). Revisit when there's a real customer to onboard.
+**`TODO.md` (repo root) owns the full task list, order, and sub-checklists** — read it first. The short version of what to pick up:
+
+1. **(Optional, ~2 min) Fully close PR #28's turn-two verification** — see Verification status above. Not blocking; the fix is merged and turn one is proven. (TODO.md item 1.)
+2. **Next roadmap item: buyer-inquiry auto-reply** — deliberately last on the roadmap, inbound (new sender/allowlist + trust surface), biggest lift. (TODO.md item 2.)
+3. Everything else (Hetzner `terraform apply`, Vercel deploy, Phase 5 security items, known small issues) is captured and prioritized in TODO.md.
 
 ### How to Resume
 
