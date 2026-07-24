@@ -2,73 +2,52 @@
 
 ### Task Overview
 
-Building **AutoEstate**: a productized marketing-automation service for independent real estate agents in Tel Aviv, per [CLAUDE.md](CLAUDE.md) (source of truth — read it first on resume, especially the last few paragraphs of Section 5). This session picked up the two items explicitly deferred from PR #19 (2026-07-23): the reporting-app read-only Listings page ("PR-2"), and a live WhatsApp end-to-end test of the Listing-tracking pipeline. The first is done and merged; the second surfaced a real, unresolved bug that's the intended focus of the *next* session.
+Building **AutoEstate**: a productized marketing-automation service for independent real estate agents in Tel Aviv, per [CLAUDE.md](CLAUDE.md) (source of truth — read it first on resume, especially the last few paragraphs of Section 5). This session's explicit goal, picked up from the previous handoff: resume debugging the gateway footer-omission bug rather than leave it as an accepted "known gap." It's now **resolved and merged**, plus two reporting-app UX gaps the user caught by actually using the app were fixed in the same PR.
 
-GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). **Repo is on `main`, clean, up to date with origin. Both PR #21 (Listings page code) and PR #22 (docs) are MERGED** — merged with the user's explicit go-ahead at the end of this session, feature branches deleted both locally and remotely, stale remote-tracking refs pruned. Nothing is pending review; `main` has everything described in this handoff.
-
-**Explicit intent for the next session (stated by the user): resume debugging the gateway footer-omission bug** (see Errors Hit / Debugging Journey below and [[project_gateway_footer_omission_bug]] in memory) — this was accepted as a "known gap" at the end of this session, but the user wants to pick the investigation back up rather than leave it parked. Start there.
+GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). **Repo is on `main`, clean, up to date with origin. PR #23 is MERGED.** Nothing is pending review.
 
 ### Files Modified
 
-**In the git repo, all now merged to `main` via PR #21** (`feat/listings-page`, branch deleted post-merge):
-- `reporting-app/lib/stat-tile.tsx` — new. `StatTile` extracted out of `run-list.tsx` (was duplicated verbatim) — lives in `lib/` matching the existing `lib/markdown-components.tsx` precedent for shared JSX, not a new `app/components/` directory.
-- `reporting-app/app/run-list.tsx` — now imports `StatTile` from `lib/stat-tile.tsx` instead of defining it inline.
-- `reporting-app/lib/listings.ts` — new. `getListings(customer)` — read-only, no mutation helpers, matches the schema's own "no edit UI in this pass" comment on the `Listing` model.
-- `reporting-app/lib/format.ts` — added `formatPrice`, `statusLabel`, `transactionTypeLabel`.
-- `reporting-app/app/listings/page.tsx` + `reporting-app/app/listings/listing-list.tsx` — new. Server-fetch/client-filter split mirroring the existing Activity list pattern exactly. Shows every listing status by default (not just Active), matching a comment already in `app/api/listings/active/route.ts` from PR #19 anticipating this exact page.
-- `reporting-app/app/layout.tsx` — added a "Listings" nav link next to "Settings".
+**In the git repo, merged to `main` via PR #23** (`feat/listing-footer-reminder-plugin`, branch deleted both locally and remotely post-merge):
+- `agent/plugins/listing-footer-reminder/__init__.py` + `plugin.yaml` — new. A `pre_llm_call` hook (same mechanism as `active-listings-context`) that force-injects the exact 7-line "Listing Record" footer format into context on every WhatsApp/Telegram turn, unconditionally (platform-gated only, no keyword gate — see Decisions Made).
+- `reporting-app/lib/listings.ts` — `getListings()` now includes each listing's most recent linked `Run` (via the `runs` reverse relation), returning `latestRunId: string | null`.
+- `reporting-app/app/listings/listing-list.tsx` — each row is now a real `<Link href="/runs/[id]">` when `latestRunId` exists (falls back to a non-clickable row for the rare mixed-two-listings-in-one-turn case).
+- `reporting-app/app/layout.tsx` — added an explicit "Activity" nav link next to "Listings" (previously the only way back to `/` was clicking the logo).
 
-**Also merged to `main` via PR #22** (`docs/update-readme-claude-md-pr21-gateway-bug`, branch deleted post-merge) — matching this repo's established pattern of a separate docs PR per feature (e.g. PR #20 for PR #19):
-- `CLAUDE.md` — new Section 5 entries: the PR #21 build (plan self-review findings, what shipped, verification), and the full live-WhatsApp-test writeup with the gateway bug investigation.
-- `README.md` — status paragraphs updated to reflect PR #21 (merged) and the gateway bug (found, accepted as known gap, revisit planned next session).
-- This file (`session-handoff-2026-07-24.md`).
-
-Both PRs merged in sequence (#21 then #22, no conflicts — they touched disjoint files) with the user's explicit go-ahead. `git fetch --prune` run afterward; no stale branches remain locally or on origin besides `main`.
-
-**Outside the repo** (local machine state, matters for reproducing on another machine):
-- `%LOCALAPPDATA%\hermes\profiles\autoestate\.env` — `ANTHROPIC_API_KEY` confirmed **dead** (HTTP 400: credit balance too low). The gateway currently works anyway because it auto-detects ambient Claude Code OAuth credentials (`~/.claude/.credentials.json`) on this shared machine/account — see Errors Hit. If that OAuth session is ever unavailable, the gateway has no working fallback. Worth fixing (top up the Console credits) even though it isn't blocking anything today.
-- The `autoestate` Hermes gateway process was killed and restarted three times this session (chasing the bug below) and is currently running in its normal (non-verbose) logging mode.
-- The reporting-app dev server (port 4127) was stopped at the end of this session for a clean handoff — nothing should be listening on 4127 right now. Start it with `npm run dev -- -p 4127` from `reporting-app/` if needed; always use `http://127.0.0.1:4127`, not `localhost` (unrelated IPv6 collision on this machine).
+**Outside the git repo** (local machine / live profile state — matters for reproducing or continuing on this machine):
+- `~/hermes/profiles/autoestate/memories/USER.md` — edited mid-session to add a footer mention + an explicit "always reload the skill" instruction. **This fix did NOT work** (see Errors Hit) — the edit is still in place (harmless) but the actual fix is the plugin above, not this file. Don't assume this file drives correct behavior.
+- `~/hermes/profiles/autoestate/plugins/listing-footer-reminder/` — the plugin manually copied in from the repo (plugins aren't loaded via an `external_dirs` config pointer the way skills are).
+- `~/hermes/profiles/autoestate/config.yaml` — `plugins.enabled` now includes `listing-footer-reminder` (alongside the pre-existing `sync-to-webapp`). Note `active-listings-context` (built in PR #19) is still NOT in this list and still not deployed to `~/hermes/profiles/autoestate/plugins/` — a pre-existing, deliberate deferral, not something this session changed.
+- The `autoestate` Hermes gateway process was killed and restarted twice this session (once for the memory-edit attempt, once for the plugin) and is currently running normally.
+- `~/hermes/profiles/autoestate/.env`'s `ANTHROPIC_API_KEY` **was confirmed dead mid-session** (credit balance too low) — this caused a real live outage (see Errors Hit). **The user topped it up during this session**, so it should be working now, but this is a recurring risk (pay-as-you-go balance, no auto-reload configured) — recommend the user enable Anthropic Console's auto-reload billing setting; not yet confirmed done.
+- The reporting-app dev server (port 4127) **was left running** at the end of this session (`http://127.0.0.1:4127` — always use `127.0.0.1`, not `localhost`, unrelated IPv6 collision on this machine). Check `Get-NetTCPConnection -LocalPort 4127` before starting another one — don't create a duplicate/orphaned instance (see PR #17's documented gotcha on this).
 
 ### Decisions Made
 
-- **Listings page scope: strictly read-only**, no create/edit/delete, no linking a listing row to its originating run(s) — the schema's own comment already called this out, and a `Listing` can have many related `Run`s with no single "the" run to link to.
-- **Default filter shows every status, not just Active** — deliberate, matching a pre-existing comment in `app/api/listings/active/route.ts` that this page should make ingest/auto-matching mistakes visible rather than hide them.
-- **Genuine plan self-review before implementing** (user's explicit standing request, see `feedback_plan_self_review` memory) caught 3 real issues: wrong location for the shared `StatTile` component, an under-scoped 3-tile stat strip instead of matching the existing 4-tile pattern, and sloppy query pseudocode. All fixed before any code was written.
-- **Sent real listings via WhatsApp to test the pipeline**, with the user's explicit go-ahead at every step (gateway restart, session deletion, second restart, verbose-logging restart, final restart back to normal) — nothing was done unilaterally.
-- **Root-caused as far as reasonably possible, then explicitly stopped** at the user's direction once the investigation crossed from "our code" into Hermes's own vendored internals (`gateway/run.py`'s prompt assembly) — a deliberate decision to accept a known gap rather than keep digging into third-party code that an upstream `hermes update` could overwrite anyway.
+- **First fix attempt (edit `USER.md` memory) was tried, tested live, and found not to work — don't repeat it.** This was a real, deliberate test of a hypothesis (stale memory → model skips reload), not skipped due to laziness. It failed cleanly, which is what reframed the bug as a tool-call *compliance* gap rather than a stale-fact gap.
+- **Fixed via a new plugin instead of fighting model compliance.** `listing-footer-reminder` force-injects the footer format rather than trying to make the model call `skill_view` more reliably — sidesteps the problem rather than re-litigating it.
+- **No keyword gate on the new plugin, unlike `active-listings-context`.** Deliberate: this is pure static text with no network-call cost to firing on every turn, and real listing messages are often raw shorthand facts with no predictable trigger phrase — a keyword gate would just recreate the original silent-failure shape (missing the reminder on a genuine listing turn).
+- **Listings page rows link to their most recent `Run`, not all related runs.** A `Listing` can have many related `Run`s over time (new listing, later a price-drop update, etc.); linking to the single most recent one is the simplest useful behavior and matches what a user actually wants ("show me the latest posts for this property").
 
-### Errors Hit / Debugging Journey (the gateway footer-omission bug)
+### Errors Hit
 
-**Symptom:** every real WhatsApp listing (5 total: Hertzl St, Shenkin St, Hayarkon, Ben Yehuda, King David St) produced a correct, complete Instagram/Facebook/Yad2 caption, but **none produced the "Listing Record" footer** that `listing-to-social` v0.4.0 (PR #19) is supposed to append — so nothing ever landed in the `Listing` table.
-
-Theories tested and ruled out, each with direct evidence (not assumed):
-1. **Stale gateway process, never reloaded the newer `SKILL.md`.** Plausible by timing (gateway had been running since before the skill file's last edit) — but restarting the gateway **did not fix it.**
-2. **Long-lived session degrading instruction-following** (the real WhatsApp session has been one continuous thread since 2026-07-22; Hermes never resets sessions by design). Tested by resuming the *exact* live session via CLI (`hermes -p autoestate --resume <session_id> -z "..."`) — footer appeared correctly. **Ruled out.** (Side-finding: `hermes sessions delete <id>` only removes the DB row — a *running* gateway keeps an in-memory cache of that session and reuses the same ID regardless, confirmed via its own log line "Persisted transcript lagged live cached history... preserving live conversation context." Only a full process restart actually drops a session. Real gotcha, unrelated to root cause.)
-3. **Token/length truncation.** Ruled out — the gateway's own debug log showed `finish_reason=stop` with a 128k token budget barely touched (~1300 chars generated). A natural stop, not a cutoff.
-4. **Output redaction stripping the footer.** Ruled out — fed the literal footer text directly to Hermes's own `agent.redact.redact_sensitive_text(force=True)`; came back byte-for-byte unchanged.
-5. **Stale/shadow skill file.** Ruled out — confirmed `config.yaml`'s `skills.external_dirs` points at the live repo path, and a filesystem-wide search found no duplicate/shadow copy of the skill anywhere under the Hermes install.
-6. **Different model.** Ruled out — both the gateway and every CLI test logged the identical `model=claude-opus-4-6`.
-7. **Different credentials** — a dead end, but a real separate finding: gateway and CLI run under the same Windows account, so `Path.home()` resolves identically and both auto-detect the same ambient Claude Code OAuth credentials (`agent/anthropic_adapter.py`'s priority list: `ANTHROPIC_TOKEN` > `CLAUDE_CODE_OAUTH_TOKEN` > Claude Code credentials file > `credential_pool` > `ANTHROPIC_API_KEY`). Confirmed separately: the profile's actual `ANTHROPIC_API_KEY` is dead and `credential_pool` is empty — not the cause of this bug, but a real latent risk (see Files Modified above).
-
-**Not pinned down:** something in the real gateway turn's exact system-prompt/context assembly specific to `platform=whatsapp` causes the model to naturally omit the footer — reproducible 5-for-5 on real sends, never reproduced via CLI on the identical session/facts. The remaining leads require digging into Hermes's own vendored `gateway/run.py`, which we don't maintain. **User's explicit decision: stop here, accept as a known gap.** Revisit only if it keeps blocking real usage, or consider filing it upstream to Nous Research.
+1. **First fix attempt failed.** Edited `USER.md`, restarted the gateway, sent a real test listing — still zero tool calls, still no footer. This wasn't a bug in the edit itself; it directly disproved the "stale fact" hypothesis and pointed at a deeper tool-call compliance issue instead. Root-caused via direct SQLite evidence from `state.db`: every fresh CLI test's first action is a `skill_view` call; the real long-lived WhatsApp session called zero tools across every real turn.
+2. **A real live outage, caused by my own restart.** Restarting the gateway from a Claude Code tool/agent environment (rather than the user's own interactive shell) lost access to whatever ambient Claude Code OAuth credential the previous process instance had been using as a fallback for the profile's own dead `ANTHROPIC_API_KEY`. Every reply became a generic "credit balance too low" error until the user topped up the real key. Confirmed via `agent.log`: `credential pool: no available entries` + `HTTP 400: credit balance too low`. Resolved by the user topping up the key directly at console.anthropic.com — after that, restarts from any environment worked fine since the real key now works standalone.
+3. **The Listings page appeared "unresponsive" to the user** — not a bug, but a real UX gap: PR #21 built it as a pure read-only summary with zero click-through (plain `<li>`, no `Link`). Fixed as described above.
+4. **No "Activity" nav link existed** — another real UX gap the user caught, not a bug per se. Fixed by adding one.
 
 ### Current State
 
-- **PR #21 and PR #22 both merged to `main`.** Local repo is on `main`, clean, up to date, no leftover branches. Listings page verified (lint/build clean, data layer checked against the real dev database with a throwaway customer). Browser verification not done — same known Clerk headless-auth limitation as PR #17 (documented, not a regression).
-- **The real customer's `Listing` table is empty**, confirmed directly against the dev database (not assumed) — because of the gateway bug below, not because of anything wrong in PR #21 itself.
-- **CLAUDE.md/README.md are up to date on `main`** with full detail on both the PR #21 work and the bug investigation — read those directly rather than trusting this summary if anything seems inconsistent.
-- **Memory updated:** new `project_gateway_footer_omission_bug.md` (full evidence trail), `project_listing_memory_digest.md` amended (PR-2 done, live test done, links to the bug memory, notes both PRs merged), `project_reporting_app_activity_layout.md` corrected (a stale claim about `app/page.tsx`'s width), `MEMORY.md` index updated and de-staled.
-- **Gateway is running normally** (non-verbose logging) — the live service is up and working correctly for everything except footer/Listing-tracking on real WhatsApp turns.
-- **Dev server is stopped.** Nothing bound to port 4127 as of end of session.
+- **PR #23 merged to `main`.** Local repo on `main`, clean, up to date.
+- **The gateway footer-omission bug is resolved and verified live**, not just theoretically fixed: a real WhatsApp test (Ben Gurion Blvd listing) produced the footer and a real `Listing` row confirmed via `/api/listings/active`.
+- **The reporting-app dev server is currently running** on port 4127 with real data now visible on `/listings` (at least the Ben Gurion listing; earlier test sends before the dev server was up did not sync).
+- **CLAUDE.md is up to date** with the full writeup of this resolution — read it directly if anything here seems inconsistent.
+- **Memory updated:** `project_gateway_footer_omission_bug.md` rewritten to reflect the failed first attempt and the actual working fix; `project_listing_memory_digest.md` and `project_marketing_automation_roadmap.md` updated to reflect the roadmap's weekly-digest item now being genuinely done end-to-end (not shipped-but-blocked); `MEMORY.md` index updated.
+- **Open, not yet done:** enabling Anthropic Console auto-reload billing (recommended, not confirmed).
 
 ### Next Step
 
-**Primary, per the user's explicit statement at the end of this session: resume debugging the gateway footer-omission bug.** It was accepted as a "known gap" for this session's purposes, but the user wants to continue the investigation, not leave it permanently parked. Start from the evidence trail in Errors Hit above (or the fuller memory `project_gateway_footer_omission_bug.md`) — six theories are already ruled out with direct evidence, so don't re-test those; the open thread is Hermes's own `gateway/run.py` system-prompt/context assembly for `platform=whatsapp` specifically. Useful next moves not yet tried: diff the exact system-prompt text sent by a real gateway turn against the exact system-prompt text sent by an equivalent CLI turn (both were captured in this session's debug logs, but not diffed against each other line-by-line — only the model name and `finish_reason` were checked); or reach out to Nous Research/check Hermes's own issue tracker for a similar report.
-
-Two smaller open decisions, not yet made — surface these rather than assuming an answer:
-1. **How to get real data onto the Listings page** given the gateway bug: manually enter a few real listings by hand (a real `Listing` row via a script, using facts the user actually sent), or leave it empty until the gateway bug is fixed, or something else.
-2. Once the gateway bug is resolved or parked again: the roadmap's next feature item is **re-engagement/just-sold posts** (before the larger-scope buyer-inquiry auto-reply), per the explicit build order the user confirmed on 2026-07-23 (see `project_marketing_automation_roadmap` memory).
+**Per the confirmed roadmap (see `project_marketing_automation_roadmap` memory): re-engagement / just-sold posts is next.** Small new skill(s), same shape as `listing-status-update` (v0.2.0, already in `agent/skills/real-estate/listing-status-update/`) — use it as the template. Nothing is blocking this; the Listing-tracking pipeline it would build on top of is now confirmed working end-to-end. After that: buyer-inquiry auto-reply (deliberately last — different product shape, inbound rather than outbound, new trust surface).
 
 ### How to Resume
 
