@@ -1,7 +1,7 @@
 ---
 name: listing-status-update
-description: Use when a real estate agent wants to announce a change to a listing they already advertised — a price drop, or going under contract/rented — and wants ready-to-post content. Not for a completed sale — see just-sold. Turns the status change plus the listing's core facts into platform-formatted Hebrew and English posts for Instagram, a Facebook group, and Yad2.
-version: 0.3.0
+description: Use when a real estate agent wants to announce a change to a listing they already advertised — a price drop, or going under contract/rented — and wants ready-to-post content. Not for a completed sale — see just-sold. The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the status change plus the listing's core facts into platform-formatted Hebrew and English posts for Instagram, a Facebook group, and Yad2.
+version: 0.4.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -42,8 +42,51 @@ status-note format (see When to Use).
 
 ## Required Input
 
-Before generating anything, confirm you have (ask for anything missing —
-never invent it, and never assume it from earlier in the conversation):
+**First, check whether a locator lookup applies.** If the agent's message
+doesn't restate the identity facts below but does name a locator (a
+street/area name, e.g. "Dizengoff" or "the Ben Gurion listing") — and this
+turn's context contains a real, literal "Active listings context (from
+reporting system...)" block (the same block `weekly-digest` requires; a
+memory of one from earlier in this conversation never counts, only the
+literal block delivered in *this specific turn*):
+
+- Search that block for listings whose area reasonably matches the stated
+  locator.
+- **Exactly one match** → use that listing's identity facts (area,
+  transaction type, rooms, sqm, floor, price) below, and open your reply
+  with a short confirmation line restating them before the status content.
+- **No locator given at all** — regardless of how many active listings
+  exist, including exactly one — **do not** auto-pick a listing as
+  confirmed, and **do not append a Listing Record footer in this turn.**
+  Unlike `listing-reengagement`, this skill's footer automatically
+  transitions the `Listing` table the instant the message is sent, with no
+  review step on that side effect and (as of this writing) no way to undo a
+  wrong one in the reporting app — so the footer specifically needs a real
+  confirmation first, even though the rest of the content doesn't. Go ahead
+  and produce the Instagram/Facebook/Yad2 content using the one plausible
+  candidate's facts (or, if there's more than one candidate, using
+  whichever seems most likely, clearly labeled as unconfirmed) — but in
+  place of the Listing Record footer, end with a plain confirmation
+  question naming the candidate(s) (e.g. "Reply to confirm this is your Ben
+  Gurion listing, 4 rooms, 95 sqm, so I can record the price change" — or,
+  with more than one candidate, ask which one). Only add the actual Listing
+  Record footer once the agent confirms in a **later message** — that
+  confirmation is itself the "locator" for the purposes of this section, so
+  from that point on this is a single-match locator case (above), not a
+  no-locator case.
+- **Zero matches** → say so plainly, then fall through to asking for the
+  identity facts directly (below) — never guess.
+- **Multiple matches** → ask one specific question naming the real
+  candidates with distinguishing facts (rooms/sqm/price) — not a generic
+  "please restate everything."
+- If no such block was injected this turn, or it says there are no active
+  listings, skip straight to asking for the identity facts directly
+  (below).
+
+**If a locator lookup doesn't apply** (no context block this turn, zero or
+ambiguous matches not yet resolved, or the agent already gave the facts
+directly), the identity facts must be restated fresh in *this* message,
+never invented, never assumed from earlier in the conversation:
 
 - **Area / neighborhood**, **rooms**, and **size in sqm** — the same core
   identity facts as the original listing, restated. A status post needs to
@@ -56,19 +99,28 @@ never invent it, and never assume it from earlier in the conversation):
   that the facts are unknown to you — it's that the agent must actively
   confirm them for this specific post, so a stale or misremembered detail
   can't slip through uncaught.
+
+**Regardless of which path supplied the identity facts** (restated or
+locator-matched), the following always come from the agent's *current*
+message alone — never from a matched listing, which only ever supplies
+static identity facts, not the change being announced:
+
 - **Status type** — price drop, or under contract (or rented, for a rental)
   — never assume which one; ask if it's ambiguous. If the agent actually
   means the property sold, that's `just-sold`, not a status type here.
 - Status-specific facts:
-  - **Price drop**: the new price. The old price is optional — only include
-    it if the agent explicitly states it in this message. Never state,
-    imply, or reconstruct an old price from anywhere else — not a plausible
-    round number, not a real price you recognize from a different listing,
-    not anything recalled from earlier in the conversation. If the agent
-    doesn't give an old price, describe the price drop using only the new
-    price (e.g. "now available at ₪X") — don't invent a "before → after"
-    comparison just because the phrasing would read more naturally with
-    one.
+  - **Price drop**: the new price, always from the agent's current message.
+    The old price is optional — include it either if the agent explicitly
+    states it in this message, **or** if this update used a confirmed
+    locator match (above) and the matched listing's own stored price is a
+    real, current figure, not a guess. Outside of a confirmed locator
+    match, never state, imply, or reconstruct an old price from anywhere
+    else — not a plausible round number, not a real price you recognize
+    from a different listing, not anything recalled from earlier in the
+    conversation. If neither source gives an old price, describe the price
+    drop using only the new price (e.g. "now available at ₪X") — don't
+    invent a "before → after" comparison just because the phrasing would
+    read more naturally with one.
   - **Under contract**: no price is required. Only mention an agreed price
     if the agent explicitly wants it shared.
 - Optional: a closing note (e.g. a thank-you to the community) — only if
@@ -83,7 +135,11 @@ Properties" section: if facts for more than one property appear in the same
 request, give each complete, distinguishable one its own separate,
 clearly-labeled response (each with its own Listing Record footer, see
 Output Format) — never blend facts from different properties into the same
-piece of content, and never drop one in favor of the other.
+piece of content, and never drop one in favor of the other. This applies
+identically when a property is identified by locator rather than restated
+facts — a message naming two streets gets two separate locator lookups
+(each following the no-locator-auto-pick rule above independently) and two
+separate responses.
 
 ## Output Format
 
@@ -158,31 +214,42 @@ footer to produce, not this skill's.
    No old price given means no old price stated, period — describe the new
    price alone.
 2. **Assuming identity facts from earlier in the conversation.** Area,
-   rooms, and size must be restated for this request, not carried over
-   silently — the post needs to stand alone. This includes cases where you
-   can technically recall the facts from earlier in this same conversation
-   (e.g. the original `listing-to-social` exchange): recalling them is not
-   the same as the agent restating them, and only the latter satisfies this
-   requirement. If the current message doesn't restate them, ask — don't
-   fill the gap from memory just because you happen to have it.
-3. **Skipping a language or platform.** All three platforms, both
+   rooms, and size must be restated for this request, matched via a real,
+   literal locator-lookup context block delivered in *this* turn, or
+   confirmed via the required confirmation question — never carried over
+   silently from memory of an earlier exchange or an earlier lookup. This
+   includes cases where you can technically recall the facts from earlier
+   in this same conversation (e.g. the original `listing-to-social`
+   exchange): recalling them is not the same as the agent restating them or
+   a real current-turn locator match, and only those satisfy this
+   requirement.
+3. **Appending a Listing Record footer with no stated locator.** Even with
+   exactly one active listing on record, this skill must withhold the
+   footer and ask a confirmation question in its place — see Required
+   Input. (`listing-reengagement` is allowed to auto-pick and never has a
+   footer anyway; this skill and `just-sold` are not, since their footer has
+   an automatic,
+   un-reviewed database effect.)
+4. **Guessing a locator match instead of asking.** Zero matches or
+   multiple matches both mean "ask," never "pick the closest-sounding one."
+5. **Skipping a language or platform.** All three platforms, both
    languages, every time — including a full Yad2 section for an "under
    contract" status (see Output Format), just with a different role than a
    price drop.
-4. **Wrong tone per status.** Don't write an "under contract" post with a
+6. **Wrong tone per status.** Don't write an "under contract" post with a
    "contact for viewing" call to action, or a price-drop post that implies
    the listing is gone.
-5. **Handling a completed sale here.** If the agent means the property
+7. **Handling a completed sale here.** If the agent means the property
    sold, redirect to `just-sold` — don't produce a `Status: Sold` footer or
    sold-flavored content from this skill.
-6. **Exclusionary phrasing.** Same rule as `listing-to-social`: describe
+8. **Exclusionary phrasing.** Same rule as `listing-to-social`: describe
    the property and the update, not an "ideal" tenant or buyer.
-7. **Wrong units/currency.** Sqm, not sqft. ₪, not $, unless told otherwise.
-8. **Blending two properties into one response.** If facts for more than
+9. **Wrong units/currency.** Sqm, not sqft. ₪, not $, unless told otherwise.
+10. **Blending two properties into one response.** If facts for more than
    one property show up in the same request, give each its own complete,
    separate response (see `listing-to-social`'s "Never Blend Properties") —
    don't merge them, and don't drop one in favor of the other.
-9. **Missing or malformed Listing Record footer.** Every complete response
+11. **Missing or malformed Listing Record footer.** Every complete response
    needs its own footer, in the exact 7-line format, immediately after that
    listing's Yad2 section. Without it (or with a wrong `Status`), the
    reporting system can't recognize this as an update to the *same*
@@ -190,9 +257,20 @@ footer to produce, not this skill's.
 
 ## Verification Checklist
 
+- [ ] Locator lookup was attempted first when identity facts weren't fully
+      restated, using only a real, literal injected context block from
+      *this* turn — never a memory of one
+- [ ] With no stated locator, the Listing Record footer was withheld and a
+      confirmation question was asked in its place — even with only one
+      active listing on record — rather than committing the status change
+      unconfirmed
+- [ ] A locator match was either unambiguous (single match) or resolved by
+      asking a specific question naming the real candidates — never guessed
 - [ ] All required facts present (area, rooms, size, status type, and any
-      status-specific facts), or a single batched follow-up question was
-      asked instead of guessing
+      status-specific facts) — via restatement, a confirmed locator match,
+      or a single batched follow-up question, not guessing
+- [ ] If a locator match was used, the reply opens with a confirmation line
+      restating the matched identity facts
 - [ ] Status type is a price drop or under contract — not a completed sale
       (that's `just-sold`)
 - [ ] All three platforms produced (Instagram, Facebook, Yad2), each with
@@ -201,7 +279,8 @@ footer to produce, not this skill's.
       (see Output Format)
 - [ ] Yad2 section matches the status: full updated description for a
       price drop, short factual status note for under contract
-- [ ] No fact appears that wasn't in the agent's *current* input, including
+- [ ] No fact appears that wasn't in the agent's *current* input or a real
+      matched listing, including
       no identity facts silently carried over from earlier in the
       conversation — even ones you could technically recall
 - [ ] Each distinguishable property got its own complete, separate response

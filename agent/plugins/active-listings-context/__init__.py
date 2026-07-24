@@ -1,25 +1,39 @@
 """Fetches the customer's currently-active listings from the reporting
-webapp (GET /api/listings/active) and injects them as LLM context, for the
-weekly-digest skill to draft a roundup without the agent retyping anything.
+webapp (GET /api/listings/active) and injects them as LLM context. Used by
+four skills: weekly-digest (a roundup of everything active), and - as of
+the listing-lookup-by-locator feature - listing-reengagement,
+listing-status-update, and just-sold, so an agent can say "the Dizengoff
+place sold" instead of retyping every fact, with the skill matching the
+named locator against this injected list rather than trusting the model's
+own conversation memory (a real, verified backend record is a categorically
+different trust level than recall - see each consuming skill's own
+Required Input section for exactly how it's used and disambiguated).
 
 Uses a pre_llm_call hook, like sync-to-webapp - but unlike sync-to-webapp,
 which always returns None (its return value is never used), this hook's
 return value IS the injected context (see hermes_cli/plugins.py's
 invoke_hook contract for pre_llm_call).
 
-Keyword-gated, not every-turn: fetching on every ordinary listing-to-social/
-listing-status-update turn would couple its latency/reliability to the
-webapp's uptime for a context payload that's irrelevant except on digest
-requests. The two failure directions aren't symmetric, so the keyword list
-below is deliberately biased broad: if this regex fires but Hermes's own
-skill-routing doesn't pick weekly-digest, the fetched context is just
-unused (harmless). If routing picks weekly-digest but this regex didn't
-fire, the skill gets no context and, per its own "say so plainly" rule,
-incorrectly tells the agent there are no active listings when there are - a
-wrong answer, not a graceful fallback. Keep this phrase list in sync with
-weekly-digest/SKILL.md's own `description` field (whatever drives Hermes's
-real routing decision), and validate the two agree across a range of
-natural phrasings via `hermes -z` rather than treating this list as final.
+Keyword-gated, not every-turn: fetching on every ordinary listing-to-social
+turn (a brand-new listing, nothing to look up) would couple its
+latency/reliability to the webapp's uptime for a context payload that's
+never useful there. The two failure directions aren't symmetric in the same
+way for every consumer, though:
+  - For weekly-digest: a missed keyword means the skill gets no context and,
+    per its own "say so plainly" rule, incorrectly tells the agent there are
+    no active listings when there are - a wrong answer, not a graceful
+    fallback.
+  - For the three locator-lookup skills: a missed keyword just means no
+    context gets injected, and the skill falls back to its original,
+    already-shipped "ask the agent to restate every fact" behavior - a
+    softer degradation, not a wrong answer.
+Given that, the keyword list below stays deliberately biased broad across
+all four skills' trigger vocabulary: a false positive (context fetched but
+unused, e.g. a listing-to-social message that happens to contain "reduced"
+in a feature description) is free either way. Keep this phrase list roughly
+in sync with each consuming skill's own `description` field (whatever
+drives Hermes's real routing decision), and validate via `hermes -z` rather
+than treating this list as final.
 
 This call is a genuinely BLOCKING httpx.get (unlike sync-to-webapp's
 background-threaded POSTs) - acceptable specifically because the keyword
@@ -51,13 +65,25 @@ LISTINGS_URL = (
 SYNCED_PLATFORMS = {"whatsapp", "telegram"}
 TIMEOUT_SECONDS = 3
 
-# Deliberately broad - see module docstring on why false positives (unused
-# context) are far cheaper than false negatives (a wrong "no listings"
-# reply). Keep in sync with weekly-digest/SKILL.md's `description` field.
-DIGEST_KEYWORDS = re.compile(
+# Deliberately broad across all four consuming skills' vocabulary - see
+# module docstring on the asymmetric cost of a false positive (free) vs.
+# false negative (wrong answer for weekly-digest; softer fallback for the
+# three locator-lookup skills). Keep roughly in sync with each skill's own
+# `description` field.
+LISTING_LOOKUP_KEYWORDS = re.compile(
+    # weekly-digest
     r"digest|roundup|round-up|round up|still active|still on the market|"
     r"what'?s active|what'?s still|weekly update|summary|"
-    r"סיכום|עדכון שבועי|מה עוד פעיל|מה נשאר",
+    # listing-reengagement
+    r"re-?post|remind (people|them|buyers)|hasn'?t sold|re-?promote|"
+    r"still available|"
+    # listing-status-update
+    r"price drop|reduced|lowered the price|under contract|"
+    # just-sold
+    r"\bsold\b|closed on|"
+    # Hebrew, spanning all four
+    r"סיכום|עדכון שבועי|מה עוד פעיל|מה נשאר|"
+    r"עדיין זמינה|תזכיר|תפרסם שוב|ירד במחיר|בהליכי מכירה|נמכר",
     re.IGNORECASE,
 )
 
@@ -67,7 +93,7 @@ def inject_active_listings_context(session_id, turn_id, user_message, platform, 
         return None
     if not (LISTINGS_URL and INGESTION_SECRET):
         return None
-    if not user_message or not DIGEST_KEYWORDS.search(user_message):
+    if not user_message or not LISTING_LOOKUP_KEYWORDS.search(user_message):
         return None
 
     try:
@@ -88,7 +114,8 @@ def inject_active_listings_context(session_id, turn_id, user_message, platform, 
     lines = ["Active listings context (from reporting system - use ONLY these, never invent others):"]
     for l in listings:
         price = f"₪{l['price']}" if l.get("price") is not None else "price N/A"
-        lines.append(f"- {l['area']}, {l['rooms']} rooms, {l['sqm']} sqm, {price} ({l['transactionType']})")
+        floor = f"floor {l['floor']}" if l.get("floor") is not None else "floor N/A"
+        lines.append(f"- {l['area']}, {l['rooms']} rooms, {l['sqm']} sqm, {floor}, {price} ({l['transactionType']})")
     return "\n".join(lines)
 
 

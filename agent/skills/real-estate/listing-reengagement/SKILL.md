@@ -1,7 +1,7 @@
 ---
 name: listing-reengagement
-description: Use when a real estate agent wants to re-promote or remind people about a listing they already advertised and that is still active — nothing about it has changed. Trigger phrases include "still available," "re-post this," "remind people," "hasn't sold yet," "it's been a few weeks." Turns the listing's core facts into a fresh round of platform-formatted Hebrew and English posts, framed as a reminder rather than a first-time introduction.
-version: 0.1.0
+description: Use when a real estate agent wants to re-promote or remind people about a listing they already advertised and that is still active — nothing about it has changed. Trigger phrases include "still available," "re-post this," "remind people," "hasn't sold yet," "it's been a few weeks." The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the listing's core facts into a fresh round of platform-formatted Hebrew and English posts, framed as a reminder rather than a first-time introduction.
+version: 0.2.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -45,21 +45,54 @@ original `listing-to-social` post.
 
 ## Required Input
 
-Before generating anything, confirm you have (ask for anything missing —
-never invent it, and never assume it from earlier in the conversation):
+**First, check whether a locator lookup applies.** If the agent's message
+doesn't restate every fact below but does name a locator (a street/area
+name, e.g. "Dizengoff" or "the Ben Gurion listing") — and this turn's
+context contains a real, literal "Active listings context (from reporting
+system...)" block (the same block `weekly-digest` requires; a memory of one
+from earlier in this conversation never counts, only the literal block
+delivered in *this specific turn*):
+
+- Search that block for listings whose area reasonably matches the stated
+  locator.
+- **Exactly one match** → use that listing's facts (transaction type,
+  rooms, sqm, floor, price) as this post's identity facts, and open your
+  reply with a short confirmation line restating them (e.g. "Re-posting:
+  4-room apartment, Ben Gurion Blvd, 95 sqm, ₪4,800,000") so a wrong match
+  is visible before the agent does anything with the content.
+- **No locator given, but the context lists exactly one active listing** →
+  same as above, use it directly. This skill has no Listing Record footer
+  and makes no automatic change to any stored data (see Output Format), so
+  a wrong guess here only costs a redo of draft copy, not a bad database
+  write — safe to default to the sole listing rather than asking. (Contrast
+  `listing-status-update`/`just-sold`, which require a locator for this
+  exact reason — see their own Required Input.)
+- **Zero matches** → say so plainly, then fall through to asking for facts
+  directly (below) — never guess.
+- **Multiple matches** (locator matches more than one, or no locator given
+  and more than one active listing exists) → ask one specific question
+  naming the real candidates with distinguishing facts (rooms/sqm/price) —
+  not a generic "please restate everything."
+- If no such block was injected this turn, or it says there are no active
+  listings, skip straight to asking for facts directly (below).
+
+**If a locator lookup doesn't apply** (no context block this turn, zero or
+ambiguous matches, or the agent already gave the facts directly), confirm
+you have — restated fresh in *this* message, never invented, never assumed
+from earlier in the conversation, including anything you could technically
+recall from an earlier exchange or an earlier lookup in this same
+conversation:
 
 - **Area / neighborhood**, **sale or rental**, **rooms**, **size in sqm**,
   **price**, and **floor** — the same core facts `listing-to-social`
-  requires, restated fresh. This is a standalone promotional post (often
-  sent weeks after the original), so don't rely on conversation memory to
-  fill these in — this applies even if you can technically recall them from
-  an earlier exchange in this same conversation. If the agent's current
-  message doesn't restate them, treat them as missing and ask.
+  requires. This is a standalone promotional post (often sent weeks after
+  the original), so don't rely on conversation memory to fill these in.
 - At least one or two **standout features**, restated (renovated kitchen,
   balcony, parking, view, etc.) — same as `listing-to-social`.
 - Optional: a stated reason for re-engaging (e.g. "price is flexible,"
   "open to offers," "showings have slowed down") — only if the agent
-  actually says it, never invented.
+  actually says it, never invented. This is never filled in from a matched
+  listing — a locator lookup only ever supplies static identity facts.
 
 If the agent's message restates a **different** price or status than you'd
 expect for this listing, don't try to reconcile it or flag a discrepancy —
@@ -84,7 +117,11 @@ This skill follows the same rule as `listing-to-social`'s "Never Blend
 Properties" section: if facts for more than one property appear in the same
 request, give each complete, distinguishable one its own separate,
 clearly-labeled response — never blend facts from different properties into
-the same piece of content, and never drop one in favor of the other.
+the same piece of content, and never drop one in favor of the other. This
+applies identically when properties are identified by locator rather than
+restated facts — a message naming two streets ("re-post Dizengoff and Ben
+Gurion") gets two separate locator lookups and two separate responses, each
+following the matching rules above independently.
 
 ## Output Format
 
@@ -125,31 +162,46 @@ context; that reminder applies to the other three skills, not this one.
 ## Common Pitfalls
 
 1. **Inventing facts.** Never add a price, room count, address detail, or
-   feature that wasn't restated in this message.
+   feature that wasn't restated in this message or present in a real
+   locator-matched listing (see Required Input).
 2. **Assuming identity facts from earlier in the conversation.** Restate
-   them fresh, even if you can technically recall them.
-3. **Treating this as a brand-new listing.** The tone must read as a
+   them fresh, or match them via a real, literal locator-lookup context
+   block delivered in *this* turn — never from memory of an earlier
+   exchange or an earlier lookup, however confident.
+3. **Guessing a locator match instead of asking.** Zero matches or multiple
+   matches both mean "ask," never "pick the closest-sounding one."
+4. **Treating this as a brand-new listing.** The tone must read as a
    reminder ("still available") — don't write it as if introducing the
    property for the first time.
-4. **Folding in an unstated status or price change.** If the agent's
+5. **Folding in an unstated status or price change.** If the agent's
    message implies something actually changed, that's
    `listing-status-update` or `just-sold` — don't handle it here, and don't
-   silently reconcile a restated price against anything on file (this skill
-   has no such data to check against).
-5. **Adding a Listing Record footer.** This skill never creates or updates
+   silently reconcile a restated or matched price against anything else
+   (this skill has no such data to check against beyond the one matched
+   listing).
+6. **Adding a Listing Record footer.** This skill never creates or updates
    a Listing — no footer belongs in its output, even if the ambient footer
    reminder text is present in this turn's context.
-6. **Skipping a language or platform.** All three platforms, both
+7. **Skipping a language or platform.** All three platforms, both
    languages, every time.
-7. **Wrong units/currency.** Sqm, not sqft. ₪, not $, unless told otherwise.
-8. **Blending facts across properties.** Give each property its own
-   complete, separate response.
+8. **Wrong units/currency.** Sqm, not sqft. ₪, not $, unless told otherwise.
+9. **Blending facts across properties.** Give each property its own
+   complete, separate response — including when properties are identified
+   by locator rather than restated facts.
 
 ## Verification Checklist
 
+- [ ] Locator lookup was attempted first when facts weren't fully restated,
+      using only a real, literal injected context block from *this* turn —
+      never a memory of one
+- [ ] A locator match was either unambiguous (single match, or no locator
+      with exactly one active listing) or resolved by asking a specific
+      question naming the real candidates — never guessed
 - [ ] All required facts present (area, sale/rental, rooms, size, price,
-      floor, at least one feature), restated fresh — or a single batched
-      follow-up question was asked instead of guessing
+      floor, at least one feature) — via restatement, a confirmed locator
+      match, or a single batched follow-up question, not guessing
+- [ ] If a locator match was used, the reply opens with a confirmation line
+      restating the matched facts
 - [ ] All three platforms produced (Instagram, Facebook, Yad2), each with
       Hebrew and English, clearly labeled
 - [ ] Tone reads as a reminder about an existing listing, not a
@@ -157,10 +209,11 @@ context; that reminder applies to the other three skills, not this one.
 - [ ] No implied status or price change was handled inline — anything that
       sounded like an actual change was treated as out of scope for this
       skill
-- [ ] No fact appears that wasn't in the agent's current input, including
-      no identity facts silently carried over from earlier in the
-      conversation
+- [ ] No fact appears that wasn't in the agent's current input or a real
+      matched listing, including no identity facts silently carried over
+      from earlier in the conversation
 - [ ] Numbers use sqm and ₪ (unless told otherwise)
 - [ ] No Listing Record footer present anywhere in the response
 - [ ] Each distinguishable property got its own complete, separate response
-      if more than one appeared in the request
+      if more than one appeared in the request (by restated facts or by
+      locator)
