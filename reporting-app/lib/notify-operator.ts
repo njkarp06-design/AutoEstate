@@ -6,24 +6,25 @@ import { formatRelativeDateTime, sourceLabel } from "@/lib/format";
 // with the buyer's contact attached - the #2-value piece after capturing the
 // contact itself.
 //
-// TRANSPORT DECISION (flagged for the user - see the session handoff): a
-// Telegram bot ping is the least-friction, genuinely-free option (no provider,
-// no domain, no deliverability setup - unlike email; and unlike a real
-// WhatsApp ping, which needs an outbound sender the buyer instance doesn't
-// have). It's wired here but INERT until configured, so nothing is sent to any
-// external service without the operator's own credentials:
+// TRANSPORT: a Telegram bot ping - the least-friction, genuinely-free option
+// (no provider, no domain, no deliverability setup unlike email; and unlike a
+// real WhatsApp ping, which needs an outbound sender the buyer instance
+// doesn't have). Two pieces, and it stays INERT (dashboard-only) until both
+// are present, so nothing is ever sent without real credentials:
 //
-//   OPERATOR_TELEGRAM_BOT_TOKEN   a notifier bot's token (BotFather)
-//   OPERATOR_TELEGRAM_CHAT_ID     the operator's own Telegram chat id
+//   OPERATOR_TELEGRAM_BOT_TOKEN     app-level env: one shared notifier bot
+//                                   (BotFather) that delivers to every
+//                                   customer's chat.
+//   Customer.operatorTelegramChatId per-customer: THIS customer's own chat,
+//                                   set on the Settings page. This is the
+//                                   multi-tenant routing - each customer's
+//                                   leads go only to their own chat.
 //
-// When either is unset, this logs and no-ops. This env-based config is a
-// single-operator (dev/MVP) shape; multi-tenant production needs per-customer
-// routing (a Customer.operatorTelegramChatId column or similar) - a deliberate
-// follow-up, NOT done here without sign-off since it's an account/schema
-// commitment.
+// OPERATOR_TELEGRAM_CHAT_ID (env) remains as a single-operator fallback for
+// dev, used only when a customer has no chat id of their own configured.
 
 const TELEGRAM_BOT_TOKEN = process.env.OPERATOR_TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.OPERATOR_TELEGRAM_CHAT_ID;
+const FALLBACK_CHAT_ID = process.env.OPERATOR_TELEGRAM_CHAT_ID;
 
 export type LeadNotification = {
   customer: Customer;
@@ -54,13 +55,14 @@ function buildMessage(lead: LeadNotification): string {
 
 export async function notifyOperatorOfLead(lead: LeadNotification): Promise<void> {
   const text = buildMessage(lead);
+  const chatId = lead.customer.operatorTelegramChatId ?? FALLBACK_CHAT_ID;
 
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+  if (!TELEGRAM_BOT_TOKEN || !chatId) {
     // Inert-but-visible: the lead is always recorded in the dashboard
     // regardless; this only governs the active push. Log so it's obvious in
     // dev that a notification WOULD have fired.
     console.info(
-      "notify-operator: no transport configured, skipping push for inquiry %s (%s)",
+      "notify-operator: no transport configured (bot token or customer chat id missing), skipping push for inquiry %s (%s)",
       lead.inquiryId,
       lead.buyerContact ?? "no contact",
     );
@@ -72,7 +74,7 @@ export async function notifyOperatorOfLead(lead: LeadNotification): Promise<void
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text }),
+      body: JSON.stringify({ chat_id: chatId, text }),
     },
   );
   if (!resp.ok) {

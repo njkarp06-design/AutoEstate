@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { getCurrentCustomer } from "@/lib/customer";
-import { updateInstagramPostModeAction } from "./actions";
+import {
+  updateInstagramPostModeAction,
+  updateOperatorTelegramChatIdAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +91,39 @@ export default async function SettingsPage() {
           <button
             type="submit"
             className="mt-4 border-b border-line-strong font-mono text-xs uppercase tracking-wide"
+          >
+            Save
+          </button>
+        </form>
+      </section>
+
+      <section className="mt-10 border-t border-card-border pt-6">
+        <h2 className="font-mono text-xs uppercase tracking-widest text-brand">
+          Buyer-lead alerts
+        </h2>
+        <p className="mt-1.5 text-sm text-status-muted">
+          When a buyer asks something that needs you (a viewing, an offer, or a
+          detail the agent doesn&apos;t have), we can ping you on Telegram with
+          their contact attached. Ask your AutoEstate operator for the alert
+          bot to message, then paste the Telegram chat ID it gives you here.
+          Leave blank to get leads only on the dashboard.
+        </p>
+
+        <form action={updateOperatorTelegramChatIdAction} className="mt-5 flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1.5 font-mono text-xs uppercase tracking-wide text-status-muted">
+            Telegram chat ID
+            <input
+              type="text"
+              name="operatorTelegramChatId"
+              defaultValue={customer.operatorTelegramChatId ?? ""}
+              inputMode="numeric"
+              placeholder="e.g. 123456789"
+              className="border-b border-line-strong bg-transparent pb-1 font-sans text-sm normal-case tracking-normal text-foreground placeholder:text-status-muted focus:outline-none"
+            />
+          </label>
+          <button
+            type="submit"
+            className="border-b border-line-strong font-mono text-xs uppercase tracking-wide"
           >
             Save
           </button>

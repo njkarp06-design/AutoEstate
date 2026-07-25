@@ -64,6 +64,11 @@ model Customer {
   displayName         String?
   ingestionSecretHash String    @unique // sha256(secret) - the secret itself is never stored
   instagramPostMode   PostMode  @default(MANUAL)
+  // Where this customer's "a buyer needs you" lead alerts are pushed. The app
+  // sends via one shared notifier bot (OPERATOR_TELEGRAM_BOT_TOKEN env); this
+  // is the per-customer destination chat. Null = no push (the lead still shows
+  // in the dashboard). Set by the customer on the Settings page.
+  operatorTelegramChatId String?
   createdAt           DateTime  @default(now())
   runs                Run[]
   listings            Listing[]
