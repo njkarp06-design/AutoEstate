@@ -8,13 +8,25 @@ Last updated: 2026-07-25.
 
 ## 🔜 Next up (in order)
 
-### 1. Buyer-inquiry auto-reply skill (last roadmap item, biggest scope)
-An inbound skill: auto-respond to a prospective buyer's question about a listing. Deliberately last — it's a different product shape from everything so far (inbound, not outbound marketing content).
-- [ ] Design the **new inbound trust surface**: a sender/allowlist model distinct from the current operator-only allowlist (a buyer is not the operator).
-- [ ] Decide the guardrails: what it may answer from listing data vs. when it must defer to the human agent; never invent facts (same no-recall/no-invention discipline as the other skills).
-- [ ] Plan via plan mode with an explicit adversarial self-review before implementing (standing expectation).
-- [ ] Confirm reporting-app impact (likely a new interaction type to display).
-- [ ] Build, test via `hermes -z`, then real live-WhatsApp test with go-ahead.
+### 1. Buyer-inquiry auto-reply (last roadmap item, biggest scope) — PLAN APPROVED 2026-07-25
+An **inbound** feature: a prospective buyer (a stranger) messages and the agent answers factual questions from listing data 24/7, captures a reachable lead, and defers anything human to the operator. Full plan + rationale in the plan file (`~/.claude/plans/quirky-honking-wave.md`) and CLAUDE.md's buyer-inquiry paragraph. Architecture: **role-by-channel isolation** — a separate, locked-down buyer instance (only the buyer skill; built-in tools denied) since the Hermes allowlist is a hard adapter gate and sender identity isn't available to skills. Locked decisions: fully-auto replies (isolation is the guardrail, per-reply approval isn't possible); lead priority = capture buyer contact > notify operator > dashboard; verify-first sequencing.
+
+**Phase 0 — verify blockers (two are design-blockers). (b) and (d) resolved read-only 2026-07-25; (a)/(c) need the live Telegram spike.**
+- [ ] (a) Can a channel be opened to non-operator senders at all (empty allowlist = allow-all vs block-all)? Re-confirm on WhatsApp before production. **NEEDS live Telegram bot.**
+- [x] (b) Buyer-contact capture — **viable via a read-only `state.db` `sessions` read** (no `sender` column; use `id`,`user_id`,`chat_id`,`display_name`,`origin_json`). Real WA session had `display_name`="Natanel Karp" + a 19-char `user_id`. Caveat: that `user_id` looks like a WhatsApp **LID, not a dialable phone** (starts `107…`, not `972…`) — confirm live whether a callable number is obtainable; the lead may carry a stable id + name but not always a phone.
+- [ ] (c) Do separate buyers get isolated sessions, or collide? (picks the inquiry thread key: `id`/session vs `user_id`/sender.) **NEEDS live Telegram bot (2 accounts).**
+- [x] (d) Tool lockdown — **confirmed via `config.yaml`, no adapter patching.** Per-platform `platform_toolsets.<platform>` (gateway resolves `_get_platform_tools`) + global `agent.disabled_toolsets`. Lock the buyer instance to a minimal set (`skills`, maybe `clarify`) and exclude `terminal`,`file`,`code_execution`,`browser`,`web`,`computer_use`,`delegation`,`cronjob`,`memory`,`image_gen`. Registry in `hermes_cli/tools_config.py:CONFIGURABLE_TOOLSETS`. So "safe by construction" holds at both the skill AND tool layer via config.
+- [ ] Spike safety: test with known non-operator accounts, don't broadcast a public bot while tools may be live on the dev machine.
+
+**Phase 1 — build the loop, proven via the Telegram stand-in:**
+- [ ] 1A `buyer-inquiry` SKILL.md (match-one/ask-one/defer; status honesty; HE+EN; canonical defer phrase).
+- [ ] 1B `buyer-listings-context` plugin (always-on, injects listings incl. non-active status).
+- [ ] **CHECKPOINT (natural PR boundary):** prove the skill via `hermes -z` + Telegram (answers/defers/status-honesty/HE-EN/injection-safe) BEFORE building plumbing.
+- [ ] 1C schema (`Inquiry`/`InquiryMessage`, dedup on `hermesTurnId`), 1D endpoints (`/api/inquiries`, `/api/listings/buyer-view`, `proxy.ts`), 1E `sync-inquiries-to-webapp` plugin.
+- [ ] 1F reporting UI (`/inquiries` page/list/detail/actions + nav), 1G operator notification (transport TBD at impl; not email-is-free).
+- [ ] 1H stand up dev buyer instance (isolated skills dir — NOT shared `external_dirs`; tools denied; locked USER.md persona) + end-to-end test.
+
+**Deferred to production (Phase 2/3):** public-instance security hardening (tool lockdown + container isolation + scoped 2nd ingestion secret), dedicated WhatsApp buyer number (2nd eSIM), Terraform 2nd instance per customer (`instance_role`).
 
 ---
 
