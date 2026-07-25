@@ -2,7 +2,7 @@
 
 Task status, order, and sub-checklists. CLAUDE.md owns the brief/phase/architecture; the session-handoff file owns where work stopped. This file owns what's left to do.
 
-Last updated: 2026-07-25 (buyer-inquiry 1A–1G built + verified, Telegram notify with per-customer routing; 1H + Phase 0a/c pending live spike results from user).
+Last updated: 2026-07-25 (buyer-inquiry 1A–1G built + verified, Telegram notify with per-customer routing; 1H + Phase 0a/c pending live spike results from user; recorded the buyer-channel transport open decision — eSIM vs Cloud API vs non-WhatsApp; corrected skill-version doc drift + logged it as a known issue).
 
 ---
 
@@ -29,7 +29,13 @@ An **inbound** feature: a prospective buyer (a stranger) messages and the agent 
 - [x] **1G operator notification — done 2026-07-25, transport = Telegram (user-approved), per-customer routing built.** `lib/notify-operator.ts` fires best-effort from `/api/inquiries` on a deferring reply, buyer contact attached. **Per-customer routing:** new `Customer.operatorTelegramChatId` column (migration `20260725141319_add_operator_telegram_chat_id`), set on the **Settings page** (new "Buyer-lead alerts" section + `updateOperatorTelegramChatIdAction`, digits-only validation, blank clears → dashboard-only). Sends via one shared app-level notifier bot (`OPERATOR_TELEGRAM_BOT_TOKEN` env); `OPERATOR_TELEGRAM_CHAT_ID` env kept only as a dev fallback. Still **inert until the bot token env + a customer chat id are present** — nothing sent without real creds. Verified: chat-id setter round-trips (null→trimmed→null), lint/build clean. **Remaining before a real push works:** create the notifier bot + set `OPERATOR_TELEGRAM_BOT_TOKEN` (deployment step), and each customer pastes their chat id in Settings.
 - [ ] 1H stand up dev buyer instance (isolated skills dir — NOT shared `external_dirs`; tools denied; locked USER.md persona) + end-to-end test. **BLOCKED on the Telegram token (Phase 0a/c).**
 
-**Deferred to production (Phase 2/3):** public-instance security hardening (tool lockdown + container isolation + scoped 2nd ingestion secret), dedicated WhatsApp buyer number (2nd eSIM), Terraform 2nd instance per customer (`instance_role`).
+**Deferred to production (Phase 2/3):** public-instance security hardening (tool lockdown + container isolation + scoped 2nd ingestion secret), the buyer-channel number/transport (open decision below), Terraform 2nd instance per customer (`instance_role`).
+
+**OPEN DECISION — buyer-channel transport (per customer).** The buyer receptionist must be a *separate channel* from the operator's outbound bot — this is forced, not a preference: the Hermes allowlist is a hard adapter gate and sender identity isn't available to skills, so buyers cannot share the operator's number without exposing the outbound, DB-mutating skills (`just-sold`/price-drops) to strangers. So each fully-provisioned customer has **two channels**: the operator's outbound number (they message it) and a public buyer-facing channel (strangers message it). What that buyer channel *is* is still undecided:
+  - **(i) 2nd WhatsApp eSIM per customer (Baileys)** — matches the rest of the prototype; but the Baileys ban risk now applies to a *public-facing* number strangers hit (materially riskier than the operator number only the operator messages), plus another eSIM to provision/pair/babysit per customer. Fine for the **pilot**.
+  - **(ii) Official WhatsApp Business Cloud API** — the right long-term home for a public receptionist: no ban risk, uses the number the customer already advertises. Costs Meta Business Verification per customer + real per-message pricing. Overlaps with item 7 (currently scoped there only for the *operator* side; the *buyer* side is the stronger reason to migrate, since it's the public one that can't be a throwaway).
+  - **(iii) Non-WhatsApp buyer channel** (Telegram bot / web-chat widget linked from the Instagram/Yad2 ad) — zero WhatsApp numbers, no ban risk; but loses "reply on WhatsApp," the native local buyer behavior.
+  - Leaning: **(i) for the pilot, (ii) at scale for the buyer side specifically.** Decide at deployment; the buyer instance itself is transport-agnostic so no code depends on this yet.
 
 ---
 
@@ -94,6 +100,7 @@ Wanted 2026-07-25. The doc-sync hook keeps `CLAUDE.md`, `TODO.md` and the sessio
 - [ ] **Anthropic Console auto-reload billing not confirmed enabled:** the `autoestate` profile's API credits have run dry repeatedly across sessions, causing live outages. Recommended enabling auto-reload at console.anthropic.com — not confirmed done.
 - [ ] **`sync-to-webapp` silently drops turns when the ingest server is unreachable:** the plugin POSTs fire-and-forget with no retry queue (agent/plugins/sync-to-webapp/__init__.py) — a failed POST just logs a warning and the turn's data (including any `Listing` footer) is lost permanently. Surfaced live 2026-07-25 when the 4127 dev server was down during PR #28's turn-two test. Harmless for dev, but for a deployed customer, transient reporting-app downtime = permanently lost listing-tracking events. Consider a lightweight retry/queue before/at production (Vercel deploy, item 4).
 - [ ] **Gateway silently depends on ambient Claude Code OAuth credentials:** the profile's own `ANTHROPIC_API_KEY` keeps going dry and the `credential_pool` is empty, so the gateway falls back to the machine's ambient Claude Code OAuth login. Fragile single point of failure for a customer-facing bot — restarting the gateway from a Claude Code agent environment has knocked this out and caused a full outage before.
+- [ ] **Skill `version:` fields drift from the docs — no cross-check:** the doc-sync hook keeps docs *current* as changes happen but never re-verifies on-disk `version:` frontmatter against CLAUDE.md's stated versions. Caught 2026-07-25: `just-sold`/`listing-reengagement` were on-disk `0.2.0` (docs said v0.1.0) and `listing-status-update` `0.4.0` (docs said v0.3.0) — all bumped by PR #26 but recorded in prose without the numbers. Corrected in CLAUDE.md's PR #26 paragraph. Consider a periodic `grep '^version' agent/skills/**/SKILL.md` vs. the docs, or fold it into the README-refresh hook (item 9).
 
 ---
 
