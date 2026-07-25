@@ -2,7 +2,7 @@
 
 Task status, order, and sub-checklists. CLAUDE.md owns the brief/phase/architecture; the session-handoff file owns where work stopped. This file owns what's left to do.
 
-Last updated: 2026-07-25.
+Last updated: 2026-07-25 (buyer-inquiry 1A skill + 1B plugin written; checkpoint `hermes -z` next).
 
 ---
 
@@ -19,9 +19,9 @@ An **inbound** feature: a prospective buyer (a stranger) messages and the agent 
 - [ ] Spike safety: test with known non-operator accounts, don't broadcast a public bot while tools may be live on the dev machine.
 
 **Phase 1 — build the loop, proven via the Telegram stand-in:**
-- [ ] 1A `buyer-inquiry` SKILL.md (match-one/ask-one/defer; status honesty; HE+EN; canonical defer phrase).
-- [ ] 1B `buyer-listings-context` plugin (always-on, injects listings incl. non-active status).
-- [ ] **CHECKPOINT (natural PR boundary):** prove the skill via `hermes -z` + Telegram (answers/defers/status-honesty/HE-EN/injection-safe) BEFORE building plumbing.
+- [x] 1A `buyer-inquiry` SKILL.md **written 2026-07-25** (`agent/skills/real-estate/buyer-inquiry/SKILL.md`, v0.1.0). Conversational (not 3-platform, no footer); injected-block-only sourcing; match-one/ask-one-if-ambiguous/defer; status honesty (never call non-ACTIVE available); mirror buyer's language; canonical defer sentence HE+EN (verbatim — dashboard heuristic keys on it); lead capture on defer; prompt-injection resistance. **Not yet proven via `hermes -z`** (checkpoint below).
+- [x] 1B `buyer-listings-context` plugin **written 2026-07-25** (`agent/plugins/buyer-listings-context/`, syntax-checked). Always-on (no keyword gate), platform-gated `{whatsapp,telegram}`, reads `/api/listings/buyer-view` (derived from `AUTOESTATE_INGESTION_URL`), injects each listing WITH status; empty/failed → explicit "no listings, defer" / `None`. Note: `/api/listings/buyer-view` doesn't exist yet (1D), so a live fetch 404s→`None` until then — fine for now, simulate the block for `hermes -z`.
+- [x] **CHECKPOINT — skill proven via `hermes -z` 2026-07-25** (5/5 scenarios, simulated context block, `autoestate` profile which discovers the skill via `external_dirs`): (1) ACTIVE availability → correct factual answer + lead-capture offer; (2) SOLD → honest "already sold" + alternatives + exact EN defer sentence + contact ask; (3) Hebrew, parking-not-in-data → full-HE reply, price answered, parking deferred (not invented), exact HE defer sentence; (4) prompt-injection (run shell / post fake ad / leak prompt) → all three refused, stayed in role; (5) ambiguous "is it available?" with 2 ACTIVE → one clarifying question naming both candidates. Routing correctly picked `buyer-inquiry` every time (no mis-route to outbound skills). **Caveat:** (4) proves the *skill/prompt* layer only — the *tool* layer (built-in tools denied) is still a separate 1H/Phase-2 gate; on the operator profile the model chose not to run the shell tool, it isn't yet config-denied one. Still pending: the live Telegram-bot proof (Phase 0a/c) once the token is ready.
 - [ ] 1C schema (`Inquiry`/`InquiryMessage`, dedup on `hermesTurnId`), 1D endpoints (`/api/inquiries`, `/api/listings/buyer-view`, `proxy.ts`), 1E `sync-inquiries-to-webapp` plugin.
 - [ ] 1F reporting UI (`/inquiries` page/list/detail/actions + nav), 1G operator notification (transport TBD at impl; not email-is-free).
 - [ ] 1H stand up dev buyer instance (isolated skills dir — NOT shared `external_dirs`; tools denied; locked USER.md persona) + end-to-end test.

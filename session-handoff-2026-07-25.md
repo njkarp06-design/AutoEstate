@@ -46,13 +46,17 @@ Still pending, **blocked on a live Telegram test bot** the user is creating righ
 
 **Environment:** reporting-app dev server is running on **127.0.0.1:4127**. Anthropic API credits were topped up earlier this session. `autoestate` gateway is running (operator profile) — untouched by this work.
 
+### Progress this continuation (2026-07-25, later)
+
+**Phase 1A + 1B written, and the CHECKPOINT passed via `hermes -z`.** Committed on `feat/buyer-inquiry`.
+- **1A** `agent/skills/real-estate/buyer-inquiry/SKILL.md` (v0.1.0) — conversational (no 3-platform format, no Listing Record footer); answers ONLY from the injected "Available listings" block (never memory/guess); match-one / ask-one-if-ambiguous / defer-if-absent; status honesty (never call SOLD/UNDER_CONTRACT available); mirror the buyer's language; **canonical defer sentence** in HE + EN that must appear verbatim (the 1D display heuristic will key on it — coupling documented in the skill); lead capture (ask for contact once on defer); prompt-injection resistance.
+- **1B** `agent/plugins/buyer-listings-context/` (`__init__.py` + `plugin.yaml`, syntax-checked) — cousin of `active-listings-context` but **always-on (no keyword gate)**, platform-gated `{whatsapp,telegram}`, reads `/api/listings/buyer-view` (derived from `AUTOESTATE_INGESTION_URL`), injects each listing WITH status; empty → explicit "no listings, defer"; any fetch failure → `None` (skill then defers — safe). **`/api/listings/buyer-view` doesn't exist yet (that's 1D)**, so a live fetch 404s→`None` until built; harmless, and `hermes -z` is `cli` so the plugin doesn't fire there anyway (simulate the block in the prompt).
+- **Checkpoint 5/5** (simulated context, `autoestate` profile): ACTIVE answer+lead; SOLD honesty + exact EN defer sentence; Hebrew reply + parking-deferred-not-invented + exact HE defer sentence; prompt-injection fully refused; ambiguous → one clarifying question. Routing picked `buyer-inquiry` every time. **Caveat:** the injection test proves the *skill/prompt* layer only — tool-layer lockdown (deny built-in tools) is still the 1H/Phase-2 gate.
+
 ### Next Step
 
-**Two tracks, do in this order:**
-1. **(No user needed) Write the bot's brain now:** `agent/skills/real-estate/buyer-inquiry/SKILL.md` (Phase 1A) + `agent/plugins/buyer-listings-context/` (Phase 1B). These are independent of blockers (a)/(c) and testable via `hermes -z`. Mirror these real templates (already read this session): skill → `agent/skills/real-estate/listing-status-update/SKILL.md`; context plugin → `agent/plugins/active-listings-context/__init__.py` (but always-on, no keyword gate, and inject listings *with status* including SOLD/UNDER_CONTRACT). The buyer skill is a *conversational reply*, NOT the 3-platform/footer format — match-one/ask-one-if-ambiguous/defer-if-absent, status honesty, HE+EN mirroring, a canonical defer phrase, no Listing Record footer.
-2. **(When the user's bot token is ready) Run Phase 0(a)/(c):** stand up a minimal isolated Hermes profile for the throwaway Telegram bot (open allowlist; tools locked to `skills`/`clarify`; own skills dir with ONLY the buyer skill — NOT the shared `external_dirs`), have the user drop the token into its `.env`, message it from two accounts, and inspect `state.db` to confirm (a) strangers get through and (c) sessions stay separate.
-
-After both: the **checkpoint** — prove the skill via `hermes -z` (answers/defers/status-honesty/HE-EN/injection-safe), then build the reporting plumbing (Phase 1C–1G) and stand up the dev buyer instance (1H).
+1. **(When the user's bot token is ready) Run Phase 0(a)/(c):** stand up a minimal isolated Hermes profile for the throwaway Telegram bot (open allowlist; tools locked to `skills`/`clarify`; own skills dir with ONLY the buyer skill — NOT the shared `external_dirs`), have the user drop the token into its `.env`, message it from two accounts, inspect `state.db` to confirm (a) strangers get through and (c) sessions stay separate. **Token was NOT provided in this session — still pending from @BotFather.**
+2. **Build the plumbing (1C–1G):** schema (`Inquiry`/`InquiryMessage`), the two endpoints (`/api/inquiries` + `/api/listings/buyer-view`) + `proxy.ts` public routes, `sync-inquiries-to-webapp` plugin, `/inquiries` UI, operator notification. Then stand up the dev buyer instance (1H) and test end-to-end via Telegram.
 
 ### How to Resume
 

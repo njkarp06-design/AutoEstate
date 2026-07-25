@@ -1,0 +1,3 @@
+name: buyer-listings-context
+version: "1.0"
+description: Injects the customer's listings (with status — ACTIVE/UNDER_CONTRACT/SOLD) into every buyer-facing turn, so the buyer-inquiry skill answers a stranger's questions only from real, current listing data and never invents or misstates availability. Always-on (no keyword gate), buyer instance only.
