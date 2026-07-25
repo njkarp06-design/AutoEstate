@@ -10,7 +10,7 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private).
 
 ### Current state at a glance
 
-- **Branch `feat/buyer-inquiry`** (off `main` @ `c42cb10`), **5 commits ahead of main, all pushed, working tree clean.** No open PR yet (correct — the feature isn't finished; don't merge until 1H + the spike are done).
+- **Branch `feat/buyer-inquiry`** (off `main` @ `c42cb10`), **7 commits ahead of main, all pushed, working tree clean.** No open PR yet (correct — the feature isn't finished; don't merge until 1H + the spike are done). The two most recent commits are docs-only (2026-07-25 continuation session): the **buyer-channel transport open decision** (two channels forced per customer — see CLAUDE.md's buyer-inquiry section + TODO's "OPEN DECISION" block: 2nd eSIM vs official Cloud API vs non-WhatsApp, deferred to deployment) and a **skill-version doc-drift correction** (PR #26's locator feature had bumped `just-sold`/`listing-reengagement` to v0.2.0 and `listing-status-update` to v0.4.0 without the docs recording the numbers — now fixed, and logged as a known issue in TODO). No feature code changed in this continuation session.
 - **Phase 1A–1G: built, verified, committed, pushed.** The skill, the context plugin, the full reporting pipeline (schema → endpoints → sync plugin → dashboard), and the Telegram operator-notification with per-customer routing all done.
 - **What remains: the live Telegram spike (Phase 0a/c) and 1H (the dev buyer instance).** Both need a BotFather token + two test Telegram accounts — the user will do this in their own time. **The spike has NOT been run** (an earlier "I ran it" message was retracted — no results exist; assume nothing).
 
