@@ -21,7 +21,7 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private).
 - ✅ **(b) Buyer-contact capture** viable via a read-only `state.db` `sessions` read — no `sender` column; identity is in `id`/`user_id`/`chat_id`/`display_name`/`origin_json`. Confirmed live on **Telegram** too: `display_name`="Natanel Karp" + numeric `user_id`=`8543293827` (a Telegram id, not a phone). **Caveat holds on both platforms:** a lead carries a stable id + name but **not a callable number** (WhatsApp = LID, Telegram = numeric id) — ask for a phone if a callback number is wanted.
 - ✅ **(c) Isolated sessions, no collision.** Live spike, two real senders → two separate sessions keyed `agent:main:telegram:dm:<user_id>` (Natanel `8543293827`, flatmate Maxime `5353927310`). So the current schema's `hermesSessionId` thread key is correct — **no `@@unique` change needed.**
 - ✅ **(d) Tool lockdown** works via `config.yaml` alone, no adapter patching — per-platform `platform_toolsets.<platform>` + global `agent.disabled_toolsets`; lock the buyer instance to `skills`/`clarify` and exclude `terminal`/`file`/`code_execution`/`browser`/`web`/`computer_use`/`delegation`/`cronjob`/`memory`/`image_gen`. Registry: `hermes_cli/tools_config.py:CONFIGURABLE_TOOLSETS`. Incidentally exercised live (locked spike config; flatmate typed "spend money" — nothing happened).
-- Spike hygiene (done): known accounts only, locked-down throwaway `spike` profile, bot link never broadcast, profile deleted right after. **Open user action:** `/revoke` the spike bot token in @BotFather.
+- Spike hygiene (done): known accounts only, locked-down throwaway `spike` profile, bot link never broadcast, profile deleted right after, and the spike bot token **revoked** by the user in @BotFather (2026-07-25). No spike artifacts remain.
 
 ### What was built (Phase 1A–1G) — all on `feat/buyer-inquiry`
 
@@ -49,7 +49,7 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private).
 3. **(Deployment, non-blocking) Notifier bot:** create the Telegram alert bot, set `OPERATOR_TELEGRAM_BOT_TOKEN`, paste a chat id in Settings — needed before a real lead *push* works (the dashboard already records leads regardless).
 4. **After 1H:** open the PR into `main` (don't auto-merge — confirm first, per the standing rule).
 
-**User open action:** `/revoke` the throwaway spike bot token (`8910877524:…`) in @BotFather — the token was pasted in chat; revoking retires it for good.
+**Spike bot token:** revoked by the user in @BotFather (2026-07-25) — no longer valid, nothing outstanding.
 
 ### How to Resume
 
