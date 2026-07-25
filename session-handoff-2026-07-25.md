@@ -64,16 +64,16 @@ The user said: do the Telegram spike in their own time; **build everything else.
 - **Verified:** `npm run lint`/`build` clean; a throwaway-customer dry-run drove the **real** `/api/inquiries` route + real `getInquiries`/`getInquiry`/`setInquiryHandled` against dev Neon — dedup held, disposition correct, listing-link + contact-capture + cross-customer isolation + buyer-view-all-statuses all passed; cleaned up. (Temp script deleted, not committed.)
 - **Note:** had to **restart the 4127 dev server** (killed PID, relaunched `next dev -p 4127` in background — it's up now) because the running server held a stale Prisma client and 500'd on the new `inquiry` model until restart. Lesson recorded in CLAUDE.md.
 
-### ⚠️ OPEN: the user reports they RAN the live spike (Phase 0a/c) — results not yet captured
+### ⚠️ STILL PENDING: the live Telegram spike (Phase 0a/c) has NOT been run
 
-As of the last message the user said "I've run the live spike" but hasn't shared the findings. **Do not assume outcomes.** Get from the user (or from the throwaway bot's profile `state.db` + the `sync-inquiries` "hook kwargs keys" gateway-log line) and then record in the docs:
+(Corrected 2026-07-25: an earlier message that mentioned running the spike was retracted by the user — it was **not** run. No spike results exist yet; do not assume any.) Blocked on a BotFather token + two test Telegram accounts, which the user is doing in their own time. When it runs, capture and record:
 - **(a)** Did an open/empty allowlist actually admit non-operator senders? (If block-all, the design is blocked — escalate.)
-- **(c)** Did two distinct senders get **isolated** sessions, or collide into one? → confirms/【changes the Inquiry thread key. Current schema keys on `hermesSessionId` with a documented fallback to a resolved `sender` if they collide — if the spike shows collision, switch the `@@unique` key.
+- **(c)** Did two distinct senders get **isolated** sessions, or collide into one? → confirms/changes the Inquiry thread key. Current schema keys on `hermesSessionId` with a documented fallback to a resolved `sender` if they collide — if the spike shows collision, switch the `@@unique` key.
 - **(b live)** What buyer identity is actually available to the hooks (the `sync-inquiries` log prints `hook kwargs keys = [...]`)? Confirms whether `buyerContact` can carry a real dialable number or just a LID/display name.
 
 ### Next Step
 
-1. **Capture the spike results above**, update TODO Phase-0 (a)/(c) + this handoff, and adjust the thread key if (c) showed collision.
+1. **Run the live spike (a)/(c)** once the token + two accounts are ready; record results in TODO Phase-0 + this handoff, and adjust the thread key if (c) showed collision.
 2. **1H — stand up the DEV buyer instance:** a separate Hermes profile/data dir — open allowlist (Phase-0a value); built-in tools locked to `skills`/`clarify` via `config.yaml` (`platform_toolsets` + `disabled_toolsets`); **its own skills dir with ONLY `buyer-inquiry`** (NOT the shared `external_dirs`, which holds all 5 outbound skills); plugins `buyer-listings-context` + `sync-inquiries-to-webapp` copied in + enabled; a locked `USER.md` persona; `.env` reuses the customer's ingestion secret + points at the local reporting app. Then a full end-to-end buyer→dashboard test (answers/defers/status-honesty/HE-EN; lead appears in `/inquiries` with contact; Mark handled; the deferring reply fires the operator notification once a notifier bot token is set).
 3. **(Deployment) Notifier bot:** create the Telegram alert bot, set `OPERATOR_TELEGRAM_BOT_TOKEN`, paste a chat id in Settings — needed before a real lead push works (not blocking the dashboard).
 
