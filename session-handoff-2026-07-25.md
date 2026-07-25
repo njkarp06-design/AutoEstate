@@ -24,7 +24,8 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). **Repo is 
 - The gateway was restarted several times this session (once per plugin version). **Currently running, healthy, both WhatsApp + Telegram connected** (last PID 8340; may differ if restarted again).
 - **Anthropic API credits:** the user topped up at the start of this session, so the live gateway is currently working. (This has run dry repeatedly across sessions — enabling Console auto-reload billing was recommended again; unknown if done.)
 - **Reporting-app dev server** is running on **127.0.0.1:4127** (started this session). Check `Get-NetTCPConnection -LocalPort 4127` before starting another — don't spawn a duplicate.
-- **Dev database state:** the **Ben Gurion, Tel Aviv (4 rooms, 95 sqm, floor 3)** listing is currently `ACTIVE` and **un-recorded as sold** — it was flipped back to ACTIVE for the retest and the final "yes" confirmation step was never sent, so it's sitting mid-test. Its Prisma id is `cmry5rje00004u8u6ctv54q67`. This is the dev Neon database (via `.env.local`), not a separate real-customer DB.
+- **Dev database state:** the **Ben Gurion, Tel Aviv (4 rooms, 95 sqm, floor 3)** listing (`cmry5rje00004u8u6ctv54q67`) is now `SOLD` as of 2026-07-25 — the PR #28 turn-two verification (below) was completed and the row flipped in place (no duplicate). This is the dev Neon database (via `.env.local`), not a separate real-customer DB.
+- **Reporting-app dev server:** was **down** at the start of the 2026-07-25 continuation; **restarted on 127.0.0.1:4127** (background, log in scratchpad `devserver.log`). Check `Get-NetTCPConnection -LocalPort 4127` before spawning another.
 
 ### Decisions Made
 
@@ -32,10 +33,11 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). **Repo is 
 - **Declined: two separate WhatsApp messages** (post in one bubble, confirmation in another). Impossible without patching vendored Hermes adapter code — the outgoing chunker splits only by length and there's no delivery/send hook. Not worth the `hermes update`-revert fragility for a cosmetic gain. The user's own suggestion — put the confirmation intro at the **top** of the single message — solved the visibility problem instead (v1.3/v1.4).
 - **Confirmation intro must not imply auto-posting.** Posting to Instagram/Facebook/Yad2 stays manual in this product; replying "yes" only records the update to the reporting dashboard. Built into the v1.4 plugin text as an explicit guardrail.
 
-### Verification status — READ THIS before assuming PR #28 is fully closed
+### Verification status — PR #28 fully CLOSED 2026-07-25
 
 - **Turn one (deferral): verified live on real WhatsApp**, repeatedly, across v1.1→v1.4. Footer withheld, `Status: Sold` absent, DB untouched, descriptive intro leads the reply. Checked against the live session's `state.db` content, not just the visible bubble.
-- **Turn two (the confirming "yes" → footer appended → Ben Gurion `ACTIVE`→`SOLD`): NOT separately re-verified live** with the v1.4 intro in place. Low-risk — the `ACTIVE`→`SOLD` transition-in-place itself was already proven live by the *original failing* test (same row updated, no duplicate) — but "the user trusts it works" is not the same as "we watched it work." If you want it fully closed: send "Great news, the apartment sold! Make a sold post" from the user's WhatsApp, confirm the reply leads with the intro + no footer, then reply "yes" and confirm the footer lands and Ben Gurion flips to SOLD (query `/api/listings/active` or the Listing row directly).
+- **Turn two (the confirming "yes" → footer appended → Ben Gurion `ACTIVE`→`SOLD`): now DONE.** Confirmed via `state.db`: the "Yes" turn's assistant reply appended the `Listing Record` footer with `Status: Sold`. Ben Gurion (`cmry5rje…`) flipped `ACTIVE`→`SOLD` in the dev DB, same row, no duplicate.
+- **How the DB flip actually happened (honest caveat):** the model side was fully live, but the ingest leg was **not** triggered by the live WhatsApp turn — the 4127 dev server was **down** during the test, and `sync-to-webapp` is fire-and-forget with **no retry** (agent/plugins/sync-to-webapp/__init__.py), so the "Yes" turn's POST was silently dropped. Closed the DB side by starting the dev server and **reconstructing that exact dropped `turn_completed` payload** (real session id `20260722_211453_5df9b593` + the real footer reply pulled from `state.db`) and POSTing it to the live `/api/ingest` — so the real ingest→parser→transition path ran, just not off a live turn. Added this drop-on-unreachable behavior to TODO.md's known-issues (matters before a production Vercel deploy — transient downtime would lose real listing-tracking events).
 
 ### How to query the dev DB / live session (commands that worked this session)
 
@@ -47,9 +49,10 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private). **Repo is 
 
 **`TODO.md` (repo root) owns the full task list, order, and sub-checklists** — read it first. The short version of what to pick up:
 
-1. **(Optional, ~2 min) Fully close PR #28's turn-two verification** — see Verification status above. Not blocking; the fix is merged and turn one is proven. (TODO.md item 1.)
-2. **Next roadmap item: buyer-inquiry auto-reply** — deliberately last on the roadmap, inbound (new sender/allowlist + trust surface), biggest lift. (TODO.md item 2.)
-3. Everything else (Hetzner `terraform apply`, Vercel deploy, Phase 5 security items, known small issues) is captured and prioritized in TODO.md.
+1. **Next roadmap item: buyer-inquiry auto-reply** — deliberately last on the roadmap, inbound (new sender/allowlist + trust surface), biggest lift. (TODO.md item 1.)
+2. Everything else (Hetzner `terraform apply`, Vercel deploy, Phase 5 security items, known small issues) is captured and prioritized in TODO.md. Note the new known-issue: `sync-to-webapp` drops turns when the ingest server is unreachable — worth a retry/queue before the production Vercel deploy.
+
+(PR #28 turn-two verification is now CLOSED — see Verification status above.)
 
 ### How to Resume
 

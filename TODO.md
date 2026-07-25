@@ -8,14 +8,7 @@ Last updated: 2026-07-25.
 
 ## 🔜 Next up (in order)
 
-### 1. (Optional) Close PR #28's turn-two live verification
-Low-risk, not blocking. The no-locator sale/status confirmation-deferral fix is merged and turn one is verified live; only the confirming "yes" turn is unverified with plugin v1.4 in place.
-- [ ] Send "Great news, the apartment sold! Make a sold post" from the operator's WhatsApp (no street name).
-- [ ] Confirm the reply leads with the descriptive intro + confirmation question, and has **no** Listing Record footer.
-- [ ] Reply "yes"; confirm the footer is appended and the **Ben Gurion** listing flips `ACTIVE` → `SOLD` (check `GET /api/listings/active` or the `Listing` row directly; dev id `cmry5rje00004u8u6ctv54q67`).
-- [ ] Note: the Ben Gurion dev-DB listing is currently sitting `ACTIVE` and un-recorded mid-test — this step also cleans that up.
-
-### 2. Buyer-inquiry auto-reply skill (last roadmap item, biggest scope)
+### 1. Buyer-inquiry auto-reply skill (last roadmap item, biggest scope)
 An inbound skill: auto-respond to a prospective buyer's question about a listing. Deliberately last — it's a different product shape from everything so far (inbound, not outbound marketing content).
 - [ ] Design the **new inbound trust surface**: a sender/allowlist model distinct from the current operator-only allowlist (a buyer is not the operator).
 - [ ] Decide the guardrails: what it may answer from listing data vs. when it must defer to the human agent; never invent facts (same no-recall/no-invention discipline as the other skills).
@@ -84,6 +77,7 @@ Wanted 2026-07-25. The doc-sync hook keeps `CLAUDE.md`, `TODO.md` and the sessio
 - [ ] **Reporting-app platform parser misses some real headers:** `platform-content.ts` doesn't always recognize plain-caps `INSTAGRAM` / `עברית:` headers (vs. the spec's bold/ATX format), so an occasional real reply fails to split into platform sections. The Listing-record parser is independently robust; this only affects the platform-split display.
 - [ ] **`app/page.tsx` Activity list still `max-w-3xl`:** PR #17 was believed to have widened it to `max-w-5xl`, but only its empty-state branch was widened. One-line fix, left out of scope.
 - [ ] **Anthropic Console auto-reload billing not confirmed enabled:** the `autoestate` profile's API credits have run dry repeatedly across sessions, causing live outages. Recommended enabling auto-reload at console.anthropic.com — not confirmed done.
+- [ ] **`sync-to-webapp` silently drops turns when the ingest server is unreachable:** the plugin POSTs fire-and-forget with no retry queue (agent/plugins/sync-to-webapp/__init__.py) — a failed POST just logs a warning and the turn's data (including any `Listing` footer) is lost permanently. Surfaced live 2026-07-25 when the 4127 dev server was down during PR #28's turn-two test. Harmless for dev, but for a deployed customer, transient reporting-app downtime = permanently lost listing-tracking events. Consider a lightweight retry/queue before/at production (Vercel deploy, item 4).
 - [ ] **Gateway silently depends on ambient Claude Code OAuth credentials:** the profile's own `ANTHROPIC_API_KEY` keeps going dry and the `credential_pool` is empty, so the gateway falls back to the machine's ambient Claude Code OAuth login. Fragile single point of failure for a customer-facing bot — restarting the gateway from a Claude Code agent environment has knocked this out and caused a full outage before.
 
 ---
@@ -94,3 +88,4 @@ Wanted 2026-07-25. The doc-sync hook keeps `CLAUDE.md`, `TODO.md` and the sessio
 - Re-engagement / just-sold skills (PR #25) — live-tested.
 - Locator-based listing lookup (PR #26) — name a listing instead of retyping facts.
 - No-locator confirmation-deferral fix (PR #28) — rule moved into the always-injected `listing-footer-reminder` plugin (v1.4); turn one verified live.
+- **PR #28 turn-two verification — CLOSED 2026-07-25.** Both turns confirmed live via the session `state.db`: turn one leads with intro + confirmation question and withholds the footer; turn two ("Yes") appends the `Status: Sold` footer. The **Ben Gurion** listing (`cmry5rje00004u8u6ctv54q67`) flipped `ACTIVE` → `SOLD` in the dev DB (same row, no duplicate — transition-in-place confirmed). Caveat: the ingest leg was **reconstructed** (the 4127 dev server was down during the live test, so `sync-to-webapp` silently dropped the "Yes" turn's POST — no retry queue; see the new known-issue below) — the real `/api/ingest` → parser → transition path ran, just not triggered by the live WhatsApp turn itself.
