@@ -4,7 +4,7 @@ Task status, order, and sub-checklists. CLAUDE.md owns the brief/phase/architect
 
 Last updated: 2026-07-27.
 
-**Status:** every planned feature is built, live-tested and merged — the last, buyer-inquiry, in PR #34. The `/inspect` forensic sweep (PR #37) then fixed 41 defects across infra, plugins and the reporting app. **Nothing is blocked on more building.** Everything below is productionization, plus one deployment gap (item 0).
+**Status:** every planned feature is built, live-tested and merged — the last, buyer-inquiry, in PR #34. The `/inspect` forensic sweep (PR #37) then fixed 41 defects across infra, plugins and the reporting app. Those fixes were then **deployed to the live profiles and the operator gateway restarted (2026-07-27)** — merging alone would not have done it, since plugins are physical copies inside each profile. **Nothing is blocked on more building, and nothing is half-deployed.** Everything below is productionization.
 
 **Blocked on the owner (account-level, cannot be done for you):** creating a Hetzner account so `terraform apply` can run (item 3), and setting up Vercel Pro to deploy the reporting app (item 4). These two gate a real pilot customer.
 
@@ -22,30 +22,12 @@ Last updated: 2026-07-27.
 
 ## 🔜 Next up (in order)
 
-### 0. Deploy the merged plugin fixes to the live profiles ⚠️ NOT DONE
-
-**PR #37's plugin fixes are on `main` but are NOT running.** Plugins are physical copies inside each profile's `plugins/` directory — merging deploys nothing. Verified 2026-07-27 by the parity recipe: **4 of 5 plugins have drifted**, and the live `autoestate` gateway is still executing pre-fix code.
-
-| Profile | Plugin | State |
-|---|---|---|
-| `autoestate` (running) | `active-listings-context` | **drifted** — still has the `KeyError`-out-of-hook bug |
-| `autoestate` (running) | `sync-to-webapp` | **drifted** — still no retry |
-| `autoestate` (running) | `listing-footer-reminder` | matches (unchanged by #37) |
-| `autoestate-buyer` (stopped) | `buyer-listings-context` | **drifted** — still has the `KeyError` bug |
-| `autoestate-buyer` (stopped) | `sync-inquiries-to-webapp` | **drifted** — still no retry |
-
-- [ ] Copy the four changed `__init__.py` files into `%LOCALAPPDATA%\hermes\profiles\<profile>\plugins\<name>\`.
-- [ ] Restart both gateways, then re-run the parity check to confirm all five match.
-
-**Do the restart from a normal interactive shell, not from a Claude Code agent session** — doing it from an agent environment has knocked out the ambient OAuth credential the gateway silently depends on and caused a full outage before (see the known issue below). Low urgency while nothing is deployed and the buyer bot is stopped, but the operator gateway is live, so it is running known-buggy code today.
-
-### 1. Nothing is blocking on features. The roadmap is done.
+### 1. Nothing is blocking. The roadmap is done and the fixes are live.
 
 Buyer-inquiry shipped on 2026-07-26 (PR #34), which was the last item on the marketing-automation roadmap. Every roadmap feature — listing-to-social, status updates, just-sold, re-engagement, locator lookup, weekly digest, and the buyer-facing receptionist — is built, live-tested and merged.
 
 **What remains is productionization, not features.** It is all listed below and none of it is blocked on more building. The shortest path to a real pilot customer:
 
-0. Deploy the merged plugin fixes to the live profiles (item 0) — five minutes, and the operator gateway is running pre-fix code until it happens.
 1. `terraform apply` to a real Hetzner account (item 3) — needs an account, an account-level action.
 2. Deploy the reporting app to Vercel Pro (item 4) — also account-level.
 3. The public buyer instance's production security gates (items 5 and 6): container isolation, a scoped second ingestion secret so the buyer box does not hold one that can write to `/api/ingest`, and re-running `hermes security audit` once anything is publicly exposed.
@@ -163,7 +145,10 @@ These are **blocking** for a real deployment, not awareness items. Each is a rea
 
 ## ✅ Done (recent, for context)
 
-- **`/inspect` forensic sweep of `main` — PR #37, MERGED 2026-07-26.** 41 findings (3 critical, 9 major, 18 minor, 11 nitpick), all fixed across five commits (40 files, +807/−257) except the scoped-ingestion-secret item, which is a feature and is now tracked as a deploy gate above. **The plugin fixes are merged but not yet deployed to the live profiles — see item 0.** The three that mattered most: the **Terraform module had drifted to a 2026-07-22 snapshot** and shipped 1 of 5 skills and 1 of 3 plugins — a customer provisioned from it would have tracked **zero** listings, reproducing the exact bug PR #23 fixed; both context plugins could **raise `KeyError` out of `pre_llm_call`** on the public buyer instance, on every turn, breaking their own documented degrade-to-`None` contract; and **every dashboard timestamp would have rendered in UTC on Vercel**, 2-3 hours off for Tel Aviv users, with Today/Yesterday flipping at the wrong moment. Two fixes were changed by measurement rather than shipped as planned: the inquiry→listing matcher's "obvious" fix would have produced **zero** links on real data, and `next build` caught a `"use server"` export error that neither `tsc` nor eslint saw.
+- **PR #37's plugin fixes deployed to the live profiles — 2026-07-27.** Merging did not deploy them: plugins are physical copies inside each profile's `plugins/` dir, and the parity check found 4 of 5 drifted with the running operator gateway still on pre-fix code. The four changed `__init__.py` files were copied into `autoestate` and `autoestate-buyer`, and the owner restarted the operator gateway from their own PowerShell (not an agent session — that has caused an outage before). Verified end to end: live files were confirmed to be unmodified pre-#37 copies **before** overwriting; parity 5/5 after; all five import and register with the right hooks; PID 8340 → 6072 with a start time 7 minutes *after* the files were written, which is what proves the new code was loaded rather than a cache; log shows a clean shutdown and `Gateway running with 2 platform(s)`. No second restart was needed — the known inert-on-first-restart quirk applies to *newly enabled* plugins, not updated ones.
+  **Standing rule this establishes:** a plugin PR is not finished when it merges. Run the parity recipe and redeploy, or the fix exists only in git.
+
+- **`/inspect` forensic sweep of `main` — PR #37, MERGED 2026-07-26.** 41 findings (3 critical, 9 major, 18 minor, 11 nitpick), all fixed across five commits (40 files, +807/−257) except the scoped-ingestion-secret item, which is a feature and is now tracked as a deploy gate above. Its plugin fixes were deployed to the live profiles the next day — see the entry above. The three findings that mattered most: the **Terraform module had drifted to a 2026-07-22 snapshot** and shipped 1 of 5 skills and 1 of 3 plugins — a customer provisioned from it would have tracked **zero** listings, reproducing the exact bug PR #23 fixed; both context plugins could **raise `KeyError` out of `pre_llm_call`** on the public buyer instance, on every turn, breaking their own documented degrade-to-`None` contract; and **every dashboard timestamp would have rendered in UTC on Vercel**, 2-3 hours off for Tel Aviv users, with Today/Yesterday flipping at the wrong moment. Two fixes were changed by measurement rather than shipped as planned: the inquiry→listing matcher's "obvious" fix would have produced **zero** links on real data, and `next build` caught a `"use server"` export error that neither `tsc` nor eslint saw.
 
 - **`buyer-inquiry` v0.2.0 — never offer a SOLD listing as a choice (2026-07-26).** The disambiguation menu had listed sold properties as if on offer, so a buyer could pick one and only then be told. Anything the skill offers unprompted is now `ACTIVE`-only. Verified via `hermes -z` including the regression case (a buyer *naming* a sold property still gets the honest answer).
 
