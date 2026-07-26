@@ -11,3 +11,9 @@ ingestion_api_url      = "REPLACE_ME"  # e.g. https://app.autoestate.example/api
 whatsapp_allowed_users = "REPLACE_ME"  # customer's WhatsApp number, international format, no + (e.g. 972501234567)
 
 operator_ssh_cidrs = ["REPLACE_ME/32"] # your own current IP - never leave this open
+
+# Name of your SSH key as already uploaded to the Hetzner project (Security ->
+# SSH Keys). Upload it ONCE and reuse the same name for every customer -
+# Hetzner rejects the same public key twice in a project, so this is looked up
+# rather than created per customer. Defaults to "autoestate-operator".
+# operator_ssh_key_name = "autoestate-operator"

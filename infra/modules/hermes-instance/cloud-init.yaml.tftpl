@@ -1,8 +1,12 @@
 #cloud-config
 # Provisions a customer's dedicated Hermes instance up to the point where
 # WhatsApp pairing (a manual, interactive step - see module README) is the
-# only thing left. The ingestion secret is deliberately NOT written here -
-# see the null_resource.inject_secret provisioner in main.tf.
+# only thing left. Two things are deliberately NOT written here:
+#   - The ingestion secret and API key - see null_resource.inject_secrets.
+#   - The skills and plugins themselves - see
+#     null_resource.deploy_agent_content. They do not fit: Hetzner caps
+#     user_data at 32KB and the five operator skills alone are ~63KB of
+#     Markdown. They are uploaded over SSH post-boot instead.
 
 write_files:
   - path: /root/.hermes/.env
@@ -27,31 +31,30 @@ write_files:
       model:
         default: ${hermes_model}
         provider: anthropic
+      # All three operator plugins. Plugins are NOT auto-discovered the way
+      # skills are - each must be physically present in /root/.hermes/plugins
+      # (uploaded by null_resource.deploy_agent_content) AND named here.
+      #   sync-to-webapp          - syncs each turn to the reporting webapp.
+      #   listing-footer-reminder - force-injects the Listing Record footer
+      #                             format every turn. Load-bearing: without
+      #                             it a long-lived session stops emitting
+      #                             the footer and NOTHING is ever tracked in
+      #                             the Listing table (see CLAUDE.md, PR #23).
+      #   active-listings-context - fetches the customer's active listings so
+      #                             weekly-digest and the locator lookup in
+      #                             the status/sold/re-engagement skills work.
       plugins:
         enabled:
           - sync-to-webapp
-
-  - path: /root/.hermes/skills/real-estate/listing-to-social/SKILL.md
-    permissions: '0644'
-    content: |
-      ${indent(6, skill_content)}
-
-  - path: /root/.hermes/plugins/sync-to-webapp/plugin.yaml
-    permissions: '0644'
-    content: |
-      ${indent(6, plugin_yaml_content)}
-
-  - path: /root/.hermes/plugins/sync-to-webapp/__init__.py
-    permissions: '0644'
-    content: |
-      ${indent(6, plugin_init_content)}
+          - listing-footer-reminder
+          - active-listings-context
 
   - path: /root/docker-compose.yml
     permissions: '0644'
     content: |
       services:
         gateway:
-          image: nousresearch/hermes-agent:latest
+          image: nousresearch/hermes-agent:${hermes_image_tag}
           container_name: hermes
           restart: unless-stopped
           volumes:
@@ -63,6 +66,10 @@ write_files:
       # unset), so there is nothing to publish.
 
 runcmd:
+  # Vendor-recommended Docker install. Deliberately left as the upstream
+  # convenience script rather than pinned - pinning it means tracking Docker's
+  # apt repo setup by hand, which is a bigger maintenance surface than the
+  # risk it removes on a single-tenant box we rebuild rather than patch.
   - curl -fsSL https://get.docker.com | sh
   - systemctl enable --now docker
   - docker compose -f /root/docker-compose.yml pull

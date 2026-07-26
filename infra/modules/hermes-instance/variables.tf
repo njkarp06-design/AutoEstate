@@ -1,9 +1,3 @@
-variable "hcloud_token" {
-  description = "Hetzner Cloud API token (project-scoped, generated in the Hetzner console)."
-  type        = string
-  sensitive   = true
-}
-
 variable "customer_id" {
   description = "Short, unique slug for this customer (e.g. \"acme-realty\"). Used to name cloud resources - keep it DNS/hostname-safe."
   type        = string
@@ -30,9 +24,10 @@ variable "whatsapp_allowed_users" {
   type        = string
 }
 
-variable "operator_ssh_public_key" {
-  description = "Operator's SSH public key content, for provisioning access to the instance."
+variable "operator_ssh_key_name" {
+  description = "Name of the operator's SSH key as already uploaded to the Hetzner project (Security -> SSH Keys). Looked up, not created: Hetzner rejects a duplicate public key within a project regardless of the resource name, so creating one per customer from the same operator key breaks every apply after the first. Upload it once, reference it by name for every customer."
   type        = string
+  default     = "autoestate-operator"
 }
 
 variable "operator_ssh_private_key_path" {
