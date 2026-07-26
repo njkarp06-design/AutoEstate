@@ -48,7 +48,9 @@ Also outstanding and non-blocking: create the Telegram notifier bot and set `OPE
 ### 3. `terraform apply` to a real Hetzner account
 Infra module (`infra/modules/hermes-instance/`) is written and validated (`terraform validate`/`fmt` clean) but **never applied** — no real Hetzner account exists yet.
 - [ ] Create a Hetzner Cloud account (account-level action — needs user sign-off).
+- [ ] **Upload the operator SSH public key to the Hetzner project once** (Security → SSH Keys), named to match `operator_ssh_key_name` (default `autoestate-operator`). The module looks it up rather than creating it — Hetzner rejects the same public key twice in a project, so a per-customer `hcloud_ssh_key` broke every apply after the first (fixed 2026-07-26).
 - [ ] `terraform apply` a first per-customer instance and verify boot/cloud-init/secret-injection end to end.
+- [ ] **Verify the post-boot skill/plugin upload actually landed** — `ls /root/.hermes/skills/real-estate` (expect 5) and `/root/.hermes/plugins` (expect 3, no buyer plugins, no `__pycache__`). This step is new and has never run: skills/plugins are uploaded over SSH rather than embedded in cloud-init, because they exceed Hetzner's 32KB `user_data` cap.
 
 ### 4. Deploy the reporting app to Vercel Pro
 Still `npm run dev`-only (local, port 4127).
@@ -97,6 +99,18 @@ The thinking already done here still applies and is the real content of this ite
 
 ---
 
+## 🚧 Deploy gates opened by the 2026-07-26 `/inspect` sweep
+
+These are **blocking** for a real deployment, not awareness items. Each is a real defect that the sweep found and deliberately did **not** paper over.
+
+- [ ] **The buyer profile's `skills.external_dirs` is an absolute Windows path.** `agent/profiles/autoestate-buyer/config.yaml` points at `C:/dev/...`. On a Linux instance it resolves to nothing and the profile discovers **zero** skills — a public receptionist with no receptionist, failing silently and totally. Marked `MACHINE-SPECIFIC` in the file. Must be set to the deployed path before the buyer instance runs anywhere but this laptop.
+- [ ] **The buyer profile hardcodes the operator's own Telegram user id** as `allow_admin_from` (and `group_allow_admin_from`). Shipped unchanged to every customer, one personal account would hold admin-tier slash-command access — including `/profile` — on every buyer bot. Marked `MACHINE-SPECIFIC`. Needs parameterising when Terraform grows `instance_role`.
+- [ ] **Scoped second ingestion secret** (see also item 5). The buyer `.env` carries the *same* secret that authenticates `POST /api/ingest`, so the one untrusted-input surface in the product holds a credential that can create and mutate `Run` and `Listing` rows — including flipping a property to `SOLD`. The tool lockdown does not mitigate this: it is credential scope, not agent capability. **This is the highest-consequence open item in the repo** and should land before any public exposure, in its own PR (schema column + provisioning + per-route authorization).
+
+> Both config keys above are left at their real dev values on purpose, so the repo copy stays a verbatim match of the deployed file and CLAUDE.md's parity recipe keeps working. **Exclude `skills.external_dirs` and `allow_admin_from`/`group_allow_admin_from` from that key-by-key comparison**, alongside the machine-written `onboarding.seen`.
+
+---
+
 ## 🐛 Known small issues / awareness (not blocking, no owner yet)
 
 - [ ] **Command-refusal text leaks internal config vocabulary at strangers:** a denied command replies "ask an admin to add you to `allow_admin_from` or set `user_allowed_commands`". Vendored gateway text, so changing it means patching code an upstream `hermes update` would overwrite. Low impact now that `/start` is allowed and buyers rarely trigger commands.
@@ -104,15 +118,17 @@ The thinking already done here still applies and is the real content of this ite
 
 - [ ] **Batched-follow-up rule occasionally violated:** the agent sometimes asks for missing facts (e.g. rooms, then sqm) as separate single-field questions instead of one batched question. Pre-existing, flagged in PR #26, unrelated to the locator feature.
 - [ ] **Reporting-app platform parser misses some real headers:** `platform-content.ts` doesn't always recognize plain-caps `INSTAGRAM` / `עברית:` headers (vs. the spec's bold/ATX format), so an occasional real reply fails to split into platform sections. The Listing-record parser is independently robust; this only affects the platform-split display.
-- [ ] **`app/page.tsx` Activity list still `max-w-3xl`:** PR #17 was believed to have widened it to `max-w-5xl`, but only its empty-state branch was widened. One-line fix, left out of scope.
+- [x] ~~**`app/page.tsx` Activity list still `max-w-3xl`**~~ — widened to `max-w-5xl` by the 2026-07-26 `/inspect` sweep.
 - [ ] **Anthropic Console auto-reload billing not confirmed enabled:** the `autoestate` profile's API credits have run dry repeatedly across sessions, causing live outages. Recommended enabling auto-reload at console.anthropic.com — not confirmed done.
-- [ ] **`sync-to-webapp` silently drops turns when the ingest server is unreachable:** the plugin POSTs fire-and-forget with no retry queue (agent/plugins/sync-to-webapp/__init__.py) — a failed POST just logs a warning and the turn's data (including any `Listing` footer) is lost permanently. Surfaced live 2026-07-25 when the 4127 dev server was down during PR #28's turn-two test. Harmless for dev, but for a deployed customer, transient reporting-app downtime = permanently lost listing-tracking events. Consider a lightweight retry/queue before/at production (Vercel deploy, item 4).
+- [ ] **Sync plugins are still not durable across a gateway restart** (partially addressed 2026-07-26). Both `sync-to-webapp` and `sync-inquiries-to-webapp` now retry 3× with 1s/4s backoff (4xx is not retried — that means our own payload or secret is wrong), which covers the case that actually bit us: the reporting app restarting, or a momentary blip. It is **not** durable delivery — nothing survives a gateway restart or a long outage, which needs an on-disk spool. Revisit at the Vercel deploy (item 4) if lost turns show up in practice.
 - [ ] **Gateway silently depends on ambient Claude Code OAuth credentials:** the profile's own `ANTHROPIC_API_KEY` keeps going dry and the `credential_pool` is empty, so the gateway falls back to the machine's ambient Claude Code OAuth login. Fragile single point of failure for a customer-facing bot — restarting the gateway from a Claude Code agent environment has knocked this out and caused a full outage before.
 - [ ] **Skill `version:` fields drift from the docs — no cross-check:** the doc discipline keeps docs *current* as changes happen but nothing re-verifies on-disk `version:` frontmatter against CLAUDE.md's stated versions. Caught 2026-07-25: `just-sold`/`listing-reengagement` were on-disk `0.2.0` (docs said v0.1.0) and `listing-status-update` `0.4.0` (docs said v0.3.0) — all bumped by PR #26 but recorded in prose without the numbers. Corrected in CLAUDE.md's PR #26 paragraph. Recurred and was caught again on 2026-07-26: `agent/README.md` stated 4 of 5 skill versions wrongly. **Versions are asserted in two places — CLAUDE.md prose and `agent/README.md` — so both must be checked.** A `grep '^version:' agent/skills*/**/SKILL.md` against both is the cheap periodic check.
 
 ---
 
 ## ✅ Done (recent, for context)
+
+- **`/inspect` forensic sweep of `main` — 2026-07-26.** 41 findings (3 critical, 9 major, 18 minor, 11 nitpick), all fixed across four commits except the scoped-ingestion-secret item, which is a feature and is now tracked as a deploy gate above. The three that mattered most: the **Terraform module had drifted to a 2026-07-22 snapshot** and shipped 1 of 5 skills and 1 of 3 plugins — a customer provisioned from it would have tracked **zero** listings, reproducing the exact bug PR #23 fixed; both context plugins could **raise `KeyError` out of `pre_llm_call`** on the public buyer instance, on every turn, breaking their own documented degrade-to-`None` contract; and **every dashboard timestamp would have rendered in UTC on Vercel**, 2-3 hours off for Tel Aviv users, with Today/Yesterday flipping at the wrong moment. Two fixes were changed by measurement rather than shipped as planned: the inquiry→listing matcher's "obvious" fix would have produced **zero** links on real data, and `next build` caught a `"use server"` export error that neither `tsc` nor eslint saw.
 
 - **`buyer-inquiry` v0.2.0 — never offer a SOLD listing as a choice (2026-07-26).** The disambiguation menu had listed sold properties as if on offer, so a buyer could pick one and only then be told. Anything the skill offers unprompted is now `ACTIVE`-only. Verified via `hermes -z` including the regression case (a buyer *naming* a sold property still gets the honest answer).
 

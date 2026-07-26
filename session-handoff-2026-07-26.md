@@ -61,6 +61,25 @@ The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by desig
 - Dev DB: one customer, four listings — 2 `ACTIVE` (Rothschild Boulevard, Neve Tzedek, seeded for testing) and 2 `SOLD` (Ben Gurion, Dizengoff).
 - Anthropic credits on this key have run dry repeatedly and caused live outages.
 
+### Later on 2026-07-26 — `/inspect` sweep, branch `fix/inspect-sweep` (open PR, not merged)
+
+A full forensic read of all 88 in-scope tracked files on `main`. **41 findings; all fixed in four commits except the scoped ingestion secret**, which is a feature and is now a tracked deploy gate. Four commits on `fix/inspect-sweep`: infra, plugins, reporting-app, doc/comment corrections.
+
+**What it caught that mattered:**
+
+1. **The Terraform module had drifted to a 2026-07-22 snapshot** — 1 of 5 skills, 1 of 3 plugins. A customer provisioned from it would have tracked **zero** listings (no `listing-footer-reminder`). Skills/plugins now upload post-boot over SSH; they cannot go in cloud-init (Hetzner's 32KB `user_data` cap vs. ~63KB of skills). Also: `hermes_image_tag` was never referenced in the template so pinning did nothing, and the per-customer `hcloud_ssh_key` would have failed every apply after the first.
+2. **Both context plugins could raise `KeyError` out of `pre_llm_call`** — public buyer instance, every turn, contradicting their own documented degrade-to-`None` contract.
+3. **Every dashboard timestamp would render in UTC on Vercel**, 2-3h off for Tel Aviv.
+4. A `Price: ₪3.2M` footer silently left the listing untracked (float into an `Int?` column, swallowed by the ingest `catch`).
+
+**Two things changed by measurement, worth knowing:** the planned inquiry→listing fix would have produced **zero** links on real data (verified against the dev DB before shipping — the shipped version produces identical decisions to the old code), and `next build` caught a `"use server"` export error that **`tsc` and `eslint` both passed**.
+
+**Not fixed, deliberately:** the scoped second ingestion secret (needs a schema column + per-route authorization — its own PR), and durable sync delivery across a gateway restart (needs an on-disk spool; a 3-attempt retry now covers the blip case).
+
+**Three new deploy gates** are in TODO.md under "Deploy gates opened by the `/inspect` sweep" — the buyer profile's absolute Windows skills path and hardcoded operator Telegram id (both left at real values on purpose and marked `MACHINE-SPECIFIC`, so exclude them from the config parity check), plus the ingestion secret.
+
+Verification: `terraform fmt`/`validate`; 27 Python checks running the real hook functions; `lint`/`tsc`/`build` clean; 24 checks running the real parsers and formatter against the real dev Neon database. **No browser verification** — the Clerk headless-cookie limitation still applies.
+
 ### How to resume
 
-> Read session-handoff-2026-07-26.md and continue. Everything is built and merged; nothing is in flight and nothing is blocked on more building. What's left is productionization, starting with whichever account-level step I want to authorize: Hetzner + `terraform apply`, or the Vercel deploy.
+> Read session-handoff-2026-07-26.md and continue. Everything is built and merged. `fix/inspect-sweep` has four commits from the `/inspect` sweep — review the PR and decide on merging (nothing is merged without my say-so). After that, what's left is productionization, starting with whichever account-level step I want to authorize: Hetzner + `terraform apply`, or the Vercel deploy.
