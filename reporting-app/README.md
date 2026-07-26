@@ -41,7 +41,7 @@ To register a new customer after provisioning their Hermes instance (see `infra/
 - `proxy.ts` — Clerk middleware; the machine-facing API routes above are explicitly listed as public (they use bearer auth, not a Clerk session).
 - `lib/db.ts` — customer-scoped Prisma queries and mutations (`getRuns`, `getRun`, `setPlatformEditedContent`, `resetPlatformEditedContent`, `setPlatformPosted`). Both `getRuns`/`getRun` group per-turn `Run` rows into per-listing display groups via `lib/run-grouping.ts` before returning anything.
 - `lib/run-grouping.ts` — `groupRunsIntoListings()`, chains consecutive same-session turns into one listing whenever an earlier turn's reply doesn't parse as real generated content (a clarifying follow-up question, not a finished listing); also derives each closed group's clean display title.
-- `lib/customer.ts` — resolves the logged-in Clerk user to their `Customer` row; `updateInstagramPostMode`.
+- `lib/customer.ts` — resolves the logged-in Clerk user to their `Customer` row; `updateInstagramPostMode` and `updateOperatorTelegramChatId`.
 - `lib/platform-content.ts` — splits Hermes's one raw reply into Instagram/Facebook/Yad2 sections (tolerant of heading-style drift; takes the *last* occurrence of each header, not the first, since a rapid follow-up listing can get merged into the same reply — see CLAUDE.md); falls back to rendering the raw reply unmodified if a confident split isn't found. Also exports `splitByLanguage` (Hebrew/English split, used for both the mirrored-column display and title derivation) and `deriveListingTitle` (a clean one-line title from a matched listing's Yad2 content, used by `run-grouping.ts`).
 - `lib/markdown-components.tsx` — shared `react-markdown` component overrides.
 - `app/api/ingest/route.ts` — ingestion endpoint for Hermes instances.
@@ -49,4 +49,6 @@ To register a new customer after provisioning their Hermes instance (see `infra/
 - `app/runs/[id]/page.tsx` + `platform-section.tsx` + `actions.ts` — full run detail: per-platform cards (mirrored Hebrew/English columns), edit/copy/mark-posted Server Actions. Renders the merged multi-turn transcript (if any) as a collapsed disclosure at the bottom, parses platform content from the group's last assistant message.
 - `app/settings/` — the Instagram posting-mode preference, and the per-customer Telegram chat id for buyer-lead alerts.
 
-Both list/detail page routes are forced dynamic (`export const dynamic = "force-dynamic"`) so they always reflect the live database rather than a build-time snapshot.
+Every page route is forced dynamic (`export const dynamic = "force-dynamic"`) — `/`, `/runs/[id]`, `/listings`, `/inquiries`, `/inquiries/[id]` and `/settings` — so they always reflect the live database rather than a build-time snapshot.
+
+All user-facing timestamps render in `Asia/Jerusalem`, pinned explicitly in `lib/format.ts`. Without that they format in the *server's* zone, which is UTC on Vercel — every time 2-3 hours off, and the Today/Yesterday boundary flipping at the wrong moment.

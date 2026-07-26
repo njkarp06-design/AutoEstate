@@ -178,11 +178,11 @@ Status: Sold
 a completed rental). `Price` is the final sale price only if the agent
 explicitly wants it shared, otherwise `N/A`. If more than one property's
 sale is being announced in the same message, give each its own complete
-response and its own Listing Record footer. **Exception:** if the listing
-was identified via locator lookup with no locator actually stated (see
-Required Input), omit the footer from this turn entirely and end with a
-confirmation question instead — add it only once the agent confirms in a
-later message.
+response and its own Listing Record footer. **Exception — the no-locator
+case:** if the agent's message neither restated the identity facts nor named
+a locator (see Required Input), omit the footer from this turn entirely and
+end with a confirmation question instead — add it only once the agent
+confirms in a later message.
 
 ## Common Pitfalls
 
