@@ -48,3 +48,19 @@ export async function updateInstagramPostMode(
     data: { instagramPostMode: mode },
   });
 }
+
+/**
+ * Sets (or clears, when passed an empty string) the Telegram chat where this
+ * customer's buyer-lead alerts are pushed. A blank value stores null - no
+ * push, dashboard-only. See lib/notify-operator.ts.
+ */
+export async function updateOperatorTelegramChatId(
+  customer: Customer,
+  chatId: string,
+): Promise<void> {
+  const trimmed = chatId.trim();
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: { operatorTelegramChatId: trimmed === "" ? null : trimmed },
+  });
+}

@@ -69,6 +69,9 @@ export default function RootLayout({
                   <Link href="/listings" className="text-status-muted hover:text-foreground">
                     Listings
                   </Link>
+                  <Link href="/inquiries" className="text-status-muted hover:text-foreground">
+                    Inquiries
+                  </Link>
                   <Link href="/settings" className="text-status-muted hover:text-foreground">
                     Settings
                   </Link>

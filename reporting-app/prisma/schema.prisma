@@ -44,6 +44,19 @@ enum ListingStatus {
   SOLD
 }
 
+// A buyer inquiry's handling state. Unlike RunStatus (which tracks whether
+// Hermes finished generating), this tracks whether the human OPERATOR still
+// needs to act: every inquiry is auto-answered by the buyer bot, but a lead
+// that asked for a viewing / made an offer / hit a non-ACTIVE listing needs a
+// person. Defaults to NEEDS_OPERATOR; the operator marks it HANDLED from the
+// dashboard. (The per-message "does this reply defer to a human?" signal is
+// computed display-only in lib/inquiries.ts, not stored - see the buyer-inquiry
+// skill's canonical defer sentence, which that heuristic keys on.)
+enum InquiryStatus {
+  NEEDS_OPERATOR
+  HANDLED
+}
+
 model Customer {
   id                  String    @id @default(cuid())
   email               String    @unique // set by the operator at onboarding time
@@ -51,9 +64,15 @@ model Customer {
   displayName         String?
   ingestionSecretHash String    @unique // sha256(secret) - the secret itself is never stored
   instagramPostMode   PostMode  @default(MANUAL)
+  // Where this customer's "a buyer needs you" lead alerts are pushed. The app
+  // sends via one shared notifier bot (OPERATOR_TELEGRAM_BOT_TOKEN env); this
+  // is the per-customer destination chat. Null = no push (the lead still shows
+  // in the dashboard). Set by the customer on the Settings page.
+  operatorTelegramChatId String?
   createdAt           DateTime  @default(now())
   runs                Run[]
   listings            Listing[]
+  inquiries           Inquiry[]
 
   @@map("customers")
 }
@@ -156,7 +175,68 @@ model Listing {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   runs            Run[]
+  inquiries       Inquiry[]
 
   @@index([customerId, status])
   @@map("listings")
+}
+
+// One buyer conversation — an inbound thread from a prospective buyer/renter
+// (a stranger) with the customer's dedicated, locked-down buyer instance. The
+// inbound counterpart to Run: Run holds the operator's outbound content
+// generation; Inquiry holds a buyer's questions and the bot's answers.
+//
+// Thread key is the Hermes SESSION, not the turn (the opposite of Run, which
+// keys on the turn to keep unrelated back-to-back listings separate). A buyer
+// conversation is a genuine multi-turn back-and-forth we WANT kept together as
+// one lead, and on the isolated buyer instance one session is one buyer — so
+// each turn appends an InquiryMessage rather than starting a new Inquiry.
+// (Guaranteed-available choice; if Phase-0c's live Telegram spike shows
+// distinct buyers colliding into one session, switch this key to a resolved
+// `sender` handle instead — see the buyer-inquiry plan.)
+model Inquiry {
+  id              String           @id @default(cuid())
+  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId      String
+  hermesSessionId String
+  // Best human-reachable contact for the buyer, resolved best-effort by the
+  // sync-inquiries-to-webapp plugin (Phase-0b). THE #1 lead field: a lead you
+  // can't reach is worthless. Null when nothing reachable could be captured
+  // (e.g. a WhatsApp LID with no dialable number) — the UI then shows
+  // "contact not captured" rather than a fabricated value.
+  buyerContact    String?
+  // Set when the bot's answers in this thread pinned the inquiry to exactly
+  // one listing (best-effort, at ingest time). SetNull so deleting a listing
+  // never deletes the lead.
+  listing         Listing?         @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  listingId       String?
+  source          String // "whatsapp" | "telegram"
+  status          InquiryStatus    @default(NEEDS_OPERATOR)
+  title           String?
+  startedAt       DateTime
+  messages        InquiryMessage[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([customerId, hermesSessionId])
+  @@index([customerId, startedAt])
+  @@map("inquiries")
+}
+
+model InquiryMessage {
+  id           String   @id @default(cuid())
+  inquiry      Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  inquiryId    String
+  // Hermes's own turn_id. Dedup is on the turn + role, NOT a computed row
+  // index: a retried sync POST for the same turn can't double-insert, and
+  // there's no count()-based race under concurrent turns (see the buyer plan).
+  hermesTurnId String
+  role         String // "user" | "assistant"
+  content      String   @db.Text
+  timestamp    DateTime
+  sortIndex    Int      @default(0) // display order only
+
+  @@unique([inquiryId, hermesTurnId, role])
+  @@index([inquiryId, timestamp, sortIndex])
+  @@map("inquiry_messages")
 }
