@@ -117,7 +117,7 @@ export default async function InquiryPage({
             className="mt-1 inline-block font-display text-base font-semibold hover:underline"
           >
             {inquiry.listing.rooms}-room{" "}
-            {transactionTypeLabel(inquiry.listing.transactionType ?? "").toLowerCase() || "listing"}{" "}
+            {transactionTypeLabel(inquiry.listing.transactionType).toLowerCase() || "listing"}{" "}
             in {inquiry.listing.area}
           </Link>
           <p className="mt-1 font-mono text-xs uppercase tracking-wide text-status-muted">

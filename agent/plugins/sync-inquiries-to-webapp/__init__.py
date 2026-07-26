@@ -15,19 +15,20 @@ reply, same platform gate excluding CLI. The differences:
     feature, so we try - but degrade cleanly to None (the endpoint keeps the
     thread on session id and the dashboard shows "contact not captured").
 
-Why sender resolution is defensive/tentative here: per Phase-0b, sender
-identity is NOT reliably passed to plugin hooks, and the live Telegram spike
-(Phase-0c) that would confirm exactly what IS available hasn't run yet. So
-this reads whatever the hook kwargs happen to carry and logs the kwarg keys
-once at debug, which is exactly what the spike needs to see. When the spike
-confirms the real source (kwargs vs. a read-only state.db sessions read),
-tighten _resolve_lead accordingly.
+Sender resolution is now settled, not tentative. The Phase-0c live Telegram
+spike ran (2026-07-25) and the first real buyer conversation (2026-07-26)
+confirmed exactly which kwargs the hooks pass - see _resolve_lead. Phase-0b
+had already established that platform metadata never carries a dialable
+number on either WhatsApp (a LID) or Telegram (a numeric user id), which is
+why the buyer-inquiry skill asks for one and why the contact is extracted
+from the buyer's own message text.
 """
 
 import logging
 import os
 import re
 import threading
+import time
 from datetime import datetime, timezone
 
 import httpx
@@ -44,13 +45,22 @@ INQUIRIES_URL = (
 
 SYNCED_PLATFORMS = {"whatsapp", "telegram"}
 
-# Emitted once so the Phase-0c spike can see exactly which identity fields the
-# hook kwargs actually carry on a real buyer turn.
+# See sync-to-webapp for the full rationale; same policy, same reason. A
+# dropped buyer turn loses the lead itself, which is the one thing this
+# feature exists to capture.
+RETRY_DELAYS_SECONDS = (1, 4)  # 3 attempts total
+
+# Emitted once so a real buyer turn's actual identity kwargs stay visible in
+# the log - this is how the wrong-kwarg-name bug below was found.
 _logged_kwargs_once = False
 
-# A dialable-looking phone (Israeli or international). Used only to prefer a
-# real number over a display name when picking buyerContact.
-_PHONE_RE = re.compile(r"\+?\d[\d\s\-]{7,}\d")
+# A dialable-looking phone (Israeli or international).
+#
+# The separator class is [ \t-] and NOT \s: \s matches newlines, so a message
+# listing short numbers on consecutive lines ("4\n95\n3\n3950000") would be
+# spliced into one 11-digit run and captured as a phone number - defeating the
+# digit-count guard below using the very separator it relies on.
+_PHONE_RE = re.compile(r"\+?\d[\d \t\-]{7,}\d")
 
 
 def _now_iso() -> str:
@@ -90,64 +100,76 @@ def _extract_phone(text: str | None) -> str | None:
 
 
 def _resolve_lead(kwargs: dict, user_message: str | None = None) -> tuple[str | None, str | None]:
-    """Best-effort (sender_handle, buyer_contact). sender_handle is a stable
-    opaque id; buyer_contact is the most human-reachable value we can find -
-    a number the buyer typed, else a display name. Both default to None, never
-    a guess.
+    """(sender_handle, buyer_contact). sender_handle is a stable opaque id;
+    buyer_contact is a dialable number the buyer typed into their message.
+    Both default to None, never a guess.
 
-    The kwarg names here are the ones the hook ACTUALLY passes, confirmed from
-    a real buyer turn's log line rather than assumed:
+    The hooks pass exactly these kwargs, confirmed by logging them on a real
+    buyer turn rather than assumed:
         conversation_history, is_first_turn, model, sender_id, task_id,
         telemetry_schema_version
-    An earlier version read `sender`/`user_id`/`chat_id`/`display_name`/`phone`,
-    none of which exist, so every lead silently recorded a null sender AND a
-    null contact - including one where the buyer had actually given a number.
+
+    An earlier version read `sender`/`user_id`/`chat_id`/`display_name`/`phone`
+    - none of which exist - so every lead silently recorded a null sender AND a
+    null contact, including one where the buyer had actually given a number.
+    Those lookups are gone rather than kept "just in case": each was dead, and
+    together they made the code read as though a display-name fallback existed
+    when it never could. If a future adapter does start carrying a name or a
+    number, add it here deliberately, having checked the log line above.
     """
     global _logged_kwargs_once
     if not _logged_kwargs_once:
         logger.info("sync-inquiries: hook kwargs keys = %s", sorted(kwargs.keys()))
         _logged_kwargs_once = True
 
-    sender = (
-        kwargs.get("sender_id")
-        or kwargs.get("sender")
-        or kwargs.get("user_id")
-        or kwargs.get("chat_id")
-        or None
-    )
-    display_name = kwargs.get("display_name") or kwargs.get("name") or None
+    sender = kwargs.get("sender_id")
 
-    # A number the buyer typed beats anything else; fall back to a display name
-    # (a name with no number is still worth showing the operator), then to the
-    # metadata fields in case a future adapter does carry one.
+    # The buyer's own message text is the ONLY place a dialable number ever
+    # exists (Phase-0b: platform metadata carries a LID or a numeric user id on
+    # both channels, never a phone), which is exactly why the skill asks.
     contact = _extract_phone(user_message)
-    if contact is None:
-        for candidate in (kwargs.get("phone"), kwargs.get("sender")):
-            if candidate and _extract_phone(str(candidate)):
-                contact = str(candidate)
-                break
-    if contact is None:
-        contact = display_name
 
     return (str(sender) if sender is not None else None, contact)
 
 
 def _post(payload: dict) -> None:
-    try:
-        resp = httpx.post(
-            INQUIRIES_URL,
-            headers={"Authorization": f"Bearer {INGESTION_SECRET}"},
-            json=payload,
-            timeout=5,
-        )
-        if resp.status_code >= 400:
-            logger.warning(
-                "sync-inquiries: API returned %s: %s",
-                resp.status_code,
-                resp.text[:200],
+    for attempt, delay in enumerate((*RETRY_DELAYS_SECONDS, None), start=1):
+        try:
+            resp = httpx.post(
+                INQUIRIES_URL,
+                headers={"Authorization": f"Bearer {INGESTION_SECRET}"},
+                json=payload,
+                timeout=5,
             )
-    except Exception as e:
-        logger.warning("sync-inquiries: failed to sync %s: %s", payload.get("event"), e)
+            # 4xx is our own bug (bad payload, bad secret) - retrying cannot
+            # help. Only 5xx and transport errors are worth another attempt.
+            if resp.status_code < 500:
+                if resp.status_code >= 400:
+                    logger.warning(
+                        "sync-inquiries: API returned %s, not retrying: %s",
+                        resp.status_code,
+                        resp.text[:200],
+                    )
+                return
+            last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+        except Exception as e:
+            last_error = str(e)
+
+        if delay is None:
+            logger.warning(
+                "sync-inquiries: failed to sync %s after %s attempts, giving up: %s",
+                payload.get("event"),
+                attempt,
+                last_error,
+            )
+            return
+        logger.info(
+            "sync-inquiries: sync of %s failed (%s), retrying in %ss",
+            payload.get("event"),
+            last_error,
+            delay,
+        )
+        time.sleep(delay)
 
 
 def _post_in_background(payload: dict) -> None:

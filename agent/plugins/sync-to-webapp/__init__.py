@@ -30,6 +30,7 @@ instead.
 import logging
 import os
 import threading
+import time
 from datetime import datetime, timezone
 
 import httpx
@@ -39,6 +40,18 @@ logger = logging.getLogger("plugins.sync-to-webapp")
 INGESTION_URL = os.getenv("AUTOESTATE_INGESTION_URL")
 INGESTION_SECRET = os.getenv("AUTOESTATE_INGESTION_SECRET")
 SYNCED_PLATFORMS = {"whatsapp", "telegram"}
+
+# A dropped turn is permanent data loss - the Run, its messages, and any
+# Listing transition in that reply are simply never recorded, with nothing but
+# a log line to show for it. That has already cost one real, hand-reconstructed
+# turn (see CLAUDE.md, PR #28), when the reporting app happened to be down.
+#
+# These retries cover the common case: the app restarting, or a momentary
+# network blip. They deliberately do NOT make delivery durable - nothing
+# survives a gateway restart, which needs a real on-disk spool and stays
+# deferred. Runs on the existing daemon thread, so a slow retry never delays
+# the reply to the customer.
+RETRY_DELAYS_SECONDS = (1, 4)  # 3 attempts total
 
 
 def _now_iso() -> str:
@@ -51,21 +64,44 @@ def _now_iso() -> str:
 
 
 def _post(payload: dict) -> None:
-    try:
-        resp = httpx.post(
-            INGESTION_URL,
-            headers={"Authorization": f"Bearer {INGESTION_SECRET}"},
-            json=payload,
-            timeout=5,
-        )
-        if resp.status_code >= 400:
-            logger.warning(
-                "sync-to-webapp: ingestion API returned %s: %s",
-                resp.status_code,
-                resp.text[:200],
+    for attempt, delay in enumerate((*RETRY_DELAYS_SECONDS, None), start=1):
+        try:
+            resp = httpx.post(
+                INGESTION_URL,
+                headers={"Authorization": f"Bearer {INGESTION_SECRET}"},
+                json=payload,
+                timeout=5,
             )
-    except Exception as e:
-        logger.warning("sync-to-webapp: failed to sync %s: %s", payload.get("event"), e)
+            # 4xx is our own bug (bad payload, bad secret) - retrying cannot
+            # help and would just repeat it. Only 5xx and transport errors are
+            # worth another attempt.
+            if resp.status_code < 500:
+                if resp.status_code >= 400:
+                    logger.warning(
+                        "sync-to-webapp: ingestion API returned %s, not retrying: %s",
+                        resp.status_code,
+                        resp.text[:200],
+                    )
+                return
+            last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+        except Exception as e:
+            last_error = str(e)
+
+        if delay is None:
+            logger.warning(
+                "sync-to-webapp: failed to sync %s after %s attempts, giving up: %s",
+                payload.get("event"),
+                attempt,
+                last_error,
+            )
+            return
+        logger.info(
+            "sync-to-webapp: sync of %s failed (%s), retrying in %ss",
+            payload.get("event"),
+            last_error,
+            delay,
+        )
+        time.sleep(delay)
 
 
 def _post_in_background(payload: dict) -> None:

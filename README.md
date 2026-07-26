@@ -59,8 +59,11 @@ it is locked down by construction rather than by prompt:
   data are not present on it at all — necessary, because the Hermes sender
   allowlist is enforced upstream of every skill and sender identity never
   reaches one, so a skill cannot tell an operator from a stranger.
-- Its agent is configured down to **three tools** (skill listing and reading).
-  No shell, file access, code execution, browser, web, or memory.
+- Its agent is configured down to **three tools**: listing skills, reading a
+  skill, and a skill-*write* tool that cannot be dropped (the toolset is
+  all-or-nothing and Hermes has no per-tool denylist) and is instead neutered —
+  every write stages for an approval nobody grants. No shell, file access, code
+  execution, browser, web, vision, or memory.
 - Slash commands are restricted to non-privileged ones.
 
 Secrets never live in this repo. Per-customer credentials are generated at

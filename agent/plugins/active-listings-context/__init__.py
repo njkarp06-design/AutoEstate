@@ -65,6 +65,14 @@ LISTINGS_URL = (
 SYNCED_PLATFORMS = {"whatsapp", "telegram"}
 TIMEOUT_SECONDS = 3
 
+# The fields a row must carry to be describable. A row missing any of them is
+# skipped rather than rendered with a hole in it - weekly-digest reproduces
+# this block verbatim, so a half-described listing becomes a half-described
+# post.
+REQUIRED_FIELDS = ("area", "rooms", "sqm", "transactionType")
+
+NO_LISTINGS_CONTEXT = "Active listings context: no currently active listings on record."
+
 # Deliberately broad across all four consuming skills' vocabulary - see
 # module docstring on the asymmetric cost of a false positive (free) vs.
 # false negative (wrong answer for weekly-digest; softer fallback for the
@@ -74,9 +82,10 @@ LISTING_LOOKUP_KEYWORDS = re.compile(
     # weekly-digest
     r"digest|roundup|round-up|round up|still active|still on the market|"
     r"what'?s active|what'?s still|weekly update|summary|"
-    # listing-reengagement
-    r"re-?post|remind (people|them|buyers)|hasn'?t sold|re-?promote|"
-    r"still available|"
+    # listing-reengagement (incl. "it's been a few weeks", one of that skill's
+    # own documented trigger phrases, which this gate was missing)
+    r"re-?post|remind (?:people|them|buyers)|hasn'?t sold|re-?promote|"
+    r"still available|been a (?:few|couple of) weeks|"
     # listing-status-update
     r"price drop|reduced|lowered the price|under contract|"
     # just-sold
@@ -109,13 +118,39 @@ def inject_active_listings_context(session_id, turn_id, user_message, platform, 
         return None
 
     if not listings:
-        return "Active listings context: no currently active listings on record."
+        return NO_LISTINGS_CONTEXT
 
-    lines = ["Active listings context (from reporting system - use ONLY these, never invent others):"]
-    for l in listings:
-        price = f"₪{l['price']}" if l.get("price") is not None else "price N/A"
-        floor = f"floor {l['floor']}" if l.get("floor") is not None else "floor N/A"
-        lines.append(f"- {l['area']}, {l['rooms']} rooms, {l['sqm']} sqm, {floor}, {price} ({l['transactionType']})")
+    # Formatting is inside a try and every field is read with .get(): an
+    # unexpected response shape must degrade to "no context injected", never
+    # raise out of the hook. This block previously indexed
+    # area/rooms/sqm/transactionType directly and sat outside any try, so one
+    # missing key would have propagated a KeyError out of pre_llm_call.
+    try:
+        lines = ["Active listings context (from reporting system - use ONLY these, never invent others):"]
+        for listing in listings:
+            if not isinstance(listing, dict) or any(
+                listing.get(f) is None for f in REQUIRED_FIELDS
+            ):
+                logger.warning(
+                    "active-listings-context: skipping malformed listing row (missing %s)",
+                    REQUIRED_FIELDS,
+                )
+                continue
+            price = f"₪{listing['price']}" if listing.get("price") is not None else "price N/A"
+            floor = f"floor {listing['floor']}" if listing.get("floor") is not None else "floor N/A"
+            lines.append(
+                f"- {listing['area']}, {listing['rooms']} rooms, {listing['sqm']} sqm, "
+                f"{floor}, {price} ({listing['transactionType']})"
+            )
+    except Exception as e:
+        logger.warning("active-listings-context: could not format listings, no context injected: %s", e)
+        return None
+
+    # Every row was malformed - say so plainly rather than emit a bare header,
+    # which weekly-digest would read as "here are the listings" and find none.
+    if len(lines) == 1:
+        return NO_LISTINGS_CONTEXT
+
     return "\n".join(lines)
 
 

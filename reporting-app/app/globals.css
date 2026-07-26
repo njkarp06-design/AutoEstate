@@ -7,12 +7,9 @@
   --card-border: #e4e1d9;
   --line-strong: #1a1a1a;
   --brand: #10412f;
-  --brand-foreground: #ffffff;
   --secondary: #7a3323;
   --status-done: #10412f;
-  --status-done-bg: transparent;
   --status-pending: #7a3323;
-  --status-pending-bg: transparent;
   --status-muted: #57534a;
 }
 
@@ -23,12 +20,9 @@
   --color-card-border: var(--card-border);
   --color-line-strong: var(--line-strong);
   --color-brand: var(--brand);
-  --color-brand-foreground: var(--brand-foreground);
   --color-secondary: var(--secondary);
   --color-status-done: var(--status-done);
-  --color-status-done-bg: var(--status-done-bg);
   --color-status-pending: var(--status-pending);
-  --color-status-pending-bg: var(--status-pending-bg);
   --color-status-muted: var(--status-muted);
   --font-sans: var(--font-assistant);
   --font-mono: var(--font-jetbrains-mono);
@@ -43,12 +37,9 @@
     --card-border: #33301f;
     --line-strong: #f1ede3;
     --brand: #57b78e;
-    --brand-foreground: #0e1a14;
     --secondary: #e08161;
     --status-done: #57b78e;
-    --status-done-bg: transparent;
     --status-pending: #e08161;
-    --status-pending-bg: transparent;
     --status-muted: #c9c2b0;
   }
 }

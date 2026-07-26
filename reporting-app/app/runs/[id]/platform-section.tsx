@@ -38,6 +38,7 @@ export function PlatformSection({
 }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const [isTogglingPosted, startPostedTransition] = useTransition();
   const [isSaving, startSaveTransition] = useTransition();
   const [isResetting, startResetTransition] = useTransition();
@@ -45,10 +46,16 @@ export function PlatformSection({
   const languageSplit = splitByLanguage(content);
 
   function handleCopy() {
-    navigator.clipboard.writeText(content).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    // Caught: the Clipboard API rejects on a denied permission or a
+    // non-secure context, which without this is an unhandled rejection and a
+    // button that appears to do nothing at all.
+    navigator.clipboard.writeText(content).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => setCopyFailed(true),
+    );
   }
 
   function handleTogglePosted() {
@@ -146,7 +153,7 @@ export function PlatformSection({
       {!isEditing && (
         <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-card-border pt-3 font-mono text-xs uppercase tracking-wide">
           <button onClick={handleCopy} className="border-b border-line-strong">
-            {copied ? "Copied" : "Copy"}
+            {copyFailed ? "Copy failed — select manually" : copied ? "Copied" : "Copy"}
           </button>
           <button onClick={() => setIsEditing(true)} className="border-b border-line-strong">
             Edit

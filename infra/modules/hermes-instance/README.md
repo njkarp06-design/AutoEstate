@@ -1,15 +1,34 @@
 # hermes-instance module
 
 Provisions one dedicated Hetzner Cloud server for one AutoEstate customer:
-Docker, the official `nousresearch/hermes-agent` image, the real-estate
-skill, and the `sync-to-webapp` plugin - everything up to the point where
-WhatsApp pairing (a manual, interactive step) is the only thing left.
+Docker, the official `nousresearch/hermes-agent` image, all five operator
+real-estate skills, and the three operator plugins - everything up to the
+point where WhatsApp pairing (a manual, interactive step) is the only thing
+left.
 
-**Status: written and unapplied.** `terraform plan` only, per Phase C's
-scope - no real server has been provisioned against this module yet. See
-the `resilient-waddling-lecun` plan file for the original design this was
-built from (updated here: the plan's gateway-hook design is superseded by
-the plugin-hook approach that Phase B actually shipped).
+Shipped to the instance:
+
+- **Skills** (`/root/.hermes/skills/real-estate/`) - `listing-to-social`,
+  `listing-status-update`, `just-sold`, `listing-reengagement`,
+  `weekly-digest`. Everything under `agent/skills/real-estate/` is uploaded,
+  so a new skill directory needs no change here.
+- **Plugins** (`/root/.hermes/plugins/`, and named in `config.yaml`'s
+  `plugins.enabled`) - `sync-to-webapp`, `listing-footer-reminder`,
+  `active-listings-context`. The buyer-instance plugins are removed after
+  upload; this module provisions the **operator** role only.
+
+**How they get there matters.** Skills and plugins are *not* embedded in
+cloud-init `user_data` - Hetzner caps that at 32KB and the five skills alone
+are ~63KB of Markdown. They are uploaded over SSH after boot by
+`null_resource.deploy_agent_content`, which re-uploads whenever any of those
+files change, then `null_resource.inject_secrets` restarts the gateway.
+
+**Status: written and unapplied.** `terraform validate`/`fmt` only, per Phase
+C's scope - no real server has been provisioned against this module yet, so
+nothing here has been observed working end to end. See the
+`resilient-waddling-lecun` plan file for the original design this was built
+from (updated here: the plan's gateway-hook design is superseded by the
+plugin-hook approach that Phase B actually shipped).
 
 ## Prerequisites
 
@@ -18,7 +37,12 @@ the plugin-hook approach that Phase B actually shipped).
   for the default `cx22` type) - nothing is charged by writing or planning
   this module, only by `apply`.
 - Terraform >= 1.5.
-- An SSH key pair for operator access.
+- An SSH key pair for operator access, with the **public key already uploaded
+  to the Hetzner project** (Security -> SSH Keys). The module looks it up by
+  name (`operator_ssh_key_name`, default `autoestate-operator`) rather than
+  creating it: Hetzner rejects the same public key twice within a project
+  regardless of resource name, so creating one per customer would break every
+  `apply` after the first. Upload once, reuse for every customer.
 - The reporting webapp already deployed somewhere reachable from the
   internet (customer instances need to reach `ingestion_api_url`) - not
   done yet as of Phase C; the app has only run locally so far.

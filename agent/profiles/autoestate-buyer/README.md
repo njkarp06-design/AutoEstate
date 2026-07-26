@@ -10,6 +10,20 @@ value stripped. They live in the repo so the lockdown is reviewable and
 reproducible — a security posture that exists only on one laptop is not a
 deliverable, and Terraform's future per-customer buyer instance ships from here.
 
+## Two keys that are machine-specific — change them on deploy
+
+Both are marked `MACHINE-SPECIFIC` in `config.yaml` and tracked as deploy gates
+in TODO.md. They are left at their real dev values so this file stays a verbatim
+copy of the deployed one (which is what makes the parity check in CLAUDE.md
+work); both are excluded from that comparison rather than templated.
+
+- **`skills.external_dirs`** is an absolute Windows path. On a Linux instance it
+  resolves to nothing and the profile discovers **zero** skills — a public
+  receptionist with no receptionist, failing silently and totally.
+- **`platforms.telegram.extra.allow_admin_from`** (and the `group_` twin) is the
+  dev operator's own Telegram user id. Shipped as-is to every customer, it would
+  grant one personal account admin-tier slash-command access to every buyer bot.
+
 ## Why a second instance exists at all
 
 The Hermes sender allowlist is enforced **inside the vendored adapter, upstream

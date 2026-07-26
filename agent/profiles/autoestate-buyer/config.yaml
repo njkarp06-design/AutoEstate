@@ -12,6 +12,12 @@ model:
 # which holds the five outbound, Listing-table-mutating skills. A stranger
 # must never be able to route to just-sold / listing-status-update / etc.
 skills:
+  # MACHINE-SPECIFIC - change per deployment. An absolute path on the dev
+  # laptop. On a Linux instance it resolves to nothing, and the failure is
+  # silent and total: the profile discovers ZERO skills, leaving a public
+  # receptionist with no receptionist. Terraform's future per-customer buyer
+  # instance ships from this file, so this must be set to the deployed
+  # skills-buyer path. Tracked as a deploy gate in TODO.md.
   external_dirs:
     - C:/dev/Portfolio/AI-Marketing/agent/skills-buyer
   # The `skills` toolset is all-or-nothing (skills_list + skill_view +
@@ -106,11 +112,17 @@ agent:
 # skills. Setting an admin list is what switches gating on at all.
 #
 # Result: only the operator's Telegram id is admin; everyone else is capped at
-# the hardcoded floor of /help and /whoami (_ALWAYS_ALLOWED_FOR_USERS), because
-# user_allowed_commands is deliberately empty.
+# `start` plus the hardcoded floor of /help and /whoami
+# (_ALWAYS_ALLOWED_FOR_USERS). See the note on `start` below - it is the one
+# entry deliberately added to user_allowed_commands.
 platforms:
   telegram:
     extra:
+      # MACHINE-SPECIFIC - change per deployment. This is the dev operator's
+      # own Telegram user id. Terraform's future per-customer buyer instance
+      # ships from this file, and there is no parameterisation yet, so leaving
+      # it would grant one personal account admin-tier access to every
+      # customer's bot. Tracked as a deploy gate in TODO.md.
       allow_admin_from:
         - "8543293827"          # operator's Telegram user id
       # Strangers get `start` plus the hardcoded floor (help/whoami) and

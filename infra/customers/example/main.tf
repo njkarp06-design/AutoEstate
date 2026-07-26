@@ -38,9 +38,9 @@ variable "whatsapp_allowed_users" {
   type = string
 }
 
-variable "operator_ssh_public_key_path" {
+variable "operator_ssh_key_name" {
   type    = string
-  default = "~/.ssh/id_ed25519.pub"
+  default = "autoestate-operator"
 }
 
 variable "operator_ssh_private_key_path" {
@@ -55,13 +55,12 @@ variable "operator_ssh_cidrs" {
 module "hermes" {
   source = "../../modules/hermes-instance"
 
-  hcloud_token                  = var.hcloud_token
   customer_id                   = var.customer_id
   customer_email                = var.customer_email
   anthropic_api_key             = var.anthropic_api_key
   ingestion_api_url             = var.ingestion_api_url
   whatsapp_allowed_users        = var.whatsapp_allowed_users
-  operator_ssh_public_key       = file(var.operator_ssh_public_key_path)
+  operator_ssh_key_name         = var.operator_ssh_key_name
   operator_ssh_private_key_path = var.operator_ssh_private_key_path
   operator_ssh_cidrs            = var.operator_ssh_cidrs
 }

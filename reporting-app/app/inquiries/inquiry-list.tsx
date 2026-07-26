@@ -117,7 +117,10 @@ export function InquiryList({ inquiries }: { inquiries: Inquiry[] }) {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {inq.disposition === "needs_you" && (
+                  {/* Suppressed once handled, matching the detail page - the two
+                      pages previously disagreed, this one showing "Needs you"
+                      and "Handled" side by side on the same lead. */}
+                  {inq.disposition === "needs_you" && inq.status !== "handled" && (
                     <span className="flex items-center border border-status-pending px-2.5 py-1 font-mono text-xs uppercase tracking-wide text-status-pending">
                       Needs you
                     </span>

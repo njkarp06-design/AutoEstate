@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { getCurrentCustomer } from "@/lib/customer";
-import {
-  updateInstagramPostModeAction,
-  updateOperatorTelegramChatIdAction,
-} from "./actions";
+import { updateInstagramPostModeAction } from "./actions";
+import { TelegramChatIdForm } from "./telegram-chat-id-form";
 
 export const dynamic = "force-dynamic";
 
@@ -109,25 +107,7 @@ export default async function SettingsPage() {
           Leave blank to get leads only on the dashboard.
         </p>
 
-        <form action={updateOperatorTelegramChatIdAction} className="mt-5 flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1.5 font-mono text-xs uppercase tracking-wide text-status-muted">
-            Telegram chat ID
-            <input
-              type="text"
-              name="operatorTelegramChatId"
-              defaultValue={customer.operatorTelegramChatId ?? ""}
-              inputMode="numeric"
-              placeholder="e.g. 123456789"
-              className="border-b border-line-strong bg-transparent pb-1 font-sans text-sm normal-case tracking-normal text-foreground placeholder:text-status-muted focus:outline-none"
-            />
-          </label>
-          <button
-            type="submit"
-            className="border-b border-line-strong font-mono text-xs uppercase tracking-wide"
-          >
-            Save
-          </button>
-        </form>
+        <TelegramChatIdForm defaultValue={customer.operatorTelegramChatId ?? ""} />
       </section>
 
       <section className="mt-10 border-t border-card-border pt-6">

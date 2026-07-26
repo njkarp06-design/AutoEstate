@@ -23,11 +23,17 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Local Claude Code tooling state.
-# Everything under .claude/ stays local EXCEPT settings.json, which holds the
-# shared doc-sync hook and is meant to be version-controlled. Note the pattern
-# must be `.claude/*` rather than `.claude/` — git does not descend into an
-# excluded directory, so a negation under a `.claude/` rule would never match.
+# Local Claude Code tooling state — everything under .claude/ stays local.
+#
+# The `!.claude/settings.json` negation below is a deliberate leftover, not an
+# active rule: that file held a doc-sync hook and was deleted on 2026-07-26
+# (see CLAUDE.md §3). It now just permits a file that does not exist. Kept
+# rather than swept up with the deletion, so re-adding a tracked settings.json
+# needs no .gitignore change.
+#
+# The pattern must be `.claude/*` rather than `.claude/` — git does not descend
+# into an excluded directory, so a negation under a `.claude/` rule would never
+# match.
 .claude/*
 !.claude/settings.json
 # Personal per-machine overrides stay ignored.

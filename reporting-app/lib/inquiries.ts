@@ -25,8 +25,10 @@ function toInquiryStatus(status: DbInquiryStatus): InquiryStatus {
 // Stable fragments of the buyer-inquiry skill's canonical defer sentence, in
 // each language. Matched as substrings rather than the whole sentence so a
 // stray punctuation/quote difference can't silently drop a real defer. This is
-// a REAL COUPLING with agent/skills/real-estate/buyer-inquiry/SKILL.md's
-// "Deferring" section - if the canonical sentence there changes, change these.
+// a REAL COUPLING with
+// agent/skills-buyer/real-estate/buyer-inquiry/SKILL.md's "Deferring to the
+// agent + capturing the lead" section - if the canonical sentence there
+// changes, change these.
 const DEFER_FRAGMENTS = [
   "passed your details along to the agent", // English
   "העברתי את הפרטים שלך לסוכן", // Hebrew
@@ -75,8 +77,8 @@ function toEpochSeconds(date: Date): number {
   return Math.floor(date.getTime() / 1000);
 }
 
-// Disposition = did the LATEST assistant message defer? An inquiry with no
-// assistant reply yet (only a buyer question recorded) is treated as
+// Disposition = did ANY assistant message in the thread defer? An inquiry with
+// no assistant reply yet (only a buyer question recorded) is treated as
 // auto-answered - nothing to flag until the bot actually hands off.
 function computeDisposition(
   messages: { role: string; content: string }[],
@@ -101,7 +103,8 @@ function computeDisposition(
 /**
  * Every buyer inquiry for this customer, newest first. Scoped by customerId -
  * a customer only ever sees their own buyer's leads. Disposition is computed
- * per-inquiry from its latest assistant message (see computeDisposition).
+ * per-inquiry from whether any assistant message in the thread defers (see
+ * computeDisposition).
  */
 export async function getInquiries(customer: Customer): Promise<Inquiry[]> {
   const inquiries = await prisma.inquiry.findMany({

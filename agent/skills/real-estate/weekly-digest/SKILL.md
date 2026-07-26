@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [real-estate, social-media, content-generation, hebrew, tel-aviv, digest]
-    related_skills: [listing-to-social, listing-status-update]
+    related_skills: [listing-to-social, listing-status-update, just-sold, listing-reengagement]
 ---
 
 # Weekly Digest
@@ -20,17 +20,21 @@ skill, that meant restating every active listing by hand each time — this
 skill instead reads the reporting system's own record of what's currently
 active (injected into this turn by the `active-listings-context` plugin,
 see Required Input) and drafts one combined post from it. This skill only
-produces text — it does not post anything, and it does not create or
-update any listing (that's `listing-to-social` and `listing-status-update`'s
-job).
+produces text — it does not post anything, and it does not create or update
+any listing (that's `listing-to-social`, `listing-status-update` and
+`just-sold`'s job).
 
 ## When to Use
 
 - The agent asks for a digest, roundup, weekly update, or summary of active
   listings — not details about one specific property.
-- Don't use for: a brand-new listing (`listing-to-social`), a single status
-  change (`listing-status-update`), or answering a question about one named
-  property.
+- **Don't use for:** a brand-new listing (`listing-to-social`), a price drop
+  or going under contract (`listing-status-update`), a completed sale
+  (`just-sold`), re-promoting a single unchanged listing
+  (`listing-reengagement`), or answering a buyer's question about one named
+  property (`buyer-inquiry`, which runs on a separate instance). Each of
+  those is about **one** property; this skill is the only one that covers
+  the whole active set at once.
 
 ## Required Input
 
@@ -72,15 +76,14 @@ This is the core rule of this skill:
 
 Produce **one combined bilingual post** — Hebrew version first, English
 version second, clearly labeled with headers (same
-`**🇮🇱 עברית:**` / `**🇬🇧 English:**` convention as the other two skills).
+`**🇮🇱 עברית:**` / `**🇬🇧 English:**` convention as the other skills).
 
-This is deliberately **not** the other two skills' 3-platform
+This is deliberately **not** the other skills' 3-platform
 Instagram/Facebook/Yad2 structure — a digest is a roundup, not a piece of
 per-property content, so don't force it into that shape even if it would
 otherwise fit. It also has **no Listing Record footer** — this skill only
 reads the reporting system's data, it never creates or updates a Listing.
-Both omissions are intentional; don't "fix" this skill to match the other
-two.
+Both omissions are intentional; don't "fix" this skill to match the others.
 
 List each active listing as a short line: area, rooms, sqm, price
 (sale/rental phrasing matching that listing's own type), one line per

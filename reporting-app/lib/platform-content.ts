@@ -106,6 +106,22 @@ export function splitPlatformContent(raw: string): ParsedPlatformContent {
   };
 }
 
+/**
+ * Drops everything from the first "Listing Record" footer onwards.
+ *
+ * splitPlatformContent already caps its Yad2 slice at that header so the
+ * footer's raw labels can't leak into the customer-facing caption. This is the
+ * same guarantee for the *unmatched* path (`matched: false`), which renders the
+ * reply verbatim - otherwise the one place a viewer sees raw bookkeeping is the
+ * fallback. Takes the FIRST footer, unlike the platform split's last-occurrence
+ * rule: here everything after it is footer material either way.
+ */
+export function stripListingRecordFooter(raw: string): string {
+  const lines = raw.split("\n");
+  const at = lines.findIndex((line) => LISTING_RECORD_HEADER_RE.test(line.trim()));
+  return at === -1 ? raw : lines.slice(0, at).join("\n").trimEnd();
+}
+
 const HEBREW_CHAR_RE = /[֐-׿]/;
 const ENGLISH_WORD_RE = /english/i;
 
