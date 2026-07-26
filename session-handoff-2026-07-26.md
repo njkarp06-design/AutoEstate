@@ -50,6 +50,8 @@ What is left:
 
 ### Environment notes
 
+- **There are no Claude Code hooks in this repo** — `.claude/settings.json` (the doc-sync `UserPromptSubmit` hook) was deleted 2026-07-26 at the owner's request; no git hooks either. Keeping CLAUDE.md / TODO.md / this file current is a convention now, not automation. See CLAUDE.md section 3.
+
 - Reporting-app dev server runs on **`127.0.0.1:4127`** — always `127.0.0.1`, never `localhost` (IPv6 collision on this machine). Verify a *newly launched* server's own log for `EADDRINUSE`; a stale process answering curl has fooled a previous session.
 - The `autoestate` operator gateway is running and **untouched** by this work. Port 3000 is the live Hermes WhatsApp bridge — never kill it. All three profiles (`default`, `autoestate`, `autoestate-buyer`) run gateways concurrently without conflict.
 - **Never edit a profile's `config.yaml` while its gateway is running** — the gateway rewrites the file (persisting things like `onboarding.seen`), strips all comments, and will silently clobber the edit. The commented copy in `agent/profiles/autoestate-buyer/config.yaml` is the documented source of truth.
