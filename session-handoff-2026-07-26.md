@@ -8,9 +8,9 @@ Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history;
 
 ### Where things stand
 
-- **All planned features are built, live-tested and merged.** The last, buyer-inquiry, shipped in **PR #34** on 2026-07-26. `main` is at `7ba4c21`.
+- **All planned features are built, live-tested and merged.** The last, buyer-inquiry, shipped in **PR #34** on 2026-07-26.
 - **Nothing is blocked on more building.** Everything remaining is productionization.
-- **Current branch: `docs/buyer-inquiry-merged`, with PR #35 open** — documentation only, no code. It records the merge and this doc-consistency pass. Merge or close it before starting new work; nothing depends on it.
+- **On `main`, clean, nothing in flight.** PR #34 (the feature) and PR #35 (docs) are both merged; no PR is open. The merged branches `feat/buyer-inquiry` and `docs/buyer-inquiry-merged` still exist locally and on origin and are safe to delete. `chore/doc-consistency-checker` is deliberately kept — it holds the closed doc-checker script in case it is ever wanted as a manual pre-PR check.
 - **Nothing is deployed.** The reporting app runs only via `npm run dev` (port 4127). The Terraform module is written and validated but has **never been applied** — there is no Hetzner account yet.
 
 ### Live systems, verified 2026-07-26
@@ -63,4 +63,4 @@ The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by desig
 
 ### How to resume
 
-> Read session-handoff-2026-07-26.md and continue. Everything is built and merged as of PR #34; nothing is blocked on more building. PR #35 (docs only) is open — merge or close it first. What's left is productionization, starting with whichever account-level step I want to authorize: Hetzner + `terraform apply`, or the Vercel deploy.
+> Read session-handoff-2026-07-26.md and continue. Everything is built and merged; nothing is in flight and nothing is blocked on more building. What's left is productionization, starting with whichever account-level step I want to authorize: Hetzner + `terraform apply`, or the Vercel deploy.

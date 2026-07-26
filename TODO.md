@@ -12,7 +12,7 @@ Last updated: 2026-07-26.
 
 **Open, unverified:** whether Anthropic auto-reload billing was ever enabled (recommended after repeated credit outages, never confirmed), and whether the dev buyer bot's still-valid Telegram token should be revoked now testing is done.
 
-**In flight:** PR #35 (documentation only — records the #34 merge and a doc-consistency pass). Nothing depends on it.
+**In flight:** nothing. No PR is open.
 
 ---
 
