@@ -37,10 +37,19 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private).
 ### Next steps (in order)
 
 1. **Get the bot token.** User creates a dev bot in @BotFather (`/newbot`), separate from the operator bot and from the revoked 2026-07-25 spike bot. Write it into `%LOCALAPPDATA%\hermes\profiles\autoestate-buyer\.env` as `TELEGRAM_BOT_TOKEN`.
-2. **Make sure there's an `ACTIVE` listing first.** Both `Listing` rows in the dev DB are currently `SOLD` (Ben Gurion, Dizengoff), so as things stand the bot can only demonstrate status-honesty, not a real factual answer. Send a fresh listing through the operator WhatsApp bot, or seed one.
+2. ~~Make sure there's an `ACTIVE` listing~~ **DONE 2026-07-26.** The dev DB now holds 4 listings for the real customer — 2 `SOLD` (Ben Gurion, Dizengoff) and 2 newly seeded `ACTIVE`: **Rothschild Boulevard** (sale, 3 rooms, 78 sqm, floor 2, ₪3,950,000) and **Neve Tzedek** (rental, 2.5 rooms, 62 sqm, floor 1, ₪9,200). Confirmed visible through the real `/api/listings/buyer-view` endpoint via the plugin. A leftover `_dryrun_` test customer was also deleted (the docs had wrongly claimed it was already cleaned up); the dev DB now has exactly one customer.
 3. **Confirm the 4127 reporting-app dev server is up** before testing — `sync-inquiries-to-webapp` is fire-and-forget with no retry (same known issue as `sync-to-webapp`), so a down server means the inquiry is silently lost.
 4. **Start the gateway:** `hermes -p autoestate-buyer gateway`. Watch for a Windows Startup-folder login-item prompt — a previous session had one auto-install non-interactively; flag it rather than accept it silently.
-5. **Run the end-to-end test** from a Telegram account that is *not* the operator's (the flatmate account worked for the spike): a factual question on an ACTIVE listing, a question about a SOLD one, a Hebrew message, a "can I see it?" (should defer + capture contact), and a prompt-injection attempt. Then confirm the `/inquiries` dashboard shows the thread, the disposition, and the captured contact.
+5. **Run the end-to-end test** from a Telegram account that is *not* the operator's (the flatmate account worked for the spike). Suggested cases, matched to the seeded data:
+   - *"How much is the Rothschild place?"* → factual answer from the ACTIVE sale listing.
+   - *"Is the Ben Gurion apartment still available?"* → honest "already sold", no availability claim.
+   - *"Is it still available?"* (no locator, 2 ACTIVE) → **one** clarifying question naming both candidates. This path has only ever been proven via `hermes -z`; this is its first live run.
+   - A Hebrew message → full-Hebrew reply, mirroring language.
+   - Ask about something not in the data (parking, balcony) → defers, does not invent.
+   - *"Can I see it this week?"* → defers to the operator + captures contact.
+   - A prompt-injection attempt → refused, stays in role.
+
+   Then confirm the `/inquiries` dashboard shows the thread, the disposition, and the captured contact.
 6. **Then** open the PR into `main` — and confirm before merging (standing rule, never auto-merge).
 
 ### Environment notes
