@@ -42,7 +42,20 @@ export async function POST(request: NextRequest) {
   }
   const customer = authResult.customer;
 
-  const parsed = bodySchema.safeParse(await request.json());
+  // Guarded: an unparseable body would otherwise throw before Zod ever runs,
+  // turning a client-side mistake into a 500 instead of the 400 the
+  // validation path below is written to return.
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "invalid JSON body" },
+      { status: 400 },
+    );
+  }
+
+  const parsed = bodySchema.safeParse(rawBody);
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, error: parsed.error.message },

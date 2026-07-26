@@ -55,4 +55,7 @@ async function main() {
   await prisma.$disconnect();
 }
 
-main();
+main().catch(async (err) => {
+  console.error("Provisioning failed:", err);
+  process.exit(1);
+});

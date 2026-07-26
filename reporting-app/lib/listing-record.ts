@@ -27,6 +27,25 @@ function parseNumber(value: string): number | null {
   return match ? parseFloat(match[0]) : null;
 }
 
+/**
+ * For fields backed by an `Int?` column (`Listing.floor`, `Listing.price`).
+ * Returns null rather than rounding when the parse isn't a whole number.
+ *
+ * The case that matters is shorthand: "Price: ₪3.2M" parses to 3.2. Writing
+ * that to an Int column throws, and /api/ingest's blanket catch swallows it -
+ * so the reply looks perfect, the listing is silently never tracked, and only
+ * a server log records it. That is the same invisible-failure shape as the
+ * original footer bug. Rounding instead would store ₪3, which is worse than
+ * useless: null reads as "price unknown" in the UI, and the listing is still
+ * created and matched, since area/rooms/sqm/status are what identify it.
+ */
+function parseIntegerField(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = parseNumber(value);
+  if (parsed === null || !Number.isInteger(parsed)) return null;
+  return parsed;
+}
+
 function normalizeTransactionType(value: string): string {
   if (/rent/i.test(value)) return "rental";
   if (/sale/i.test(value)) return "sale";
@@ -103,8 +122,8 @@ export function parseListingRecords(raw: string): ParsedListingRecord[] {
       transactionType: fields.transactionType ? normalizeTransactionType(fields.transactionType) : "",
       rooms,
       sqm,
-      floor: fields.floor ? parseNumber(fields.floor) : null,
-      price: fields.price ? parseNumber(fields.price) : null,
+      floor: parseIntegerField(fields.floor),
+      price: parseIntegerField(fields.price),
       status,
     });
   });

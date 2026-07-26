@@ -5,7 +5,11 @@ import { getRun } from "@/lib/db";
 import { getCurrentCustomer } from "@/lib/customer";
 import { formatRelativeDateTime, sourceLabel } from "@/lib/format";
 import { markdownComponents } from "@/lib/markdown-components";
-import { splitPlatformContent, PLATFORM_KEYS } from "@/lib/platform-content";
+import {
+  splitPlatformContent,
+  stripListingRecordFooter,
+  PLATFORM_KEYS,
+} from "@/lib/platform-content";
 import { PlatformSection } from "./platform-section";
 import {
   savePlatformContentAction,
@@ -52,7 +56,7 @@ export default async function RunPage({
   // did yet, the agent's latest reply); everything before it is shown as a
   // short transcript so the viewer can see the whole exchange, including
   // any photo the agent sent.
-  const assistantMessage = [...run.messages].reverse().find((m) => m.role === "assistant");
+  const assistantMessage = run.messages.findLast((m) => m.role === "assistant");
   const precursorMessages = assistantMessage
     ? run.messages.filter((m) => m !== assistantMessage)
     : run.messages;
@@ -133,9 +137,13 @@ export default async function RunPage({
                 Instagram/Facebook/Yad2 sections, so showing the full response
                 below instead.
               </p>
+              {/* Footer stripped: the matched path caps the Yad2 section at
+                  it for exactly this reason, so the fallback shouldn't be the
+                  one place raw "Listing Record" bookkeeping leaks into a
+                  customer-facing view. */}
               <div className="text-sm leading-relaxed">
                 <ReactMarkdown components={markdownComponents}>
-                  {assistantMessage.content}
+                  {stripListingRecordFooter(assistantMessage.content)}
                 </ReactMarkdown>
               </div>
             </div>

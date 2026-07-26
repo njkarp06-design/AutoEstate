@@ -28,7 +28,7 @@ export default async function Home() {
   const runs = await getRuns(customer);
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
       <RunList runs={runs} />
     </main>
   );

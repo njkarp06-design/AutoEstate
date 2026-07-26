@@ -69,12 +69,19 @@ export async function notifyOperatorOfLead(lead: LeadNotification): Promise<void
     return;
   }
 
+  // Timed out deliberately, and deliberately below the sync plugin's own 5s
+  // client timeout. This call is awaited on /api/inquiries' request path, so
+  // without a timeout a slow Telegram API stalls the response past the point
+  // where the plugin gives up - and since the plugin's retry budget is finite,
+  // a hang here can cost the very lead this notification is about. Better to
+  // lose the push (the lead is already recorded in the dashboard) than the turn.
   const resp = await fetch(
     `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: chatId, text }),
+      signal: AbortSignal.timeout(4000),
     },
   );
   if (!resp.ok) {

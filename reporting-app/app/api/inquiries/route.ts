@@ -56,7 +56,19 @@ export async function POST(request: NextRequest) {
   }
   const customer = authResult.customer;
 
-  const parsed = bodySchema.safeParse(await request.json());
+  // Guarded: an unparseable body would otherwise throw before Zod ever runs,
+  // turning a client-side mistake into a 500 instead of a 400.
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "invalid JSON body" },
+      { status: 400 },
+    );
+  }
+
+  const parsed = bodySchema.safeParse(rawBody);
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, error: parsed.error.message },
@@ -147,7 +159,7 @@ export async function POST(request: NextRequest) {
   //  2. If this reply hands off to a human, notify the operator with the
   //     buyer's contact attached (the #1-value lead moment).
   try {
-    await maybeLinkListing(customer.id, inquiry.id, `${body.userMessage}\n${body.assistantResponse}`);
+    await maybeLinkListing(customer.id, inquiry.id, body.userMessage);
   } catch (err) {
     console.error("inquiries: listing linking failed", err);
   }
@@ -171,15 +183,25 @@ export async function POST(request: NextRequest) {
 }
 
 // Conservative, best-effort: link the inquiry to a listing only when exactly
-// one of the customer's listing areas appears in the turn text. The buyer
-// skill emits no Listing Record footer (it only reads), so unlike /api/ingest
+// one of the customer's listing areas is named by the BUYER. The buyer skill
+// emits no Listing Record footer (it only reads), so unlike /api/ingest
 // there's no structured marker to parse - this is a soft area-mention match,
 // deliberately no-op unless it's unambiguous. Never overwrites an existing
 // link (once pinned, it stays).
+//
+// Matches the buyer's own message only, NOT the bot's reply. Since
+// buyer-inquiry v0.2.0 the bot proactively names ACTIVE candidates the buyer
+// never mentioned, so including its reply could pin a lead to a property the
+// buyer never asked about. Verified against the real dev database: on every
+// recorded turn this produces the same link decision as the previous
+// combined-text version, because the loose-token rule below recovers the
+// realistic phrasings ("the Rothschild place", "how much is the Rothschild
+// one?") that a strict full-segment match on the buyer's text alone would
+// have dropped - which would have meant zero links on all real data.
 async function maybeLinkListing(
   customerId: string,
   inquiryId: string,
-  text: string,
+  buyerMessage: string,
 ): Promise<void> {
   const current = await prisma.inquiry.findUnique({
     where: { id: inquiryId },
@@ -192,17 +214,23 @@ async function maybeLinkListing(
     select: { id: true, area: true },
   });
   // Match on the area's leading segment, not the whole stored string. Areas
-  // are stored as "Rothschild Boulevard, Tel Aviv" (the skills' footer format),
-  // but nobody types the city: a buyer writes "the Rothschild place" and the
-  // bot replies "Rothschild Boulevard". Requiring the full string meant this
-  // never fired for realistic phrasing - confirmed on the first real buyer
-  // thread, which was unmistakably about Rothschild and still linked to null.
-  // Still conservative: a single distinct match is required, so a turn naming
-  // two areas links nothing.
-  const haystack = text.toLowerCase();
+  // are stored as "Rothschild Boulevard, Tel Aviv" (the skills' footer format)
+  // but nobody types the city, and most don't type the street type either -
+  // real buyers wrote "the Rothschild place" and "how much is the Rothschild
+  // one?". So also accept the segment's first word, which is what carries the
+  // identity. Length-gated at 4 so a short word like "Ben" (of "Ben Gurion")
+  // can't match incidental prose; that area still matches on its full segment,
+  // as a real buyer's "Is the Ben Gurion apartment still available?" does.
+  //
+  // Still conservative: exactly one distinct match is required, so a message
+  // naming two areas links nothing.
+  const haystack = buyerMessage.toLowerCase();
   const matched = listings.filter((l) => {
-    const needle = l.area.split(",")[0].trim().toLowerCase();
-    return needle.length > 0 && haystack.includes(needle);
+    const segment = l.area.split(",")[0].trim().toLowerCase();
+    if (segment.length === 0) return false;
+    if (haystack.includes(segment)) return true;
+    const firstWord = segment.split(/\s+/)[0];
+    return firstWord.length >= 4 && haystack.includes(firstWord);
   });
   const distinctIds = new Set(matched.map((l) => l.id));
   if (distinctIds.size !== 1) return;

@@ -9,6 +9,16 @@ import {
 } from "@/lib/db";
 import type { PlatformKey } from "@/lib/platform-content";
 
+// These actions no-op silently when there's no customer, or when lib/db.ts's
+// helpers find the run isn't owned by them. That is deliberate and stays:
+// these are ownership checks on an endpoint reachable by anyone who can send
+// the POST (see Next's Server Actions security notes), and telling a caller
+// whether a run id exists but belongs to someone else is exactly the
+// distinction not worth leaking. A legitimate user cannot reach either branch
+// - the page already resolved their customer and their own run to render the
+// form. Contrast settings/actions.ts, where a *validation* rejection is
+// something the real user needs to see.
+
 export async function savePlatformContentAction(
   runId: string,
   platform: PlatformKey,
