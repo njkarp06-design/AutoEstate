@@ -13,7 +13,7 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private).
 - **Branch `feat/buyer-inquiry`**, ahead of `main` (`git log --oneline main..HEAD`), working tree clean, all pushed. **No open PR yet** — correct; don't open or merge until 1H's live test passes.
 - **Phase 0: all four blockers resolved** (2026-07-25 — two read-only, two via a live throwaway Telegram spike that was deleted and its token revoked).
 - **Phase 1A–1G: built, verified, committed** — the skill, the two buyer plugins, the full reporting pipeline (schema → endpoints → sync plugin → `/inquiries` dashboard), and Telegram operator notification with per-customer routing.
-- **Phase 1H: BUILT, RUNNING, and live-tested from the operator's account (2026-07-26).** The bot is `@autoestate_buyerdev_bot`; the gateway is up (`hermes -p autoestate-buyer gateway run`, foreground). The skill layer passed all seven test cases; four defects in the *surrounding* plumbing were found and fixed. **What's left is a fresh-session test from a genuine non-operator account** (the ambiguity path + contact capture) — see Next steps.
+- **Phase 1H: COMPLETE (2026-07-26)** — built, running, and live-tested from BOTH the operator's account and a genuine non-operator (flatmate) account. Six defects found across the two runs, all fixed. The bot is `@autoestate_buyerdev_bot`; the gateway is up (`hermes -p autoestate-buyer gateway run`, foreground). The skill layer passed every case in both runs; every defect was in the surrounding plumbing. **Nothing on the buyer-inquiry feature is outstanding — the next step is the PR.**
 
 ### Where 1H actually stands
 
@@ -37,16 +37,13 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private).
 
 ### Next steps (in order)
 
-**The operator-account leg of the end-to-end test PASSED on 2026-07-26.** Seven real messages to `@autoestate_buyerdev_bot`; the skill layer was correct on every case it owns (data-only price answer, honest SOLD, Hebrew mirroring, missing fact deferred not invented, viewing deferred + contact asked, prompt injection refused, defer sentence verbatim x3). All synced as one Inquiry, 14 messages, correct order. Four surrounding defects were found and fixed the same day — detail in CLAUDE.md.
+**Both live legs of the end-to-end test have now PASSED (2026-07-26).** The operator's own account covered the factual/SOLD/Hebrew/defer/injection cases; the flatmate's fresh session then closed the two gaps that had never been cleanly exercised — the **ambiguity path** (a cold "is it still available?" produced one clarifying question naming real candidates) and **contact capture**. Session isolation confirmed: two separate `Inquiry` rows. Six defects were found across the two runs and all six are fixed — the most serious being `buyerContact` silently null on every lead (the feature's #1 field) and a `/start` regression that would have met every future buyer with a permissions refusal. Detail in CLAUDE.md.
 
-What is left:
+1. **Open the PR into `main`.** 1H is complete. Nothing is outstanding on the buyer-inquiry feature itself. **Confirm before merging — never auto-merge.**
+2. **(Deployment, non-blocking) Notifier bot:** create the Telegram alert bot, set `OPERATOR_TELEGRAM_BOT_TOKEN`, paste a chat id in Settings. Needed before a real lead *push* works; the dashboard records leads regardless.
+3. **Optional polish before or after the PR** — one real content defect found in the flatmate run, tracked in TODO's known-issues: the disambiguation menu lists `SOLD` listings without marking them, so a buyer can pick a sold property and only then be told. Status honesty holds once a listing is chosen; this is the menu itself presenting sold stock as current inventory.
 
-1. **Flatmate / fresh-session leg — the real remaining test.** Two things are still unverified and both need a *fresh* session from a genuine non-operator account:
-   - **The ambiguity path.** Send a cold **"is it still available?"** as the FIRST message, with no prior property mentioned. Expected: ONE clarifying question naming both ACTIVE listings (Rothschild + Neve Tzedek). In the operator run this turn had a clear referent from the previous message, so the model reasonably resolved it instead of asking — the case was never cleanly exercised.
-   - **Contact capture.** Ask for a viewing and then actually **give a phone number**. Expected: it lands in `Inquiry.buyerContact`. In the operator run no number was ever supplied, so `buyerContact` is correctly `null` and the field has never been proven end to end.
-   - Also worth confirming incidentally: the stranger tier of the slash-command gating (`/model` should be refused, `/help` allowed), and that the first-contact onboarding note does NOT reappear.
-2. **Then** open the PR into `main` — and confirm before merging (standing rule, never auto-merge).
-3. **(Deployment, non-blocking) Notifier bot:** create the Telegram alert bot, set `OPERATOR_TELEGRAM_BOT_TOKEN`, paste a chat id in Settings — needed before a real lead *push* works (the dashboard already records leads regardless).
+After that the whole marketing-automation roadmap is done, and what remains is productionization: `terraform apply` to a real Hetzner account, deploying the reporting app to Vercel, the buyer-instance security gates (container isolation, a scoped second ingestion secret, re-running `hermes security audit`), re-confirming open-channel behaviour on WhatsApp, and the still-open buyer-channel transport decision.
 
 ### Environment notes
 
@@ -62,4 +59,4 @@ What is left:
 
 Start a fresh Claude Code session and open with:
 
-> Read session-handoff-2026-07-26.md and continue from where we left off. We're on branch `feat/buyer-inquiry`. The buyer instance (1H) is built, running, and passed a live end-to-end test from the operator's own Telegram account. What's left is a fresh-session test from a genuine non-operator account — the ambiguity path (a cold "is it still available?") and contact capture (give a real phone number and check it lands in `Inquiry.buyerContact`) — then open the PR.
+> Read session-handoff-2026-07-26.md and continue from where we left off. We're on branch `feat/buyer-inquiry`. Buyer-inquiry (1H) is complete — live-tested end to end from both the operator's account and a real non-operator account, with all six defects found along the way fixed. The next step is opening the PR into main (confirm before merging).
