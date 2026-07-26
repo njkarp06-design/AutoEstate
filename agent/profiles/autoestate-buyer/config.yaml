@@ -94,6 +94,30 @@ agent:
     # operator's task board.
     - kanban
 
+# --- Slash-command lockdown ------------------------------------------------
+# The tool lockdown above does NOT cover gateway slash commands — they are not
+# tools. On connect, Hermes registers 68 of them on the bot (/model, /profile,
+# /yolo, /update, /restart, /reset, /memory, /skills, …).
+#
+# gateway/slash_access.py resolves access with `enabled = bool(admin_ids)`, and
+# when gating is disabled `can_run()` returns True for EVERY allowed caller.
+# With TELEGRAM_ALLOWED_USERS=* that means every stranger had admin-tier access
+# to all 68 — including /profile, which would hand them the operator's outbound
+# skills. Setting an admin list is what switches gating on at all.
+#
+# Result: only the operator's Telegram id is admin; everyone else is capped at
+# the hardcoded floor of /help and /whoami (_ALWAYS_ALLOWED_FOR_USERS), because
+# user_allowed_commands is deliberately empty.
+platforms:
+  telegram:
+    extra:
+      allow_admin_from:
+        - "8543293827"          # operator's Telegram user id
+      user_allowed_commands: []  # strangers get nothing beyond help/whoami
+      group_allow_admin_from:
+        - "8543293827"
+      group_user_allowed_commands: []
+
 # --- Memory off ------------------------------------------------------------
 # On a public instance, agent memory and the user profile are a poisoning
 # vector: a stranger could write durable state that colours later replies to
