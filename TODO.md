@@ -2,28 +2,50 @@
 
 Task status, order, and sub-checklists. CLAUDE.md owns the brief/phase/architecture; the session-handoff file owns where work stopped. This file owns what's left to do.
 
-Last updated: 2026-07-26.
+Last updated: 2026-07-27.
 
-**Status:** every planned feature is built, live-tested and merged — the last, buyer-inquiry, in PR #34. **Nothing is blocked on more building.** Everything below is productionization.
+**Status:** every planned feature is built, live-tested and merged — the last, buyer-inquiry, in PR #34. The `/inspect` forensic sweep (PR #37) then fixed 41 defects across infra, plugins and the reporting app. **Nothing is blocked on more building.** Everything below is productionization, plus one deployment gap (item 0).
 
 **Blocked on the owner (account-level, cannot be done for you):** creating a Hetzner account so `terraform apply` can run (item 3), and setting up Vercel Pro to deploy the reporting app (item 4). These two gate a real pilot customer.
 
 **Not blocked, but must happen before a real customer:** hardening the public buyer instance (items 5–6), re-confirming open-channel behaviour on WhatsApp rather than Telegram alone, and settling the buyer-channel transport decision below.
 
-**Open, unverified:** whether Anthropic auto-reload billing was ever enabled (recommended after repeated credit outages, never confirmed), and whether the dev buyer bot's still-valid Telegram token should be revoked now testing is done.
+**Both former open questions are now answered (owner, 2026-07-27), and both have consequences:**
+- **The dev buyer bot's Telegram token is REVOKED.** Good hygiene, and the buyer gateway was already stopped, so nothing broke. But it means **the buyer instance can no longer be started** — a new BotFather token (or a decision on the buyer-channel transport) is a prerequisite for any further buyer testing, including the outstanding WhatsApp open-channel re-confirmation.
+- **Anthropic auto-reload billing is NOT enabled.** This was previously recorded as merely unverified; it is now a confirmed-off setting, which makes the recurring credit-exhaustion outage a matter of when, not if. See item 9.
 
-**In flight:** nothing. No PR is open.
+**In flight:** nothing. No PR is open (#37 merged 2026-07-26 23:11 UTC).
+
+**Verification record:** reconciled by `/fastpassdocs` on **2026-07-27** — live systems and repo↔live parity verified, satellite docs read in full, only recently-changed files re-read. **Tracked files were NOT swept in full by that pass**; the last full file sweep was `/inspect` on 2026-07-26, which read all 88 in-scope files.
 
 ---
 
 ## 🔜 Next up (in order)
 
-### 1. Nothing is blocking. The roadmap is done.
+### 0. Deploy the merged plugin fixes to the live profiles ⚠️ NOT DONE
+
+**PR #37's plugin fixes are on `main` but are NOT running.** Plugins are physical copies inside each profile's `plugins/` directory — merging deploys nothing. Verified 2026-07-27 by the parity recipe: **4 of 5 plugins have drifted**, and the live `autoestate` gateway is still executing pre-fix code.
+
+| Profile | Plugin | State |
+|---|---|---|
+| `autoestate` (running) | `active-listings-context` | **drifted** — still has the `KeyError`-out-of-hook bug |
+| `autoestate` (running) | `sync-to-webapp` | **drifted** — still no retry |
+| `autoestate` (running) | `listing-footer-reminder` | matches (unchanged by #37) |
+| `autoestate-buyer` (stopped) | `buyer-listings-context` | **drifted** — still has the `KeyError` bug |
+| `autoestate-buyer` (stopped) | `sync-inquiries-to-webapp` | **drifted** — still no retry |
+
+- [ ] Copy the four changed `__init__.py` files into `%LOCALAPPDATA%\hermes\profiles\<profile>\plugins\<name>\`.
+- [ ] Restart both gateways, then re-run the parity check to confirm all five match.
+
+**Do the restart from a normal interactive shell, not from a Claude Code agent session** — doing it from an agent environment has knocked out the ambient OAuth credential the gateway silently depends on and caused a full outage before (see the known issue below). Low urgency while nothing is deployed and the buyer bot is stopped, but the operator gateway is live, so it is running known-buggy code today.
+
+### 1. Nothing is blocking on features. The roadmap is done.
 
 Buyer-inquiry shipped on 2026-07-26 (PR #34), which was the last item on the marketing-automation roadmap. Every roadmap feature — listing-to-social, status updates, just-sold, re-engagement, locator lookup, weekly digest, and the buyer-facing receptionist — is built, live-tested and merged.
 
 **What remains is productionization, not features.** It is all listed below and none of it is blocked on more building. The shortest path to a real pilot customer:
 
+0. Deploy the merged plugin fixes to the live profiles (item 0) — five minutes, and the operator gateway is running pre-fix code until it happens.
 1. `terraform apply` to a real Hetzner account (item 3) — needs an account, an account-level action.
 2. Deploy the reporting app to Vercel Pro (item 4) — also account-level.
 3. The public buyer instance's production security gates (items 5 and 6): container isolation, a scoped second ingestion secret so the buyer box does not hold one that can write to `/api/ingest`, and re-running `hermes security audit` once anything is publicly exposed.
@@ -84,9 +106,22 @@ The reporting app has a per-platform Instagram post-action preference, but the a
 
 ---
 
+## 🔑 Credentials — both answered 2026-07-27, both now actionable
+
+### 9. Anthropic auto-reload billing (account-level, owner only)
+**Confirmed OFF.** The `autoestate` profile's API credits have run dry mid-session repeatedly and taken the live WhatsApp bot down each time — every reply becoming a credit-balance error. The gateway's only fallback is the machine's ambient Claude Code OAuth login, which is itself fragile (see the known issue below), so a dry key plus an unavailable ambient credential is a total outage with no backstop.
+- [ ] Enable auto-reload at console.anthropic.com. Cheapest possible fix for the single most recurrent live failure this project has had.
+
+### 10. The buyer instance has no usable bot token
+**The dev buyer bot's Telegram token was revoked by the owner on 2026-07-27** (correct hygiene — it was a public bot accepting messages from anyone, and it had already served its testing purpose). Consequence: `hermes -p autoestate-buyer gateway run` will now fail to authenticate. The profile, its lockdown and both its plugins are intact and version-controlled; only the credential is gone.
+- [ ] Before any further buyer testing, mint a fresh BotFather token and put it in the buyer profile's `.env` — **or** skip Telegram entirely if the buyer-channel transport decision (above) lands on WhatsApp or a web widget.
+- [ ] Note this blocks the outstanding **"re-confirm open-channel behaviour on WhatsApp"** item, which needs a runnable buyer instance either way.
+
+---
+
 ## 🧰 Repo tooling / docs automation
 
-### 9. Keep README.md from drifting
+### 11. Keep README.md from drifting
 Wanted 2026-07-25; reframed 2026-07-26. `README.md` is the **public-facing** description of AutoEstate and nothing keeps it current, so it drifts behind the real state of the project.
 
 Originally scoped as an end-of-session `Stop` hook. **That mechanism is dropped** — all hooks were removed from this repo on 2026-07-26 (see CLAUDE.md section 3). The refresh is now ordinary work, done the same way the other docs are maintained: when something user-visible actually changes, update it, in a normal commit on a feature branch.
@@ -119,7 +154,7 @@ These are **blocking** for a real deployment, not awareness items. Each is a rea
 - [ ] **Batched-follow-up rule occasionally violated:** the agent sometimes asks for missing facts (e.g. rooms, then sqm) as separate single-field questions instead of one batched question. Pre-existing, flagged in PR #26, unrelated to the locator feature.
 - [ ] **Reporting-app platform parser misses some real headers:** `platform-content.ts` doesn't always recognize plain-caps `INSTAGRAM` / `עברית:` headers (vs. the spec's bold/ATX format), so an occasional real reply fails to split into platform sections. The Listing-record parser is independently robust; this only affects the platform-split display.
 - [x] ~~**`app/page.tsx` Activity list still `max-w-3xl`**~~ — widened to `max-w-5xl` by the 2026-07-26 `/inspect` sweep.
-- [ ] **Anthropic Console auto-reload billing not confirmed enabled:** the `autoestate` profile's API credits have run dry repeatedly across sessions, causing live outages. Recommended enabling auto-reload at console.anthropic.com — not confirmed done.
+- [ ] **Anthropic Console auto-reload billing is OFF — confirmed by the owner 2026-07-27.** No longer an unverified maybe: the `autoestate` profile's credits have run dry repeatedly across sessions and caused live outages, and nothing prevents the next one. Compounded by the ambient-OAuth issue below — when credits run out, the gateway's only fallback is a credential that is itself fragile. Enabling auto-reload at console.anthropic.com is an account-level action only the owner can take. See item 9.
 - [ ] **Sync plugins are still not durable across a gateway restart** (partially addressed 2026-07-26). Both `sync-to-webapp` and `sync-inquiries-to-webapp` now retry 3× with 1s/4s backoff (4xx is not retried — that means our own payload or secret is wrong), which covers the case that actually bit us: the reporting app restarting, or a momentary blip. It is **not** durable delivery — nothing survives a gateway restart or a long outage, which needs an on-disk spool. Revisit at the Vercel deploy (item 4) if lost turns show up in practice.
 - [ ] **Gateway silently depends on ambient Claude Code OAuth credentials:** the profile's own `ANTHROPIC_API_KEY` keeps going dry and the `credential_pool` is empty, so the gateway falls back to the machine's ambient Claude Code OAuth login. Fragile single point of failure for a customer-facing bot — restarting the gateway from a Claude Code agent environment has knocked this out and caused a full outage before.
 - [ ] **Skill `version:` fields drift from the docs — no cross-check:** the doc discipline keeps docs *current* as changes happen but nothing re-verifies on-disk `version:` frontmatter against CLAUDE.md's stated versions. Caught 2026-07-25: `just-sold`/`listing-reengagement` were on-disk `0.2.0` (docs said v0.1.0) and `listing-status-update` `0.4.0` (docs said v0.3.0) — all bumped by PR #26 but recorded in prose without the numbers. Corrected in CLAUDE.md's PR #26 paragraph. Recurred and was caught again on 2026-07-26: `agent/README.md` stated 4 of 5 skill versions wrongly. **Versions are asserted in two places — CLAUDE.md prose and `agent/README.md` — so both must be checked.** A `grep '^version:' agent/skills*/**/SKILL.md` against both is the cheap periodic check.
@@ -128,7 +163,7 @@ These are **blocking** for a real deployment, not awareness items. Each is a rea
 
 ## ✅ Done (recent, for context)
 
-- **`/inspect` forensic sweep of `main` — 2026-07-26.** 41 findings (3 critical, 9 major, 18 minor, 11 nitpick), all fixed across four commits except the scoped-ingestion-secret item, which is a feature and is now tracked as a deploy gate above. The three that mattered most: the **Terraform module had drifted to a 2026-07-22 snapshot** and shipped 1 of 5 skills and 1 of 3 plugins — a customer provisioned from it would have tracked **zero** listings, reproducing the exact bug PR #23 fixed; both context plugins could **raise `KeyError` out of `pre_llm_call`** on the public buyer instance, on every turn, breaking their own documented degrade-to-`None` contract; and **every dashboard timestamp would have rendered in UTC on Vercel**, 2-3 hours off for Tel Aviv users, with Today/Yesterday flipping at the wrong moment. Two fixes were changed by measurement rather than shipped as planned: the inquiry→listing matcher's "obvious" fix would have produced **zero** links on real data, and `next build` caught a `"use server"` export error that neither `tsc` nor eslint saw.
+- **`/inspect` forensic sweep of `main` — PR #37, MERGED 2026-07-26.** 41 findings (3 critical, 9 major, 18 minor, 11 nitpick), all fixed across five commits (40 files, +807/−257) except the scoped-ingestion-secret item, which is a feature and is now tracked as a deploy gate above. **The plugin fixes are merged but not yet deployed to the live profiles — see item 0.** The three that mattered most: the **Terraform module had drifted to a 2026-07-22 snapshot** and shipped 1 of 5 skills and 1 of 3 plugins — a customer provisioned from it would have tracked **zero** listings, reproducing the exact bug PR #23 fixed; both context plugins could **raise `KeyError` out of `pre_llm_call`** on the public buyer instance, on every turn, breaking their own documented degrade-to-`None` contract; and **every dashboard timestamp would have rendered in UTC on Vercel**, 2-3 hours off for Tel Aviv users, with Today/Yesterday flipping at the wrong moment. Two fixes were changed by measurement rather than shipped as planned: the inquiry→listing matcher's "obvious" fix would have produced **zero** links on real data, and `next build` caught a `"use server"` export error that neither `tsc` nor eslint saw.
 
 - **`buyer-inquiry` v0.2.0 — never offer a SOLD listing as a choice (2026-07-26).** The disambiguation menu had listed sold properties as if on offer, so a buyer could pick one and only then be told. Anything the skill offers unprompted is now `ACTIVE`-only. Verified via `hermes -z` including the regression case (a buyer *naming* a sold property still gets the honest answer).
 

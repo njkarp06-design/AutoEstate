@@ -10,28 +10,31 @@ Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history;
 
 - **All planned features are built, live-tested and merged.** The last, buyer-inquiry, shipped in **PR #34** on 2026-07-26.
 - **Nothing is blocked on more building.** Everything remaining is productionization.
-- **On `main`, clean, nothing in flight.** PR #34 (the feature) and PR #35 (docs) are both merged; no PR is open. The merged branches `feat/buyer-inquiry` and `docs/buyer-inquiry-merged` still exist locally and on origin and are safe to delete. `chore/doc-consistency-checker` is deliberately kept — it holds the closed doc-checker script in case it is ever wanted as a manual pre-PR check.
+- **On `main`, clean, nothing in flight.** PRs #34–#37 are all merged; **no PR is open**. The last, **#37** (the `/inspect` sweep), merged 2026-07-26 23:11 UTC and its branch is deleted. Three merged branches still exist locally and on origin and are safe to delete: `feat/buyer-inquiry`, `docs/buyer-inquiry-merged`, `docs/post-merge-sync`. `chore/doc-consistency-checker` is deliberately kept — it holds the closed doc-checker script in case it is ever wanted as a manual pre-PR check.
 - **Nothing is deployed.** The reporting app runs only via `npm run dev` (port 4127). The Terraform module is written and validated but has **never been applied** — there is no Hetzner account yet.
+- **⚠️ PR #37's plugin fixes are merged but NOT live.** Plugins are physical copies inside each profile, so merging deploys nothing. 4 of 5 have drifted and the running operator gateway is still executing pre-fix code. See TODO item 0 — it is the first thing to do.
 
-### Live systems, verified 2026-07-26
+### Live systems, verified 2026-07-27
 
 | | State |
 |---|---|
-| `default` Hermes gateway | running (unrelated personal profile) |
-| `autoestate` gateway (operator) | running — the live WhatsApp bot |
+| `default` Hermes gateway | running, PID 1976 (unrelated personal profile) |
+| `autoestate` gateway (operator) | running, PID 8340 — the live WhatsApp bot |
 | `autoestate-buyer` gateway | **stopped deliberately** after testing |
-| WhatsApp bridge, port 3000 | running — **never kill this** |
-| Reporting app, 127.0.0.1:4127 | running |
-| Repo↔live plugin parity (5 plugins) | all match |
-| Repo↔live buyer config parity | no drift |
+| WhatsApp bridge, port 3000 | running, PID 2996 — **never kill this** |
+| Reporting app, 127.0.0.1:4127 | running (API returns 401 = healthy) |
+| Repo↔live plugin parity (5 plugins) | **4 of 5 DRIFTED** — PR #37's fixes are not deployed, see TODO item 0 |
+| Repo↔live buyer config parity | no drift (as parsed YAML) |
 
-The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by design, which is why it is stopped rather than idling. Restart with `hermes -p autoestate-buyer gateway run`.
+The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by design, which is why it was stopped rather than left idling. **Its Telegram token was then revoked by the owner on 2026-07-27**, so `hermes -p autoestate-buyer gateway run` will now fail to authenticate — the profile, its lockdown and both plugins are intact and version-controlled, but the credential is gone deliberately. A fresh BotFather token is needed before any further buyer testing (TODO item 10).
 
 ### What to do next
 
-**The two account-level steps are the real gate, and both need the owner** — I cannot create accounts:
+**First, and it takes five minutes:** deploy PR #37's plugin fixes to the live profiles (**TODO item 0**). They are merged but not running — copy four `__init__.py` files into each profile's `plugins/` dir and restart both gateways, **from a normal interactive shell, not an agent session**. Until then the live operator bot runs code with a known crash path and no sync retry.
 
-1. **Create a Hetzner account, then `terraform apply`** (TODO item 3). Verify boot, cloud-init and secret injection end to end. Everything else about per-customer provisioning is written and waiting on this.
+**Then the two account-level steps, which are the real gate and both need the owner** — I cannot create accounts:
+
+1. **Create a Hetzner account, then `terraform apply`** (TODO item 3). Verify boot, cloud-init and secret injection end to end. Note two things are new and have never run: the operator SSH key must be uploaded to the project once beforehand, and skills/plugins now arrive via a post-boot SSH upload rather than cloud-init. Everything else about per-customer provisioning is written and waiting on this.
 2. **Deploy the reporting app to Vercel Pro** (item 4) — set up the project, wire production Neon + Clerk env vars, verify authenticated multi-tenant access.
 
 **Then, before any real customer touches it:**
@@ -44,8 +47,10 @@ The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by desig
 
 ### Open questions for the owner
 
-- **Should the dev buyer bot's token be revoked?** The 2026-07-25 spike bot's token was revoked as hygiene once done. This one is still valid; the bot is merely stopped. Low risk (nothing answers), but it is an outstanding credential.
-- **Anthropic auto-reload billing** — recommended after repeated mid-session outages when credits ran dry. **Never confirmed enabled**; unverified as of 2026-07-26.
+**None outstanding.** Both long-standing questions were answered on 2026-07-27:
+
+- **Dev buyer bot token — REVOKED** by the owner. Right call; it was a public bot and testing was done. Consequence: the buyer instance can no longer start, so a fresh token (or a transport decision) gates any further buyer work — TODO item 10.
+- **Anthropic auto-reload billing — NOT enabled**, confirmed. No longer "unverified": the recurring credit-exhaustion outage is a matter of when, not if, and it is an account-level fix only the owner can make — TODO item 9.
 
 ### Working conventions
 
@@ -59,11 +64,11 @@ The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by desig
 - **Never edit a profile's `config.yaml` while its gateway is running.** The gateway rewrites the file, strips every comment, and silently clobbers concurrent edits. The commented copies under `agent/profiles/` are the source of truth — compare them as parsed YAML, not as text.
 - Per-profile logs: `%LOCALAPPDATA%\hermes\profiles\<profile>\logs\gateway.log`. Not the shared path (which has misled a session), and not `session-run.log` (stdout is unflushed and it stays near-empty).
 - Dev DB: one customer, four listings — 2 `ACTIVE` (Rothschild Boulevard, Neve Tzedek, seeded for testing) and 2 `SOLD` (Ben Gurion, Dizengoff).
-- Anthropic credits on this key have run dry repeatedly and caused live outages.
+- **Anthropic credits on this key have run dry repeatedly and caused live outages, and auto-reload is confirmed OFF (2026-07-27).** Expect it to happen again. If the live bot starts returning credit-balance errors, that is this, not a code fault — top up at console.anthropic.com.
 
-### Later on 2026-07-26 — `/inspect` sweep, branch `fix/inspect-sweep` (open PR, not merged)
+### Later on 2026-07-26 — `/inspect` sweep, shipped as PR #37 (MERGED)
 
-A full forensic read of all 88 in-scope tracked files on `main`. **41 findings; all fixed in four commits except the scoped ingestion secret**, which is a feature and is now a tracked deploy gate. Four commits on `fix/inspect-sweep`: infra, plugins, reporting-app, doc/comment corrections.
+A full forensic read of all 88 in-scope tracked files on `main`. **41 findings; all fixed except the scoped ingestion secret**, which is a feature and is now a tracked deploy gate. Five commits (infra, plugins, reporting-app, comment corrections, doc sync), 40 files, +807/−257. Merged 2026-07-26 23:11 UTC at the owner's explicit instruction; branch deleted.
 
 **What it caught that mattered:**
 
@@ -78,8 +83,21 @@ A full forensic read of all 88 in-scope tracked files on `main`. **41 findings; 
 
 **Three new deploy gates** are in TODO.md under "Deploy gates opened by the `/inspect` sweep" — the buyer profile's absolute Windows skills path and hardcoded operator Telegram id (both left at real values on purpose and marked `MACHINE-SPECIFIC`, so exclude them from the config parity check), plus the ingestion secret.
 
-Verification: `terraform fmt`/`validate`; 27 Python checks running the real hook functions; `lint`/`tsc`/`build` clean; 24 checks running the real parsers and formatter against the real dev Neon database. **No browser verification** — the Clerk headless-cookie limitation still applies.
+Verification: `terraform fmt`/`validate`; 27 Python checks running the real hook functions; `lint`/`tsc`/`build` clean; 24 checks running the real parsers and formatter against the real dev Neon database. **No browser verification** — the Clerk headless-cookie limitation still applies. **The Terraform module still has never been applied**, so its changes — the largest in the PR — are the least proven.
+
+**One process note:** the owner explicitly asked for the merge in that turn, overriding the standing "never merge without asking" rule. That was a one-off instruction for #37, **not** a change of policy — keep asking.
+
+### Reconciliation, 2026-07-27 (`/fastpassdocs`)
+
+Run after #37 merged. Found four stale claims, all caused by the merge landing after the handoff was written, plus one real operational gap:
+
+- **The plugin deployment gap** (now TODO item 0) — the only finding that isn't bookkeeping. Merging a plugin fix deploys nothing; 4 of 5 live copies are pre-fix.
+- This file described `fix/inspect-sweep` as an open, unmerged branch in two places.
+- The live-systems table asserted plugin parity that no longer held.
+- The branch list omitted `docs/post-merge-sync`, and `reporting-app/README.md` still said "everything through PR #34".
+
+Two new verification recipes were added to CLAUDE.md §5 as a result: resolving Terraform path/`fileset` arithmetic in `terraform console` (validate passes on a glob matching nothing, and `fileset` walks the filesystem rather than git), and re-running the plugin-parity check **after** any plugin PR merges.
 
 ### How to resume
 
-> Read session-handoff-2026-07-26.md and continue. Everything is built and merged. `fix/inspect-sweep` has four commits from the `/inspect` sweep — review the PR and decide on merging (nothing is merged without my say-so). After that, what's left is productionization, starting with whichever account-level step I want to authorize: Hetzner + `terraform apply`, or the Vercel deploy.
+> Read session-handoff-2026-07-26.md and continue. Everything is built and merged; no PR is open. **Start with TODO item 0** — PR #37's plugin fixes are merged but not deployed to the live profiles, which is a five-minute copy-and-restart (do the restart from a real shell, not an agent session). After that it's productionization, starting with whichever account-level step I want to authorize: Hetzner + `terraform apply`, or the Vercel deploy.
