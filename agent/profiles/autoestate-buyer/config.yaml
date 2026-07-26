@@ -1,0 +1,121 @@
+# AutoEstate — BUYER-FACING instance (dev).
+# This profile is the first untrusted-input surface in the product: strangers
+# message it directly. Everything below exists to make it safe by construction
+# rather than by heuristic. Do not relax any of it without re-reading
+# CLAUDE.md's buyer-inquiry section.
+model:
+  default: anthropic/claude-opus-4.6
+  provider: anthropic
+
+# --- Skill isolation -------------------------------------------------------
+# ONLY the buyer skill. Deliberately NOT the operator's agent/skills dir,
+# which holds the five outbound, Listing-table-mutating skills. A stranger
+# must never be able to route to just-sold / listing-status-update / etc.
+skills:
+  external_dirs:
+    - C:/dev/Portfolio/AI-Marketing/agent/skills-buyer
+  # The `skills` toolset is all-or-nothing (skills_list + skill_view +
+  # skill_manage) and Hermes has no per-tool denylist, so skill_manage cannot
+  # be dropped while keeping skill_view — which the instance needs. Instead,
+  # neuter its writes: write_approval STAGES a create/edit/patch/delete for
+  # review instead of committing it (it never prompts inline), and nobody
+  # approves anything on a buyer instance. Without this, a prompt-injected
+  # buyer could persistently rewrite the skill that answers every later
+  # buyer — the one genuinely durable compromise this instance is exposed to.
+  write_approval: true
+  # Scan agent-written skill content too. Cheap here: this instance is never
+  # meant to author a skill, so the friction cost is zero.
+  guard_agent_created: true
+  # Never pre-execute !`cmd` snippets from SKILL.md bodies (already the
+  # default; explicit because on a public instance it is a code-exec path).
+  inline_shell: false
+
+# Background skill maintenance OFF. It archives unused skills and can fork an
+# aux-model pass over them. This profile has exactly ONE skill — an archive
+# would silently take the whole instance down, and there is no operator
+# watching it.
+curator:
+  enabled: false
+
+# --- Tool lockdown, layer 1: per-platform allowlist ------------------------
+# _get_platform_tools() uses DIRECT MEMBERSHIP when the saved list contains
+# real toolset keys (hermes_cli/tools_config.py) — so this is an allowlist,
+# not an addition to a default set. `skills` is the only one the buyer skill
+# needs (skill_view). `clarify` is deliberately omitted: the skill asks its
+# clarifying questions as plain conversational text, which is what was
+# proven via hermes -z.
+platform_toolsets:
+  telegram:
+    - skills
+  cli:
+    - skills
+
+# --- Tool lockdown, layer 2: global hard suppression -----------------------
+# NOT belt-and-braces — load-bearing. Layer 1 is not a complete allowlist:
+# _get_platform_tools ends with a "recover non-configurable platform toolsets"
+# block that runs in BOTH branches, re-adding toolsets that are part of the
+# platform composite but absent from CONFIGURABLE_TOOLSETS. `kanban` reached
+# telegram that way despite an explicit [skills] list. This layer is applied
+# unconditionally as a final subtraction (model_tools.py _compute_tool_
+# definitions) and is what actually removes them.
+agent:
+  max_turns: 12
+  reasoning_effort: medium
+  disabled_toolsets:
+    - terminal
+    - file
+    - code_execution
+    - browser
+    - web
+    - computer_use
+    - delegation
+    - cronjob
+    - memory
+    - image_gen
+    - video_gen
+    - video
+    # vision is disabled on purpose: enabling it would make a PUBLIC instance
+    # process attacker-supplied image files, which is exactly what makes the
+    # deferred Pillow CVEs (Phase 3, TODO item 6) reachable. Buyers get a
+    # text-only receptionist.
+    - vision
+    - tts
+    - x_search
+    - todo
+    - session_search
+    - context_engine
+    - homeassistant
+    - spotify
+    - discord
+    - discord_admin
+    - yuanbao
+    # Not in CONFIGURABLE_TOOLSETS — recovered into telegram by the block
+    # described above. A stranger must not be able to read or write the
+    # operator's task board.
+    - kanban
+
+# --- Memory off ------------------------------------------------------------
+# On a public instance, agent memory and the user profile are a poisoning
+# vector: a stranger could write durable state that colours later replies to
+# other buyers. The buyer skill is stateless by design — every answer comes
+# from the injected listings block.
+memory:
+  memory_enabled: false
+  user_profile_enabled: false
+
+# Buyer conversations are long-lived threads keyed per sender; never auto-reset
+# (matches the operator profile and the Inquiry-per-session schema).
+session_reset:
+  mode: none
+
+# --- Plugins ---------------------------------------------------------------
+# Copied into this profile's plugins/ dir (plugins are NOT discovered via a
+# config pointer the way skills are — see CLAUDE.md).
+plugins:
+  enabled:
+    - buyer-listings-context
+    - sync-inquiries-to-webapp
+
+# NOTE: there is deliberately no `whatsapp:` block and no WHATSAPP_* env.
+# WhatsApp is not merely disabled — it is absent, so this instance can never
+# contend with the operator profile's paired device.

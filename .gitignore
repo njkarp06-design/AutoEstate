@@ -1,5 +1,10 @@
 # Secrets — never committed
 .env*
+# ...except value-stripped profile templates. These document which env vars a
+# Hermes instance needs (and why) and are checked before every commit to be
+# sure no real value is present. Named narrowly so a stray `.env` can never
+# match this negation.
+!agent/profiles/*/.env.example
 
 # Hermes local state (credentials, memory, logs — lives outside the repo by default,
 # ignored here defensively in case HERMES_HOME ever points into the project)
