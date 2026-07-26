@@ -10,7 +10,9 @@ Last updated: 2026-07-27.
 
 **Not blocked, but must happen before a real customer:** hardening the public buyer instance (items 5–6), re-confirming open-channel behaviour on WhatsApp rather than Telegram alone, and settling the buyer-channel transport decision below.
 
-**Open, unverified:** whether Anthropic auto-reload billing was ever enabled (recommended after repeated credit outages, never confirmed), and whether the dev buyer bot's still-valid Telegram token should be revoked now testing is done.
+**Both former open questions are now answered (owner, 2026-07-27), and both have consequences:**
+- **The dev buyer bot's Telegram token is REVOKED.** Good hygiene, and the buyer gateway was already stopped, so nothing broke. But it means **the buyer instance can no longer be started** — a new BotFather token (or a decision on the buyer-channel transport) is a prerequisite for any further buyer testing, including the outstanding WhatsApp open-channel re-confirmation.
+- **Anthropic auto-reload billing is NOT enabled.** This was previously recorded as merely unverified; it is now a confirmed-off setting, which makes the recurring credit-exhaustion outage a matter of when, not if. See item 9.
 
 **In flight:** nothing. No PR is open (#37 merged 2026-07-26 23:11 UTC).
 
@@ -104,9 +106,22 @@ The reporting app has a per-platform Instagram post-action preference, but the a
 
 ---
 
+## 🔑 Credentials — both answered 2026-07-27, both now actionable
+
+### 9. Anthropic auto-reload billing (account-level, owner only)
+**Confirmed OFF.** The `autoestate` profile's API credits have run dry mid-session repeatedly and taken the live WhatsApp bot down each time — every reply becoming a credit-balance error. The gateway's only fallback is the machine's ambient Claude Code OAuth login, which is itself fragile (see the known issue below), so a dry key plus an unavailable ambient credential is a total outage with no backstop.
+- [ ] Enable auto-reload at console.anthropic.com. Cheapest possible fix for the single most recurrent live failure this project has had.
+
+### 10. The buyer instance has no usable bot token
+**The dev buyer bot's Telegram token was revoked by the owner on 2026-07-27** (correct hygiene — it was a public bot accepting messages from anyone, and it had already served its testing purpose). Consequence: `hermes -p autoestate-buyer gateway run` will now fail to authenticate. The profile, its lockdown and both its plugins are intact and version-controlled; only the credential is gone.
+- [ ] Before any further buyer testing, mint a fresh BotFather token and put it in the buyer profile's `.env` — **or** skip Telegram entirely if the buyer-channel transport decision (above) lands on WhatsApp or a web widget.
+- [ ] Note this blocks the outstanding **"re-confirm open-channel behaviour on WhatsApp"** item, which needs a runnable buyer instance either way.
+
+---
+
 ## 🧰 Repo tooling / docs automation
 
-### 9. Keep README.md from drifting
+### 11. Keep README.md from drifting
 Wanted 2026-07-25; reframed 2026-07-26. `README.md` is the **public-facing** description of AutoEstate and nothing keeps it current, so it drifts behind the real state of the project.
 
 Originally scoped as an end-of-session `Stop` hook. **That mechanism is dropped** — all hooks were removed from this repo on 2026-07-26 (see CLAUDE.md section 3). The refresh is now ordinary work, done the same way the other docs are maintained: when something user-visible actually changes, update it, in a normal commit on a feature branch.
@@ -139,7 +154,7 @@ These are **blocking** for a real deployment, not awareness items. Each is a rea
 - [ ] **Batched-follow-up rule occasionally violated:** the agent sometimes asks for missing facts (e.g. rooms, then sqm) as separate single-field questions instead of one batched question. Pre-existing, flagged in PR #26, unrelated to the locator feature.
 - [ ] **Reporting-app platform parser misses some real headers:** `platform-content.ts` doesn't always recognize plain-caps `INSTAGRAM` / `עברית:` headers (vs. the spec's bold/ATX format), so an occasional real reply fails to split into platform sections. The Listing-record parser is independently robust; this only affects the platform-split display.
 - [x] ~~**`app/page.tsx` Activity list still `max-w-3xl`**~~ — widened to `max-w-5xl` by the 2026-07-26 `/inspect` sweep.
-- [ ] **Anthropic Console auto-reload billing not confirmed enabled:** the `autoestate` profile's API credits have run dry repeatedly across sessions, causing live outages. Recommended enabling auto-reload at console.anthropic.com — not confirmed done.
+- [ ] **Anthropic Console auto-reload billing is OFF — confirmed by the owner 2026-07-27.** No longer an unverified maybe: the `autoestate` profile's credits have run dry repeatedly across sessions and caused live outages, and nothing prevents the next one. Compounded by the ambient-OAuth issue below — when credits run out, the gateway's only fallback is a credential that is itself fragile. Enabling auto-reload at console.anthropic.com is an account-level action only the owner can take. See item 9.
 - [ ] **Sync plugins are still not durable across a gateway restart** (partially addressed 2026-07-26). Both `sync-to-webapp` and `sync-inquiries-to-webapp` now retry 3× with 1s/4s backoff (4xx is not retried — that means our own payload or secret is wrong), which covers the case that actually bit us: the reporting app restarting, or a momentary blip. It is **not** durable delivery — nothing survives a gateway restart or a long outage, which needs an on-disk spool. Revisit at the Vercel deploy (item 4) if lost turns show up in practice.
 - [ ] **Gateway silently depends on ambient Claude Code OAuth credentials:** the profile's own `ANTHROPIC_API_KEY` keeps going dry and the `credential_pool` is empty, so the gateway falls back to the machine's ambient Claude Code OAuth login. Fragile single point of failure for a customer-facing bot — restarting the gateway from a Claude Code agent environment has knocked this out and caused a full outage before.
 - [ ] **Skill `version:` fields drift from the docs — no cross-check:** the doc discipline keeps docs *current* as changes happen but nothing re-verifies on-disk `version:` frontmatter against CLAUDE.md's stated versions. Caught 2026-07-25: `just-sold`/`listing-reengagement` were on-disk `0.2.0` (docs said v0.1.0) and `listing-status-update` `0.4.0` (docs said v0.3.0) — all bumped by PR #26 but recorded in prose without the numbers. Corrected in CLAUDE.md's PR #26 paragraph. Recurred and was caught again on 2026-07-26: `agent/README.md` stated 4 of 5 skill versions wrongly. **Versions are asserted in two places — CLAUDE.md prose and `agent/README.md` — so both must be checked.** A `grep '^version:' agent/skills*/**/SKILL.md` against both is the cheap periodic check.

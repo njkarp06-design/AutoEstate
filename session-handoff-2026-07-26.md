@@ -26,7 +26,7 @@ Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history;
 | Repo↔live plugin parity (5 plugins) | **4 of 5 DRIFTED** — PR #37's fixes are not deployed, see TODO item 0 |
 | Repo↔live buyer config parity | no drift (as parsed YAML) |
 
-The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by design, which is why it is stopped rather than idling. Restart with `hermes -p autoestate-buyer gateway run`.
+The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by design, which is why it was stopped rather than left idling. **Its Telegram token was then revoked by the owner on 2026-07-27**, so `hermes -p autoestate-buyer gateway run` will now fail to authenticate — the profile, its lockdown and both plugins are intact and version-controlled, but the credential is gone deliberately. A fresh BotFather token is needed before any further buyer testing (TODO item 10).
 
 ### What to do next
 
@@ -47,8 +47,10 @@ The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by desig
 
 ### Open questions for the owner
 
-- **Should the dev buyer bot's token be revoked?** The 2026-07-25 spike bot's token was revoked as hygiene once done. This one is still valid; the bot is merely stopped. Low risk (nothing answers), but it is an outstanding credential.
-- **Anthropic auto-reload billing** — recommended after repeated mid-session outages when credits ran dry. **Never confirmed enabled**; unverified as of 2026-07-26.
+**None outstanding.** Both long-standing questions were answered on 2026-07-27:
+
+- **Dev buyer bot token — REVOKED** by the owner. Right call; it was a public bot and testing was done. Consequence: the buyer instance can no longer start, so a fresh token (or a transport decision) gates any further buyer work — TODO item 10.
+- **Anthropic auto-reload billing — NOT enabled**, confirmed. No longer "unverified": the recurring credit-exhaustion outage is a matter of when, not if, and it is an account-level fix only the owner can make — TODO item 9.
 
 ### Working conventions
 
@@ -62,7 +64,7 @@ The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by desig
 - **Never edit a profile's `config.yaml` while its gateway is running.** The gateway rewrites the file, strips every comment, and silently clobbers concurrent edits. The commented copies under `agent/profiles/` are the source of truth — compare them as parsed YAML, not as text.
 - Per-profile logs: `%LOCALAPPDATA%\hermes\profiles\<profile>\logs\gateway.log`. Not the shared path (which has misled a session), and not `session-run.log` (stdout is unflushed and it stays near-empty).
 - Dev DB: one customer, four listings — 2 `ACTIVE` (Rothschild Boulevard, Neve Tzedek, seeded for testing) and 2 `SOLD` (Ben Gurion, Dizengoff).
-- Anthropic credits on this key have run dry repeatedly and caused live outages.
+- **Anthropic credits on this key have run dry repeatedly and caused live outages, and auto-reload is confirmed OFF (2026-07-27).** Expect it to happen again. If the live bot starts returning credit-balance errors, that is this, not a code fault — top up at console.anthropic.com.
 
 ### Later on 2026-07-26 — `/inspect` sweep, shipped as PR #37 (MERGED)
 
