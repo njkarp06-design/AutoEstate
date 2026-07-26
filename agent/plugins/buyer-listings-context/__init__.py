@@ -58,14 +58,11 @@ BUYER_VIEW_URL = (
 BUYER_PLATFORMS = {"whatsapp", "telegram"}
 TIMEOUT_SECONDS = 3
 
-# Maps the reporting app's ListingStatus enum to the exact tokens the
-# buyer-inquiry SKILL.md keys its status-honesty rules on. Keep in sync with
-# both the Prisma enum and the skill's "Status honesty" section.
-STATUS_LABELS = {
-    "ACTIVE": "ACTIVE",
-    "UNDER_CONTRACT": "UNDER_CONTRACT",
-    "SOLD": "SOLD",
-}
+# The fields a row must carry to be describable at all. A row missing any of
+# them is skipped rather than rendered with a hole in it - a half-described
+# listing is worse than an absent one, since the skill answers only from what
+# is in this block.
+REQUIRED_FIELDS = ("area", "rooms", "sqm", "transactionType", "status")
 
 NO_LISTINGS_CONTEXT = (
     "Available listings (from the reporting system): none on record right now. "
@@ -98,19 +95,43 @@ def inject_buyer_listings_context(session_id, turn_id, user_message, platform, *
     if not listings:
         return NO_LISTINGS_CONTEXT
 
-    lines = [
-        "Available listings (from the reporting system — answer ONLY from these; "
-        "never call a SOLD or under-contract listing available; if a detail isn't "
-        "here, do not invent it — defer to the agent):"
-    ]
-    for l in listings:
-        price = f"₪{l['price']}" if l.get("price") is not None else "price N/A"
-        floor = f"floor {l['floor']}" if l.get("floor") is not None else "floor N/A"
-        status = STATUS_LABELS.get(l.get("status"), l.get("status") or "UNKNOWN")
-        lines.append(
-            f"- {l['area']}, {l['rooms']} rooms, {l['sqm']} sqm, {floor}, "
-            f"{price} ({l['transactionType']}) — STATUS: {status}"
-        )
+    # Formatting is inside the try as well, and every field is read with
+    # .get(): an unexpected response shape must degrade to "no context
+    # injected" (so the skill defers everything), never raise out of the hook.
+    # This block previously indexed area/rooms/sqm/transactionType directly and
+    # sat OUTSIDE the try, so a single missing key would have propagated a
+    # KeyError out of pre_llm_call on a PUBLIC instance, on every turn.
+    try:
+        lines = [
+            "Available listings (from the reporting system — answer ONLY from these; "
+            "never call a SOLD or under-contract listing available; if a detail isn't "
+            "here, do not invent it — defer to the agent):"
+        ]
+        for listing in listings:
+            if not isinstance(listing, dict) or any(
+                listing.get(f) is None for f in REQUIRED_FIELDS
+            ):
+                logger.warning(
+                    "buyer-listings-context: skipping malformed listing row (missing %s)",
+                    REQUIRED_FIELDS,
+                )
+                continue
+            price = f"₪{listing['price']}" if listing.get("price") is not None else "price N/A"
+            floor = f"floor {listing['floor']}" if listing.get("floor") is not None else "floor N/A"
+            lines.append(
+                f"- {listing['area']}, {listing['rooms']} rooms, {listing['sqm']} sqm, "
+                f"{floor}, {price} ({listing['transactionType']}) "
+                f"— STATUS: {listing['status']}"
+            )
+    except Exception as e:
+        logger.warning("buyer-listings-context: could not format listings, no context injected: %s", e)
+        return None
+
+    # Every row was malformed - same situation as an empty list, and the skill
+    # must be told so explicitly rather than handed a bare header.
+    if len(lines) == 1:
+        return NO_LISTINGS_CONTEXT
+
     return "\n".join(lines)
 
 
