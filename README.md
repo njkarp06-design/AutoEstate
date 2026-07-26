@@ -1,29 +1,78 @@
 # AutoEstate
 
-A productized marketing-automation service. A Hermes agent runs one end-to-end marketing workflow for a client automatically, backed by secure configuration and a small reporting app so a non-technical client can see what the agent is doing.
+Marketing automation for independent real estate agents in Tel Aviv.
 
-See [CLAUDE.md](CLAUDE.md) for the full project brief, target industry, and build phases.
+An agent sends listing facts to a WhatsApp number and gets back ready-to-post,
+bilingual (Hebrew + English) content for Instagram, Facebook and Yad2 — written
+only from the facts they actually gave, never invented. Prospective buyers
+message a separate public number and get honest answers about a property 24/7,
+captured as leads. Both sides show up in a web dashboard the agent logs into.
 
-**Status:** Phase 2a and 2b complete. Listing-to-social skill built, tested, and hardened (v0.2.1) for sale/rental pricing and fact-only output. WhatsApp is live via a Baileys/QR bridge paired to a dedicated eSIM number on the WhatsApp Business app — a real listing sent from a personal WhatsApp number was confirmed to produce a correct bilingual Instagram/Facebook/Yad2 reply end-to-end. Phase 3 (security hardening) done for now — audited against Hermes's own trust model; AutoEstate runs on its own dedicated Hermes profile, separate from the operator's personal instance, with only the real-estate skill enabled. Containerized isolation and a supply-chain dependency audit are deliberately deferred to Phase 5. Reporting app has since moved to a multi-tenant design — a per-customer Hermes instance (provisioned via the Terraform module in `infra/`) pushes activity over HTTP to a shared Postgres-backed Next.js dashboard, with Clerk-authenticated per-customer login. A full `/inspect` pass (2026-07-22) fixed a critical secret-handling bug in the provisioning module plus several correctness issues in the reporting app's ingestion path.
+Built on [Hermes](https://github.com/NousResearch/hermes), an open-source CLI
+agent, with one dedicated instance per customer.
 
-Reporting app has since been redesigned (PR #13, merged 2026-07-23): a per-platform review workflow (edit, copy, mark-posted, a stored Instagram auto-post preference) plus a distinct "Listing Ledger" visual identity — real Hebrew/English mirrored columns, not a generic template. Real bugs surfaced and fixed by testing against real synced data, not just code review — see [CLAUDE.md](CLAUDE.md) for detail. Neither `terraform apply` (no real Hetzner account yet) nor a Vercel Pro deployment (still local-only) has happened — the app only runs via `npm run dev` today.
+## What it does
 
-`listing-to-social` has since been hardened to v0.3.0 and a new `listing-status-update` skill added (PR #14, merged 2026-07-23), and real usage of that via a live WhatsApp photo test surfaced a reporting-app bug — a listing needing the skill's follow-up-question flow showed up as two separate Activity entries — fixed (PR #15, merged 2026-07-23) along with clean generated-content-derived listing titles. Direct scenario-by-scenario testing then found two more real gaps: `listing-status-update` was recalling facts from conversation memory instead of requiring restatement, and the merge-guard's literal instruction ("drop the older listing") didn't match its actual, better behavior ("answer both separately, never blend") — both fixed, to v0.1.1 and v0.3.1 respectively (PR #16, merged 2026-07-23). The Recent Activity page was then widened (`max-w-3xl` → `max-w-5xl`) with a real-data stats strip added above the list — total listings, ready vs. in-progress, WhatsApp/Telegram split (PR #17, merged 2026-07-23).
+**Outbound — for the agent.** Message the bot in plain language and it drafts:
 
-The system now has a persistent memory of each customer's active listings, so a new `weekly-digest` skill can draft a roundup automatically instead of the agent retyping the active list every time (PR #19, merged 2026-07-23): both existing skills append a fixed-format "Listing Record" footer their replies, a new Prisma `Listing` model tracks lifecycle (`ACTIVE`/`UNDER_CONTRACT`/`SOLD`), a new authenticated `GET /api/listings/active` lets a customer's own Hermes instance read its active listings back, and a new `active-listings-context` plugin injects that as context for the digest skill. Real bugs found and fixed via testing against actual `hermes -z` output, not synthetic fixtures — see [CLAUDE.md](CLAUDE.md) for full detail.
+- a new listing announcement, in the three-platform format
+- a price drop or under-contract update
+- a "just sold" social-proof post
+- a re-promotion of a listing that's still available
+- a weekly digest of everything currently active
 
-The deferred read-only Listings page is now built (PR #21, merged 2026-07-23) — `npm run lint`/`npm run build` clean, verified against the real dev database. The other deferred item, a live WhatsApp end-to-end test, was also run with the user's explicit go-ahead and surfaced a real, unresolved bug: real WhatsApp sends produce correct captions but the gateway silently omits the "Listing Record" footer, so nothing is currently landing in the `Listing` table in practice. Extensively debugged (six theories tested and ruled out with direct evidence); root cause traces into Hermes's own vendored gateway code, not ours, and was explicitly accepted as a known gap rather than pursued further — see [CLAUDE.md](CLAUDE.md) for the full evidence trail.
+It remembers the agent's listings, so a follow-up can name one ("the Dizengoff
+place") instead of restating every fact. Posting stays manual — the agent
+reviews and publishes.
 
-The gateway footer-omission bug is now resolved (PR #23, merged 2026-07-24): a new `listing-footer-reminder` plugin force-injects the Listing Record footer format into every WhatsApp/Telegram turn, sidestepping the tool-call compliance gap that caused it (a long-lived session not reloading an updated `SKILL.md`) rather than fighting it with more prompt text, which had already been tried and failed. Confirmed live end-to-end, including a real `Listing` row landing in the reporting app for the first time.
+**Inbound — for buyers.** A separate, locked-down instance answers strangers'
+questions about a property from real listing data, is honest when something is
+already sold, defers anything human (a viewing, an offer, a fact it wasn't
+given) to the agent, and captures the buyer's contact details as a lead.
 
-With the roadmap's weekly-digest item genuinely done, next up per the confirmed build order was re-engagement/just-sold-post skills: two new skills, `just-sold` (a celebratory social-proof post announcing a completed sale — replacing `listing-status-update`'s old Sold case, to keep skill boundaries unambiguous) and `listing-reengagement` (re-promotes a still-active, unchanged listing as a reminder, agent-initiated with no new data plumbing, same shape as `listing-status-update`). Merged and live-tested the same day (PR #25).
+**The dashboard.** A Next.js app where the agent reviews generated content
+per platform, edits it, marks it posted, sees their live listings, and works
+through buyer leads.
 
-Real usage of that same day surfaced a real friction point — a typo from retyping facts by hand created a stray Listing row — so the very next piece of work (PR #26, merged) lets the agent name a listing (e.g. "the Dizengoff place") instead of retyping every fact, matching it against the reporting system's own active-listings data rather than the agent's memory. `listing-status-update` and `just-sold` require a stated locator or explicit confirmation before their Listing Record footer (which mutates the database automatically) can fire; `listing-reengagement` (no such footer) can auto-pick a lone active listing safely. Real testing found and fixed a genuine gap between simulated and live behavior: the plugin that powers this lookup only fires on real WhatsApp/Telegram turns, and silently failed to load on its first-ever enable — caught by inspecting each turn's actual raw context sent to the model, not by guessing from symptoms. See [CLAUDE.md](CLAUDE.md) for the full design/verification detail.
+## Current state
 
-The confirmation-deferral path from PR #26 was then live-tested for the first time and **failed** — a "the apartment sold" message with no locator emitted the `Status: Sold` footer immediately, mutating the database with no confirmation. Fixed in PR #28 (merged 2026-07-25): the deferral rule was living only in the skill files, which a long-lived WhatsApp session never reloads (the same tool-call compliance gap PR #23 addressed), while the `listing-footer-reminder` plugin — the one instruction the model *does* see every turn — said the opposite. Moving the rule into that plugin closed the gap. Iterated four times with live feedback (v1.1→v1.4): withhold the footer and ask for confirmation → make the ask a real separated question → move it to the top of the reply so it can't be missed → expand it into a short descriptive intro (what's below, that replying records the update to the dashboard, how to confirm) with a guardrail against implying auto-posting. Turn one verified live throughout; the confirming "yes" turn is low-risk-unverified (the ACTIVE→SOLD transition-in-place itself was already proven by the original failing test). Next up: inbound buyer-inquiry auto-reply (deliberately last — biggest scope, new inbound trust surface) — or the still-outstanding `terraform apply`/Vercel deploy steps.
+**All planned features are built, live-tested against real WhatsApp and
+Telegram traffic, and merged.** The last of them, the buyer-inquiry
+receptionist, shipped in PR #34 on 2026-07-26.
+
+**Not yet deployed.** Everything runs locally today: the reporting app via
+`npm run dev`, the agent instances on a development machine. The Terraform
+module for per-customer infrastructure is written and validated but has never
+been applied, and the reporting app has never been deployed. Those two steps,
+plus hardening the public buyer instance, are what stand between here and a
+pilot customer.
+
+See [CLAUDE.md](CLAUDE.md) for the full brief, architecture decisions and
+engineering history, and [TODO.md](TODO.md) for what is outstanding.
+
+## Security posture
+
+The buyer-facing instance is the only surface untrusted people can reach, and
+it is locked down by construction rather than by prompt:
+
+- It loads **only** the buyer skill. The outbound skills that can modify listing
+  data are not present on it at all — necessary, because the Hermes sender
+  allowlist is enforced upstream of every skill and sender identity never
+  reaches one, so a skill cannot tell an operator from a stranger.
+- Its agent is configured down to **three tools** (skill listing and reading).
+  No shell, file access, code execution, browser, web, or memory.
+- Slash commands are restricted to non-privileged ones.
+
+Secrets never live in this repo. Per-customer credentials are generated at
+provisioning time and stored only as hashes.
 
 ## Structure
 
-- `agent/` — Hermes agent configuration and skills.
-- `infra/` — Terraform module for provisioning a per-customer Hermes instance (Hetzner), plus per-customer configs.
-- `reporting-app/` — Next.js reporting app — multi-tenant, Postgres-backed dashboard of agent activity across customers.
+- `agent/skills/` — the five outbound skills, loaded by an operator instance.
+- `agent/skills-buyer/` — the single inbound skill, loaded by a buyer instance.
+  Separate roots so the two can never be loaded together.
+- `agent/plugins/` — Hermes plugins that sync activity to the dashboard and
+  inject the customer's real listing data into a turn.
+- `agent/profiles/` — committed, commented configuration for an agent instance.
+- `infra/` — Terraform module provisioning one Hetzner instance per customer.
+- `reporting-app/` — the Next.js dashboard, multi-tenant and Postgres-backed.

@@ -1,62 +1,66 @@
-## Session Handoff - 2026-07-26
+## Session Handoff — 2026-07-26
 
-### Task Overview
+### What this project is
 
-Building **AutoEstate** (see [CLAUDE.md](CLAUDE.md) — read it first, especially the buyer-inquiry paragraphs at the end of Section 5). The live thread is the **buyer-inquiry auto-reply** feature — the last and biggest roadmap item, and the first **inbound** one.
+**AutoEstate** — marketing automation for independent real estate agents in Tel Aviv. An agent messages a WhatsApp bot with listing facts and gets back bilingual (Hebrew + English) content for Instagram, Facebook and Yad2. Prospective buyers message a *separate, public* bot and get honest answers about a property 24/7, captured as leads. Both show up in a Next.js dashboard the agent logs into. Built on Hermes, one dedicated instance per customer.
 
-**Buyer-inquiry in one line:** a prospective *buyer* (a stranger, not the operator) messages a dedicated bot and gets factual answers about a listing 24/7 from real listing data, captured as a reachable lead, with anything human deferred to the operator — a "receptionist, not a closer." Full plan: **`~/.claude/plans/quirky-honking-wave.md`**. Architecture + locked decisions: CLAUDE.md's buyer-inquiry paragraphs. Phased checklist: TODO.md item 1.
+Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history; [TODO.md](TODO.md) for what's outstanding. Repo: https://github.com/njkarp06-design/AutoEstate (private).
 
-GitHub repo: https://github.com/njkarp06-design/AutoEstate (private).
+### Where things stand
 
-### Current state at a glance
+- **All planned features are built, live-tested and merged.** The last, buyer-inquiry, shipped in **PR #34** on 2026-07-26. `main` is at `7ba4c21`.
+- **Nothing is blocked on more building.** Everything remaining is productionization.
+- **Current branch: `docs/buyer-inquiry-merged`, with PR #35 open** — documentation only, no code. It records the merge and this doc-consistency pass. Merge or close it before starting new work; nothing depends on it.
+- **Nothing is deployed.** The reporting app runs only via `npm run dev` (port 4127). The Terraform module is written and validated but has **never been applied** — there is no Hetzner account yet.
 
-- **Branch `feat/buyer-inquiry`**, ahead of `main` (`git log --oneline main..HEAD`), working tree clean, all pushed. **No open PR yet** — correct; don't open or merge until 1H's live test passes.
-- **Phase 0: all four blockers resolved** (2026-07-25 — two read-only, two via a live throwaway Telegram spike that was deleted and its token revoked).
-- **Phase 1A–1G: built, verified, committed** — the skill, the two buyer plugins, the full reporting pipeline (schema → endpoints → sync plugin → `/inquiries` dashboard), and Telegram operator notification with per-customer routing.
-- **Phase 1H: COMPLETE (2026-07-26)** — built, running, and live-tested from BOTH the operator's account and a genuine non-operator (flatmate) account. Six defects found across the two runs, all fixed. The bot is `@autoestate_buyerdev_bot`; the gateway is up (`hermes -p autoestate-buyer gateway run`, foreground). The skill layer passed every case in both runs; every defect was in the surrounding plumbing. **Nothing on the buyer-inquiry feature is outstanding — the next step is the PR.**
+### Live systems, verified 2026-07-26
 
-### Where 1H actually stands
+| | State |
+|---|---|
+| `default` Hermes gateway | running (unrelated personal profile) |
+| `autoestate` gateway (operator) | running — the live WhatsApp bot |
+| `autoestate-buyer` gateway | **stopped deliberately** after testing |
+| WhatsApp bridge, port 3000 | running — **never kill this** |
+| Reporting app, 127.0.0.1:4127 | running |
+| Repo↔live plugin parity (5 plugins) | all match |
+| Repo↔live buyer config parity | no drift |
 
-**Done and verified by running the resolution code, not by reading config:**
+The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by design, which is why it is stopped rather than idling. Restart with `hermes -p autoestate-buyer gateway run`.
 
-- `agent/skills-buyer/real-estate/buyer-inquiry/` — the skill was **moved** out of the shared `agent/skills/` (user-approved). Verified: buyer profile discovers **1** skill, operator profile discovers **5**, neither sees the other's.
-- Profile `autoestate-buyer` created via `hermes profile create autoestate-buyer --no-skills --no-alias`. Empty, with a `.no-bundled-skills` marker so `hermes update` never re-seeds skills into it. No alias/startup item installed.
-- Tool lockdown verified end-to-end: the model receives exactly **3 tools** — `skills_list`, `skill_view`, `skill_manage`. Nothing else.
-- `SOUL.md` locked receptionist persona; `memory`, `vision`, `curator` all off; `skills.write_approval: true`.
-- Both plugins physically copied into the profile's `plugins/` dir and named in `plugins.enabled`; confirmed loaded with `pre_llm_call`/`post_llm_call` registered.
-- `.env` written — `TELEGRAM_ALLOWED_USERS=*` (explicit, not empty), ingestion URL/secret + API key carried from the operator profile, **no `WHATSAPP_*` vars at all**.
-- `buyer-listings-context` tested live against the running 4127 reporting app with the buyer profile's own env: returned the real two-listing block, and correctly returned `None` for a non-buyer platform.
-- The whole lockdown committed as a reviewable repo template: `agent/profiles/autoestate-buyer/` (`config.yaml` + `SOUL.md` verbatim, secret-stripped `.env.example`, README). `.gitignore` gained `!agent/profiles/*/.env.example`.
+### What to do next
 
-**Also done 2026-07-26 (after the above):**
+**The two account-level steps are the real gate, and both need the owner** — I cannot create accounts:
 
-- **Bot + gateway live.** `@autoestate_buyerdev_bot` ("AutoEstate Property Desk", id `8870082036`); token in the profile `.env` only. Started with `gateway run` (foreground) — deliberately not `gateway install/start`, so no third Windows Startup-folder login item exists.
-- **Slash-command hole closed.** 68 gateway commands (`/profile`, `/model`, `/yolo`, …) were reachable by any sender: gating is off unless an admin list exists, and `ALLOWED_USERS=*` makes everyone an "allowed caller". Fixed via `platforms.telegram.extra.allow_admin_from`; verified operator=admin, stranger=`/help`+`/whoami` only.
-- **Dev DB seeded** — 2 ACTIVE listings (Rothschild Boulevard sale, Neve Tzedek rental) alongside the 2 SOLD; a leftover `_dryrun_` customer deleted (the docs had wrongly claimed it was cleaned up).
-- **Four defects found by the live test and fixed** — `computeDisposition` (latest-reply-only → a viewing lead showed as auto-answered), `maybeLinkListing` (required the full "Area, Tel Aviv" string → linked nothing), Hermes's first-contact note offering a stranger a profile-build + web_search (disabled via `onboarding.profile_build: "off"`), and the discovery that **the running gateway rewrites `config.yaml` and strips comments** — stop it before editing.
+1. **Create a Hetzner account, then `terraform apply`** (TODO item 3). Verify boot, cloud-init and secret injection end to end. Everything else about per-customer provisioning is written and waiting on this.
+2. **Deploy the reporting app to Vercel Pro** (item 4) — set up the project, wire production Neon + Clerk env vars, verify authenticated multi-tenant access.
 
-### Next steps (in order)
+**Then, before any real customer touches it:**
 
-**Both live legs of the end-to-end test have now PASSED (2026-07-26).** The operator's own account covered the factual/SOLD/Hebrew/defer/injection cases; the flatmate's fresh session then closed the two gaps that had never been cleanly exercised — the **ambiguity path** (a cold "is it still available?" produced one clarifying question naming real candidates) and **contact capture**. Session isolation confirmed: two separate `Inquiry` rows. Six defects were found across the two runs and all six are fixed — the most serious being `buyerContact` silently null on every lead (the feature's #1 field) and a `/start` regression that would have met every future buyer with a permissions refusal. Detail in CLAUDE.md.
+3. **Harden the public buyer instance** (items 5–6). It currently runs with no OS-level isolation (`terminal.backend: local`) and shares the operator's ingestion secret, which also grants write access to `/api/ingest`. It needs container isolation and a scoped, read-limited second secret. Re-run `hermes security audit` once anything is publicly exposed — ~50 known CVEs are currently unreachable only because nothing is exposed.
+4. **Re-confirm open-channel behaviour on WhatsApp.** Everything about strangers reaching a public bot was proven on **Telegram only**.
+5. **Settle the buyer-channel transport** (open decision in TODO) — a second eSIM per customer, the official Cloud API, or staying non-WhatsApp. No code depends on it.
 
-1. **Open the PR into `main`.** 1H is complete. Nothing is outstanding on the buyer-inquiry feature itself. **Confirm before merging — never auto-merge.**
-2. **(Deployment, non-blocking) Notifier bot:** create the Telegram alert bot, set `OPERATOR_TELEGRAM_BOT_TOKEN`, paste a chat id in Settings. Needed before a real lead *push* works; the dashboard records leads regardless.
-3. ~~Optional polish~~ **DONE 2026-07-26** — the disambiguation defect (the menu listing `SOLD` properties as if on offer) is fixed in `buyer-inquiry` v0.2.0 and re-verified via `hermes -z`, including the regression case. Nothing on the feature is outstanding.
+**Non-blocking:** create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts actually push. The dashboard records leads either way.
 
-After that the whole marketing-automation roadmap is done, and what remains is productionization: `terraform apply` to a real Hetzner account, deploying the reporting app to Vercel, the buyer-instance security gates (container isolation, a scoped second ingestion secret, re-running `hermes security audit`), re-confirming open-channel behaviour on WhatsApp, and the still-open buyer-channel transport decision.
+### Open questions for the owner
 
-### Environment notes
+- **Should the dev buyer bot's token be revoked?** The 2026-07-25 spike bot's token was revoked as hygiene once done. This one is still valid; the bot is merely stopped. Low risk (nothing answers), but it is an outstanding credential.
+- **Anthropic auto-reload billing** — recommended after repeated mid-session outages when credits ran dry. **Never confirmed enabled**; unverified as of 2026-07-26.
 
-- **There are no Claude Code hooks in this repo** — `.claude/settings.json` (the doc-sync `UserPromptSubmit` hook) was deleted 2026-07-26 at the owner's request; no git hooks either. Keeping CLAUDE.md / TODO.md / this file current is a convention now, not automation. See CLAUDE.md section 3.
+### Working conventions
 
-- Reporting-app dev server runs on **`127.0.0.1:4127`** — always `127.0.0.1`, never `localhost` (IPv6 collision on this machine). Verify a *newly launched* server's own log for `EADDRINUSE`; a stale process answering curl has fooled a previous session.
-- The `autoestate` operator gateway is running and **untouched** by this work. Port 3000 is the live Hermes WhatsApp bridge — never kill it. All three profiles (`default`, `autoestate`, `autoestate-buyer`) run gateways concurrently without conflict.
-- **Never edit a profile's `config.yaml` while its gateway is running** — the gateway rewrites the file (persisting things like `onboarding.seen`), strips all comments, and will silently clobber the edit. The commented copy in `agent/profiles/autoestate-buyer/config.yaml` is the documented source of truth.
-- Live buyer profile dir: `%LOCALAPPDATA%\hermes\profiles\autoestate-buyer\`. Its log would be `.../autoestate-buyer/logs/gateway.log` — the per-profile path, not the shared `%LOCALAPPDATA%\hermes\logs\` one, which has misled a previous session into a needless restart.
-- Anthropic credits for this API key have run dry repeatedly across sessions and caused live outages; top up at console.anthropic.com if replies start failing with a credit error.
+- **Git:** `main` → feature branch → PR. Never commit to `main`. **Never merge without asking.**
+- **No hooks exist in this repo** — `.claude/settings.json` was deleted 2026-07-26 at the owner's request, and PR #33 (a `Stop`-hook doc checker) was closed for the same reason. Keeping CLAUDE.md / TODO.md / this file current is a convention: record real changes as part of finishing a task and say which files were touched. Do not reintroduce automation.
+- **Verify by running something.** CLAUDE.md section 5 ends with the exact recipes — resolving a profile's real tool list, its visible skills, slash-command policy, and repo↔live parity. Every one caught a real defect on 2026-07-26.
 
-### How to Resume
+### Environment gotchas
 
-Start a fresh Claude Code session and open with:
+- Use **`127.0.0.1`**, never `localhost` (IPv6 collision on this machine). A page-route **500 on 4127 is usually a transient Turbopack recompile** — re-check before restarting; check an API route (401 = healthy) to confirm the agent-facing path is fine.
+- **Never edit a profile's `config.yaml` while its gateway is running.** The gateway rewrites the file, strips every comment, and silently clobbers concurrent edits. The commented copies under `agent/profiles/` are the source of truth — compare them as parsed YAML, not as text.
+- Per-profile logs: `%LOCALAPPDATA%\hermes\profiles\<profile>\logs\gateway.log`. Not the shared path (which has misled a session), and not `session-run.log` (stdout is unflushed and it stays near-empty).
+- Dev DB: one customer, four listings — 2 `ACTIVE` (Rothschild Boulevard, Neve Tzedek, seeded for testing) and 2 `SOLD` (Ben Gurion, Dizengoff).
+- Anthropic credits on this key have run dry repeatedly and caused live outages.
 
-> Read session-handoff-2026-07-26.md and continue from where we left off. We're on branch `feat/buyer-inquiry`. Buyer-inquiry (1H) is complete — live-tested end to end from both the operator's account and a real non-operator account, with all six defects found along the way fixed. The next step is opening the PR into main (confirm before merging).
+### How to resume
+
+> Read session-handoff-2026-07-26.md and continue. Everything is built and merged as of PR #34; nothing is blocked on more building. PR #35 (docs only) is open — merge or close it first. What's left is productionization, starting with whichever account-level step I want to authorize: Hetzner + `terraform apply`, or the Vercel deploy.
