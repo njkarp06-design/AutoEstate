@@ -12,27 +12,25 @@ Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history;
 - **Nothing is blocked on more building.** Everything remaining is productionization.
 - **On `main`, clean, nothing in flight.** PRs #34–#37 are all merged; **no PR is open**. The last, **#37** (the `/inspect` sweep), merged 2026-07-26 23:11 UTC and its branch is deleted. Three merged branches still exist locally and on origin and are safe to delete: `feat/buyer-inquiry`, `docs/buyer-inquiry-merged`, `docs/post-merge-sync`. `chore/doc-consistency-checker` is deliberately kept — it holds the closed doc-checker script in case it is ever wanted as a manual pre-PR check.
 - **Nothing is deployed.** The reporting app runs only via `npm run dev` (port 4127). The Terraform module is written and validated but has **never been applied** — there is no Hetzner account yet.
-- **⚠️ PR #37's plugin fixes are merged but NOT live.** Plugins are physical copies inside each profile, so merging deploys nothing. 4 of 5 have drifted and the running operator gateway is still executing pre-fix code. See TODO item 0 — it is the first thing to do.
+- **PR #37's plugin fixes are deployed and live** (2026-07-27). Merging did not do this — plugins are physical copies inside each profile — so they were copied across and the operator gateway restarted. Parity is 5/5 and the running process demonstrably loaded the new code. Nothing is half-deployed.
 
 ### Live systems, verified 2026-07-27
 
 | | State |
 |---|---|
 | `default` Hermes gateway | running, PID 1976 (unrelated personal profile) |
-| `autoestate` gateway (operator) | running, PID 8340 — the live WhatsApp bot |
+| `autoestate` gateway (operator) | running, PID 6072 — the live WhatsApp bot, restarted 2026-07-27 02:42 onto PR #37's plugin fixes |
 | `autoestate-buyer` gateway | **stopped deliberately** after testing |
 | WhatsApp bridge, port 3000 | running, PID 2996 — **never kill this** |
 | Reporting app, 127.0.0.1:4127 | running (API returns 401 = healthy) |
-| Repo↔live plugin parity (5 plugins) | **4 of 5 DRIFTED** — PR #37's fixes are not deployed, see TODO item 0 |
+| Repo↔live plugin parity (5 plugins) | all 5 match (re-verified after deploying #37's fixes) |
 | Repo↔live buyer config parity | no drift (as parsed YAML) |
 
 The buyer bot (`@autoestate_buyerdev_bot`) accepts messages from anyone by design, which is why it was stopped rather than left idling. **Its Telegram token was then revoked by the owner on 2026-07-27**, so `hermes -p autoestate-buyer gateway run` will now fail to authenticate — the profile, its lockdown and both plugins are intact and version-controlled, but the credential is gone deliberately. A fresh BotFather token is needed before any further buyer testing (TODO item 10).
 
 ### What to do next
 
-**First, and it takes five minutes:** deploy PR #37's plugin fixes to the live profiles (**TODO item 0**). They are merged but not running — copy four `__init__.py` files into each profile's `plugins/` dir and restart both gateways, **from a normal interactive shell, not an agent session**. Until then the live operator bot runs code with a known crash path and no sync retry.
-
-**Then the two account-level steps, which are the real gate and both need the owner** — I cannot create accounts:
+**Everything that can be done without an account is done.** The two account-level steps are the real gate and both need the owner — I cannot create accounts:
 
 1. **Create a Hetzner account, then `terraform apply`** (TODO item 3). Verify boot, cloud-init and secret injection end to end. Note two things are new and have never run: the operator SSH key must be uploaded to the project once beforehand, and skills/plugins now arrive via a post-boot SSH upload rather than cloud-init. Everything else about per-customer provisioning is written and waiting on this.
 2. **Deploy the reporting app to Vercel Pro** (item 4) — set up the project, wire production Neon + Clerk env vars, verify authenticated multi-tenant access.
@@ -91,7 +89,7 @@ Verification: `terraform fmt`/`validate`; 27 Python checks running the real hook
 
 Run after #37 merged. Found four stale claims, all caused by the merge landing after the handoff was written, plus one real operational gap:
 
-- **The plugin deployment gap** (now TODO item 0) — the only finding that isn't bookkeeping. Merging a plugin fix deploys nothing; 4 of 5 live copies are pre-fix.
+- **The plugin deployment gap** — the only finding that wasn't bookkeeping. Merging a plugin fix deploys nothing; 4 of 5 live copies were pre-fix. **Closed the same day**: files copied across, operator gateway restarted by the owner, parity re-verified 5/5. The standing rule it produced is in TODO's Done section — a plugin PR is not finished when it merges.
 - This file described `fix/inspect-sweep` as an open, unmerged branch in two places.
 - The live-systems table asserted plugin parity that no longer held.
 - The branch list omitted `docs/post-merge-sync`, and `reporting-app/README.md` still said "everything through PR #34".
@@ -100,4 +98,4 @@ Two new verification recipes were added to CLAUDE.md §5 as a result: resolving 
 
 ### How to resume
 
-> Read session-handoff-2026-07-26.md and continue. Everything is built and merged; no PR is open. **Start with TODO item 0** — PR #37's plugin fixes are merged but not deployed to the live profiles, which is a five-minute copy-and-restart (do the restart from a real shell, not an agent session). After that it's productionization, starting with whichever account-level step I want to authorize: Hetzner + `terraform apply`, or the Vercel deploy.
+> Read session-handoff-2026-07-26.md and continue. Everything is built, merged and deployed to the live profiles; no PR is open and nothing is half-finished. There are no open questions for me. What's left is productionization, and it starts with whichever account-level step I authorize — Hetzner + `terraform apply` (TODO item 3) or the Vercel deploy (item 4). Don't start either without me: both cost money and neither account exists yet. If I haven't picked one, the most useful thing you can do unprompted is the scoped second ingestion secret (deploy gates section), which is real work and blocks public exposure.
