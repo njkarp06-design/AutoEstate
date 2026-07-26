@@ -41,7 +41,7 @@ GitHub repo: https://github.com/njkarp06-design/AutoEstate (private).
 
 1. **Open the PR into `main`.** 1H is complete. Nothing is outstanding on the buyer-inquiry feature itself. **Confirm before merging — never auto-merge.**
 2. **(Deployment, non-blocking) Notifier bot:** create the Telegram alert bot, set `OPERATOR_TELEGRAM_BOT_TOKEN`, paste a chat id in Settings. Needed before a real lead *push* works; the dashboard records leads regardless.
-3. **Optional polish before or after the PR** — one real content defect found in the flatmate run, tracked in TODO's known-issues: the disambiguation menu lists `SOLD` listings without marking them, so a buyer can pick a sold property and only then be told. Status honesty holds once a listing is chosen; this is the menu itself presenting sold stock as current inventory.
+3. ~~Optional polish~~ **DONE 2026-07-26** — the disambiguation defect (the menu listing `SOLD` properties as if on offer) is fixed in `buyer-inquiry` v0.2.0 and re-verified via `hermes -z`, including the regression case. Nothing on the feature is outstanding.
 
 After that the whole marketing-automation roadmap is done, and what remains is productionization: `terraform apply` to a real Hetzner account, deploying the reporting app to Vercel, the buyer-instance security gates (container isolation, a scoped second ingestion secret, re-running `hermes security audit`), re-confirming open-channel behaviour on WhatsApp, and the still-open buyer-channel transport decision.
 

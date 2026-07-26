@@ -113,10 +113,20 @@ platforms:
     extra:
       allow_admin_from:
         - "8543293827"          # operator's Telegram user id
-      user_allowed_commands: []  # strangers get nothing beyond help/whoami
+      # Strangers get `start` plus the hardcoded floor (help/whoami) and
+      # nothing else. `start` is NOT an admin action — it is the button
+      # Telegram shows on every new bot chat, and Hermes defines it as
+      # "acknowledge platform start pings without a reply", a no-op that
+      # creates and exposes nothing. Omitting it meant a real buyer's very
+      # first tap returned "⛔ /start is admin-only here" (found 2026-07-26 in
+      # a live test). Locking a public surface by allowlist will also catch
+      # the platform's own entry points — check them explicitly.
+      user_allowed_commands:
+        - start
       group_allow_admin_from:
         - "8543293827"
-      group_user_allowed_commands: []
+      group_user_allowed_commands:
+        - start
 
 # --- Memory off ------------------------------------------------------------
 # On a public instance, agent memory and the user profile are a poisoning
