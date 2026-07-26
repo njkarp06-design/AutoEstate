@@ -191,8 +191,19 @@ async function maybeLinkListing(
     where: { customerId },
     select: { id: true, area: true },
   });
+  // Match on the area's leading segment, not the whole stored string. Areas
+  // are stored as "Rothschild Boulevard, Tel Aviv" (the skills' footer format),
+  // but nobody types the city: a buyer writes "the Rothschild place" and the
+  // bot replies "Rothschild Boulevard". Requiring the full string meant this
+  // never fired for realistic phrasing - confirmed on the first real buyer
+  // thread, which was unmistakably about Rothschild and still linked to null.
+  // Still conservative: a single distinct match is required, so a turn naming
+  // two areas links nothing.
   const haystack = text.toLowerCase();
-  const matched = listings.filter((l) => haystack.includes(l.area.trim().toLowerCase()));
+  const matched = listings.filter((l) => {
+    const needle = l.area.split(",")[0].trim().toLowerCase();
+    return needle.length > 0 && haystack.includes(needle);
+  });
   const distinctIds = new Set(matched.map((l) => l.id));
   if (distinctIds.size !== 1) return;
 

@@ -81,8 +81,18 @@ function toEpochSeconds(date: Date): number {
 function computeDisposition(
   messages: { role: string; content: string }[],
 ): InquiryDisposition {
-  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
-  if (lastAssistant && replyDefersToOperator(lastAssistant.content)) {
+  // ANY deferring reply in the thread marks it "needs you", not just the
+  // latest one. Keying on the latest reply was wrong in a way the first real
+  // buyer thread exposed immediately: the buyer asked about a sold listing,
+  // asked for a missing fact, and asked for a viewing - three separate turns
+  // that each deferred with the canonical sentence - then sent one more
+  // message the bot answered itself. The last reply had no defer sentence, so
+  // a lead that had explicitly asked for a viewing displayed as
+  // "auto-answered", i.e. exactly the lead the operator most needs to see,
+  // hidden. Once a thread has handed off, it needs the human until the
+  // operator marks it HANDLED - which is what the separate stored `status`
+  // axis is for.
+  if (messages.some((m) => m.role === "assistant" && replyDefersToOperator(m.content))) {
     return "needs_you";
   }
   return "auto_answered";

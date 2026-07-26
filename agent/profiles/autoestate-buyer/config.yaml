@@ -143,3 +143,18 @@ plugins:
 # NOTE: there is deliberately no `whatsapp:` block and no WHATSAPP_* env.
 # WhatsApp is not merely disabled — it is absent, so this instance can never
 # contend with the operator profile's paired device.
+
+# --- First-contact onboarding note OFF ---------------------------------------
+# Hermes injects a note into the very first message ever for a profile telling
+# the agent to introduce itself, mention /help, and OFFER to build a profile of
+# the person — asking their name/occupation, offering a web_search to confirm
+# public details about them, and saving facts with the memory tool. On a public
+# buyer instance that is a stranger being asked for personal data and offered a
+# background check, and the promise is empty anyway since memory is disabled
+# here. It fired on our first real buyer. `off` reduces it to a plain intro.
+#
+# NOTE: the LIVE config.yaml has no comments — the running gateway rewrites the
+# file and strips them. This repo copy is the documented source of truth; stop
+# the gateway before editing the live one or the edit is clobbered.
+onboarding:
+  profile_build: "off"
