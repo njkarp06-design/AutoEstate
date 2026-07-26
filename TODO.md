@@ -2,9 +2,17 @@
 
 Task status, order, and sub-checklists. CLAUDE.md owns the brief/phase/architecture; the session-handoff file owns where work stopped. This file owns what's left to do.
 
-Last updated: 2026-07-26 (**PR #34 MERGED — buyer-inquiry shipped, and with it the whole marketing-automation roadmap.** Nothing is blocking; everything left is productionization (Hetzner, Vercel, the public instance's security gates, the WhatsApp re-confirmation, and the buyer-channel transport decision). PR #33 closed — its `Stop`-hook mechanism conflicts with the hook removal. The dev buyer bot has been stopped.)
+Last updated: 2026-07-26.
 
-Previously: 2026-07-25 (live Telegram spike RUN + PASSED — Phase 0 (a) and (c) both resolved: open channel via `TELEGRAM_ALLOWED_USERS=*` admits strangers with no pairing; two senders get isolated per-user sessions so the `hermesSessionId` thread key stands. All 4 Phase-0 blockers now green; 1H is the only remaining buyer-inquiry build step. Also earlier: 1A–1G built + verified, Telegram notify with per-customer routing; buyer-channel transport open decision; skill-version doc-drift correction).
+**Status:** every planned feature is built, live-tested and merged — the last, buyer-inquiry, in PR #34. **Nothing is blocked on more building.** Everything below is productionization.
+
+**Blocked on the owner (account-level, cannot be done for you):** creating a Hetzner account so `terraform apply` can run (item 3), and setting up Vercel Pro to deploy the reporting app (item 4). These two gate a real pilot customer.
+
+**Not blocked, but must happen before a real customer:** hardening the public buyer instance (items 5–6), re-confirming open-channel behaviour on WhatsApp rather than Telegram alone, and settling the buyer-channel transport decision below.
+
+**Open, unverified:** whether Anthropic auto-reload billing was ever enabled (recommended after repeated credit outages, never confirmed), and whether the dev buyer bot's still-valid Telegram token should be revoked now testing is done.
+
+**In flight:** PR #35 (documentation only — records the #34 merge and a doc-consistency pass). Nothing depends on it.
 
 ---
 
@@ -82,16 +90,15 @@ Wanted 2026-07-25; reframed 2026-07-26. `README.md` is the **public-facing** des
 Originally scoped as an end-of-session `Stop` hook. **That mechanism is dropped** — all hooks were removed from this repo on 2026-07-26 (see CLAUDE.md section 3). The refresh is now ordinary work, done the same way the other docs are maintained: when something user-visible actually changes, update it, in a normal commit on a feature branch.
 
 The thinking already done here still applies and is the real content of this item:
-- [ ] Decide which README sections are maintained vs. hand-written-and-left-alone. README is public-facing; CLAUDE.md is the internal brief. Blindly syncing internal state into it would leak working detail and make it worse, not better.
+- [x] **Decided 2026-07-26 by doing it.** `README.md` was rewritten from a chronological PR changelog (which is what it had drifted into — the exact failure this item warned about) into a stable public-facing description: what the product does, current state, security posture, structure. Only the **Current state** section is expected to change often; the rest is hand-written and left alone. Internal history stays in CLAUDE.md.
 - [ ] Only refresh when something **user-visible** actually changed — not every session. A README rewritten constantly makes noisy diffs in a history that is otherwise meaningful PRs.
 - [ ] Same git workflow as everything else: feature branch and PR, never straight to `main`.
-- [ ] Do a first pass to see how far it has actually drifted — it has not been reviewed since well before the multi-tenant pivot, the reporting-app redesign, or any of the buyer-inquiry work.
+- [x] **First pass done 2026-07-26.** It had drifted badly: the status line still read "Phase 2a and 2b complete" and the closing paragraph still called buyer-inquiry "next up" after it had shipped. Rewritten. `agent/README.md` (4 of 5 skill versions wrong, `buyer-inquiry` and `skills-buyer/` missing entirely) and `reporting-app/README.md` (status from 2026-07-23, schema section missing `Listing`/`Inquiry`/`InquiryMessage`) were corrected in the same pass.
 
 ---
 
 ## 🐛 Known small issues / awareness (not blocking, no owner yet)
 
-- [x] ~~Disambiguation menu lists SOLD listings without marking them~~ **FIXED 2026-07-26, `buyer-inquiry` v0.2.0.** Anything the skill offers unprompted is now `ACTIVE`-only, with two new branches (exactly one ACTIVE = nothing to disambiguate; nothing ACTIVE = say so plainly and defer). Verified via `hermes -z` on the real four-listing data, including the regression that mattered — a buyer who *names* a sold property still gets the honest answer plus alternatives and the verbatim defer sentence.
 - [ ] **Command-refusal text leaks internal config vocabulary at strangers:** a denied command replies "ask an admin to add you to `allow_admin_from` or set `user_allowed_commands`". Vendored gateway text, so changing it means patching code an upstream `hermes update` would overwrite. Low impact now that `/start` is allowed and buyers rarely trigger commands.
 - [ ] **The sync plugin sends a `sender` field that nothing stores:** `/api/inquiries` accepts it, but the `Inquiry` model has no such column (the thread key is `hermesSessionId` by design). Harmless dead weight; either persist it or drop it from the payload.
 
@@ -101,11 +108,13 @@ The thinking already done here still applies and is the real content of this ite
 - [ ] **Anthropic Console auto-reload billing not confirmed enabled:** the `autoestate` profile's API credits have run dry repeatedly across sessions, causing live outages. Recommended enabling auto-reload at console.anthropic.com — not confirmed done.
 - [ ] **`sync-to-webapp` silently drops turns when the ingest server is unreachable:** the plugin POSTs fire-and-forget with no retry queue (agent/plugins/sync-to-webapp/__init__.py) — a failed POST just logs a warning and the turn's data (including any `Listing` footer) is lost permanently. Surfaced live 2026-07-25 when the 4127 dev server was down during PR #28's turn-two test. Harmless for dev, but for a deployed customer, transient reporting-app downtime = permanently lost listing-tracking events. Consider a lightweight retry/queue before/at production (Vercel deploy, item 4).
 - [ ] **Gateway silently depends on ambient Claude Code OAuth credentials:** the profile's own `ANTHROPIC_API_KEY` keeps going dry and the `credential_pool` is empty, so the gateway falls back to the machine's ambient Claude Code OAuth login. Fragile single point of failure for a customer-facing bot — restarting the gateway from a Claude Code agent environment has knocked this out and caused a full outage before.
-- [ ] **Skill `version:` fields drift from the docs — no cross-check:** the doc discipline keeps docs *current* as changes happen but nothing re-verifies on-disk `version:` frontmatter against CLAUDE.md's stated versions. Caught 2026-07-25: `just-sold`/`listing-reengagement` were on-disk `0.2.0` (docs said v0.1.0) and `listing-status-update` `0.4.0` (docs said v0.3.0) — all bumped by PR #26 but recorded in prose without the numbers. Corrected in CLAUDE.md's PR #26 paragraph. Consider a periodic `grep '^version' agent/skills/**/SKILL.md` vs. the docs, or fold it into the README-refresh pass (item 9).
+- [ ] **Skill `version:` fields drift from the docs — no cross-check:** the doc discipline keeps docs *current* as changes happen but nothing re-verifies on-disk `version:` frontmatter against CLAUDE.md's stated versions. Caught 2026-07-25: `just-sold`/`listing-reengagement` were on-disk `0.2.0` (docs said v0.1.0) and `listing-status-update` `0.4.0` (docs said v0.3.0) — all bumped by PR #26 but recorded in prose without the numbers. Corrected in CLAUDE.md's PR #26 paragraph. Recurred and was caught again on 2026-07-26: `agent/README.md` stated 4 of 5 skill versions wrongly. **Versions are asserted in two places — CLAUDE.md prose and `agent/README.md` — so both must be checked.** A `grep '^version:' agent/skills*/**/SKILL.md` against both is the cheap periodic check.
 
 ---
 
 ## ✅ Done (recent, for context)
+
+- **`buyer-inquiry` v0.2.0 — never offer a SOLD listing as a choice (2026-07-26).** The disambiguation menu had listed sold properties as if on offer, so a buyer could pick one and only then be told. Anything the skill offers unprompted is now `ACTIVE`-only. Verified via `hermes -z` including the regression case (a buyer *naming* a sold property still gets the honest answer).
 
 - **Buyer-inquiry auto-reply (PR #34) — MERGED 2026-07-26. The last roadmap item.** A locked-down, public, buyer-facing Hermes instance (`autoestate-buyer`) plus the `/inquiries` dashboard. Role-by-channel isolation: the outbound skills are simply not loaded there, since the Hermes allowlist is a hard adapter gate and sender identity never reaches a skill. The model on that instance receives **3 tools**. Live-tested end to end from the operator's account *and* a genuine non-operator account; six defects found by those runs and all six fixed (the worst: `buyerContact` silently null on every lead, and `/start` blocked so every buyer's first tap would have been a permissions refusal). Architecture, the three Hermes security findings, and every defect are written up in CLAUDE.md.
 - **All Claude Code hooks removed from the repo — 2026-07-26.** `.claude/settings.json` deleted at the owner's request; doc-sync is a convention now, not automation. PR #33 (a background doc-consistency checker built on a `Stop` hook) was **closed** for the same reason — good engineering aimed at a real problem, wrong mechanism for this repo. Its branch `chore/doc-consistency-checker` still exists if the script is ever wanted as an on-demand check.
