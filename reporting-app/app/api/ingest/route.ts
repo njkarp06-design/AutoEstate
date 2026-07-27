@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { authenticateIngestRequest } from "@/lib/ingest-auth";
+import { authenticateMachineRequest } from "@/lib/ingest-auth";
 import { parseListingRecords } from "@/lib/listing-record";
 
 const turnStartedSchema = z.object({
@@ -33,7 +33,10 @@ function deriveTitle(userMessage: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const authResult = await authenticateIngestRequest(request);
+  // OPERATOR role only. This route writes Run rows and creates/transitions
+  // Listing rows, so the buyer instance's secret must never reach it - that
+  // exposure is the reason the credential was split in two.
+  const authResult = await authenticateMachineRequest(request, "operator");
   if (!authResult.ok) {
     return NextResponse.json(
       { ok: false, error: authResult.error },

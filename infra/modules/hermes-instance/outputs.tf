@@ -8,8 +8,8 @@ output "server_id" {
   value       = hcloud_server.hermes.id
 }
 
-output "ingestion_secret" {
-  description = "The generated per-customer ingestion secret. Register its SHA-256 hash as Customer.ingestionSecretHash in the reporting webapp's database - see the module README for the exact command."
+output "operator_ingestion_secret" {
+  description = "The generated per-customer OPERATOR secret. Register it with provision-customer.ts (default --role operator), which stores its SHA-256 hash as Customer.operatorSecretHash - see the module README. This module provisions the operator role only; a buyer instance needs its own separate secret, scoped to /api/inquiries and /api/listings/buyer-view, which is minted at provisioning time rather than here (there is no buyer Terraform module yet - see TODO's instance_role item)."
   value       = random_password.ingestion_secret.result
   sensitive   = true
 }

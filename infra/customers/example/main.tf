@@ -73,7 +73,7 @@ output "ssh_connection_hint" {
   value = module.hermes.ssh_connection_hint
 }
 
-output "ingestion_secret" {
-  value     = module.hermes.ingestion_secret
+output "operator_ingestion_secret" {
+  value     = module.hermes.operator_ingestion_secret
   sensitive = true
 }

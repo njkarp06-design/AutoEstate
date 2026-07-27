@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { authenticateIngestRequest } from "@/lib/ingest-auth";
+import { authenticateMachineRequest } from "@/lib/ingest-auth";
 
 // Called by a customer's own buyer-facing Hermes instance
 // (agent/plugins/buyer-listings-context) so the buyer-inquiry skill can answer
@@ -11,7 +11,9 @@ import { authenticateIngestRequest } from "@/lib/ingest-auth";
 // is already gone rather than call it available. So this returns every status
 // and includes the `status` field, which `active` omits.
 export async function GET(request: NextRequest) {
-  const authResult = await authenticateIngestRequest(request);
+  // BUYER role only, and read-only - the public instance never needs more than
+  // this from the listings table.
+  const authResult = await authenticateMachineRequest(request, "buyer");
   if (!authResult.ok) {
     return NextResponse.json(
       { ok: false, error: authResult.error },

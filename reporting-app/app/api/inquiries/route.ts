@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { authenticateIngestRequest } from "@/lib/ingest-auth";
+import { authenticateMachineRequest } from "@/lib/ingest-auth";
 import { replyDefersToOperator } from "@/lib/inquiries";
 import { notifyOperatorOfLead } from "@/lib/notify-operator";
 
@@ -47,7 +47,11 @@ function deriveTitle(userMessage: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const authResult = await authenticateIngestRequest(request);
+  // BUYER role only. Writes are confined to this customer's Inquiry and
+  // InquiryMessage rows (plus a listingId backlink); it never mutates a
+  // Listing, which is what makes it safe for the public instance to hold this
+  // credential.
+  const authResult = await authenticateMachineRequest(request, "buyer");
   if (!authResult.ok) {
     return NextResponse.json(
       { ok: false, error: authResult.error },
