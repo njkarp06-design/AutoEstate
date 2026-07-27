@@ -14,7 +14,7 @@ Last updated: 2026-07-27.
 - **The dev buyer bot's Telegram token is REVOKED.** Good hygiene, and the buyer gateway was already stopped, so nothing broke. But it means **the buyer instance can no longer be started** — a new BotFather token (or a decision on the buyer-channel transport) is a prerequisite for any further buyer testing, including the outstanding WhatsApp open-channel re-confirmation.
 - **Anthropic auto-reload billing is NOT enabled.** This was previously recorded as merely unverified; it is now a confirmed-off setting, which makes the recurring credit-exhaustion outage a matter of when, not if. See item 9.
 
-**In flight:** nothing. No PR is open (#37 merged 2026-07-26 23:11 UTC).
+**In flight:** nothing. No PR is open; #34–#41 are all merged and their branches deleted (latest: #41, 2026-07-27).
 
 **Verification record:** reconciled by `/fastpassdocs` on **2026-07-27** — live systems and repo↔live parity verified, satellite docs read in full, only recently-changed files re-read. **Tracked files were NOT swept in full by that pass**; the last full file sweep was `/inspect` on 2026-07-26, which read all 88 in-scope files.
 

@@ -10,7 +10,7 @@ Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history;
 
 - **All planned features are built, live-tested and merged.** The last, buyer-inquiry, shipped in **PR #34** on 2026-07-26.
 - **Nothing is blocked on more building.** Everything remaining is productionization.
-- **On `main`, clean, nothing in flight.** PRs #34–#37 are all merged; **no PR is open**. The last, **#37** (the `/inspect` sweep), merged 2026-07-26 23:11 UTC and its branch is deleted. Three merged branches still exist locally and on origin and are safe to delete: `feat/buyer-inquiry`, `docs/buyer-inquiry-merged`, `docs/post-merge-sync`. `chore/doc-consistency-checker` is deliberately kept — it holds the closed doc-checker script in case it is ever wanted as a manual pre-PR check.
+- **On `main`, clean, nothing in flight.** PRs #34–#41 are all merged; **no PR is open**. All merged branches have been deleted locally and on origin. Exactly two branches remain: `main`, and `chore/doc-consistency-checker` — deliberately kept and **intentionally unmerged**, holding the only copy of the closed PR #33 doc-checker script (`.claude/doc-consistency-check.sh`). Do not delete it as "stale"; it has 1 unique commit that exists nowhere else.
 - **Nothing is deployed.** The reporting app runs only via `npm run dev` (port 4127). The Terraform module is written and validated but has **never been applied** — there is no Hetzner account yet.
 - **PR #37's plugin fixes are deployed and live** (2026-07-27). Merging did not do this — plugins are physical copies inside each profile — so they were copied across and the operator gateway restarted. Parity is 5/5 and the running process demonstrably loaded the new code. Nothing is half-deployed.
 
@@ -95,6 +95,8 @@ Run after #37 merged. Found four stale claims, all caused by the merge landing a
 - The branch list omitted `docs/post-merge-sync`, and `reporting-app/README.md` still said "everything through PR #34".
 
 Two new verification recipes were added to CLAUDE.md §5 as a result: resolving Terraform path/`fileset` arithmetic in `terraform console` (validate passes on a glob matching nothing, and `fileset` walks the filesystem rather than git), and re-running the plugin-parity check **after** any plugin PR merges.
+
+**Session-boundary fixes (#40, #41).** Resuming had been depending on the owner pasting a prompt by hand: CLAUDE.md is the only auto-loaded file, and it mentioned the handoff just once, at line 30, inside a rule about *maintaining* it — never telling a new session to read it. #40 added a **START HERE** block at the top, so "resume" is now sufficient. #41 added a five-check **BEFORE YOU SAY "DONE"** block beside it, each check traced to a real failure from this session rather than an imagined risk. Deliberately a checklist, not a hook — the hook mechanism was rejected in PR #33 and the block says so, so a future session doesn't helpfully reintroduce one. It caught two stale claims in this very file on its first run.
 
 ### How to resume
 
