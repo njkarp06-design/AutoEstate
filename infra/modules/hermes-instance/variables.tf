@@ -38,6 +38,15 @@ variable "operator_ssh_private_key_path" {
 variable "operator_ssh_cidrs" {
   description = "CIDR ranges allowed to SSH into the instance (e.g. [\"1.2.3.4/32\"] for your own IP). Never leave this open to 0.0.0.0/0."
   type        = list(string)
+
+  # Enforced, not just advised. This is the only inbound rule on the firewall,
+  # so a world-open value is the difference between "SSH from the operator" and
+  # "SSH from the internet" on a box holding the customer's paired WhatsApp
+  # session and their ingestion secret.
+  validation {
+    condition     = !contains(var.operator_ssh_cidrs, "0.0.0.0/0") && !contains(var.operator_ssh_cidrs, "::/0")
+    error_message = "operator_ssh_cidrs must not contain 0.0.0.0/0 or ::/0 - SSH is the only inbound rule on this instance. Use your own address, e.g. [\"1.2.3.4/32\"]."
+  }
 }
 
 variable "hetzner_server_type" {

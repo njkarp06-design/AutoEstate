@@ -94,10 +94,9 @@ export async function POST(request: NextRequest) {
         title: body.userMessage ? deriveTitle(body.userMessage) : null,
         buyerContact: body.buyerContact ?? null,
       },
-      // Coalesce buyerContact: fill it once we learn it, never overwrite a
-      // captured value with a later null.
-      update: { buyerContact: body.buyerContact ?? undefined },
+      update: {},
     });
+    await fillBuyerContactIfEmpty(inquiry, body.buyerContact);
     return NextResponse.json({ ok: true, inquiryId: inquiry.id });
   }
 
@@ -117,8 +116,9 @@ export async function POST(request: NextRequest) {
       title: deriveTitle(body.userMessage),
       buyerContact: body.buyerContact ?? null,
     },
-    update: { buyerContact: body.buyerContact ?? undefined },
+    update: {},
   });
+  await fillBuyerContactIfEmpty(inquiry, body.buyerContact);
 
   if (!inquiry.title) {
     await prisma.inquiry.update({
@@ -180,6 +180,33 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, inquiryId: inquiry.id });
+}
+
+/**
+ * Writes buyerContact ONLY when the thread has none yet, then keeps the
+ * in-memory row in step so later reads (the operator notification) see it.
+ *
+ * This used to be `update: { buyerContact: body.buyerContact ?? undefined }`
+ * on the upsert, whose comment claimed it would "never overwrite a captured
+ * value". It only guarded against a later *null* - a later non-null replaced a
+ * real captured number unconditionally. That matters because the contact is
+ * re-extracted from the message text on every single turn (see the sync
+ * plugin's _extract_phone), so any later turn producing a different match
+ * silently overwrote the number the buyer actually gave. First value wins:
+ * a buyer who types their number once has given it, and nothing later in the
+ * conversation is more authoritative than that.
+ */
+async function fillBuyerContactIfEmpty(
+  inquiry: { id: string; buyerContact: string | null },
+  incoming: string | null | undefined,
+): Promise<void> {
+  if (inquiry.buyerContact || !incoming) return;
+
+  await prisma.inquiry.update({
+    where: { id: inquiry.id },
+    data: { buyerContact: incoming },
+  });
+  inquiry.buyerContact = incoming;
 }
 
 // Conservative, best-effort: link the inquiry to a listing only when exactly

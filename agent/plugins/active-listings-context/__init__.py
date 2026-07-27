@@ -62,6 +62,19 @@ LISTINGS_URL = (
     else None
 )
 
+# Say so out loud. A URL that is set but doesn't end in /api/ingest (a trailing
+# slash is enough) leaves LISTINGS_URL None, and the hook below then returns
+# early on every turn - no injected context, so weekly-digest reports "no active
+# listings" when there are some, and every locator lookup degrades to asking the
+# agent to retype everything. Previously not one line anywhere explained it.
+if INGESTION_URL and not LISTINGS_URL:
+    logger.warning(
+        "active-listings-context: AUTOESTATE_INGESTION_URL=%r does not end in "
+        "'/api/ingest', so the listings endpoint cannot be derived - THIS PLUGIN IS "
+        "INERT and no listing context will ever be injected.",
+        INGESTION_URL,
+    )
+
 SYNCED_PLATFORMS = {"whatsapp", "telegram"}
 TIMEOUT_SECONDS = 3
 

@@ -51,6 +51,10 @@ export function PlatformSection({
     // button that appears to do nothing at all.
     navigator.clipboard.writeText(content).then(
       () => {
+        // Clear the failure too: the label checks copyFailed first, so without
+        // this a single denied copy left the button reading "Copy failed"
+        // forever, including after every subsequent successful copy.
+        setCopyFailed(false);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       },

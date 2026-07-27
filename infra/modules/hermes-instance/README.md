@@ -46,11 +46,12 @@ plugin-hook approach that Phase B actually shipped).
 - The reporting webapp already deployed somewhere reachable from the
   internet (customer instances need to reach `ingestion_api_url`) - not
   done yet as of Phase C; the app has only run locally so far.
-- A `Customer` row for this customer already needs to exist... actually,
-  provisioning order is the reverse: `terraform apply` generates the
-  ingestion secret, then `provision-customer.ts` (see Step 3 below)
-  registers it. The customer's Clerk *login* can happen any time after
-  that - the operator sets their `email` up front either way.
+- No `Customer` row is needed up front - provisioning runs the other way
+  round. `terraform apply` generates the ingestion secret, and
+  `provision-customer.ts` (Step 3 below) then creates or updates the
+  `Customer` row with that secret's hash. The customer's Clerk *login* can
+  happen any time after that; it links to the row by the email the operator
+  registered.
 
 ## Provisioning a new customer
 

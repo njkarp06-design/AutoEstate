@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import type { Customer } from "@/prisma/generated/prisma/client";
 
-// DB-facing status value, kept as an inline literal union rather than an
-// import of Prisma's generated `InquiryStatus` type - same decoupling
-// convention as lib/db.ts and lib/listings.ts.
+// Inline literal union rather than Prisma's generated `InquiryStatus` - see
+// lib/db.ts's DbPlatform for the convention and why.
 type DbInquiryStatus = "NEEDS_OPERATOR" | "HANDLED";
 
 export type InquiryStatus = "needs_operator" | "handled";
@@ -101,26 +100,55 @@ function computeDisposition(
 }
 
 /**
+ * The ids of this customer's inquiries containing at least one deferring
+ * assistant reply - the list page's disposition, resolved without loading a
+ * single message body.
+ *
+ * The list page previously pulled every message of every thread purely to run
+ * computeDisposition over them, i.e. every buyer transcript this customer has
+ * ever received, on every dashboard load. Fine at four rows; this feature is a
+ * public 24/7 receptionist, so the row count only goes one way, and this is the
+ * page the whole thing is meant to be trusted from.
+ *
+ * `contains` is case-sensitive on Postgres, which is deliberate - it matches
+ * replyDefersToOperator's own String.includes exactly, so the two cannot drift
+ * into disagreeing about the same thread.
+ */
+async function deferringInquiryIds(customerId: string): Promise<Set<string>> {
+  const rows = await prisma.inquiryMessage.findMany({
+    where: {
+      inquiry: { customerId },
+      role: "assistant",
+      OR: DEFER_FRAGMENTS.map((fragment) => ({ content: { contains: fragment } })),
+    },
+    select: { inquiryId: true },
+    distinct: ["inquiryId"],
+  });
+  return new Set(rows.map((row) => row.inquiryId));
+}
+
+/**
  * Every buyer inquiry for this customer, newest first. Scoped by customerId -
- * a customer only ever sees their own buyer's leads. Disposition is computed
- * per-inquiry from whether any assistant message in the thread defers (see
- * computeDisposition).
+ * a customer only ever sees their own buyer's leads. Disposition comes from
+ * deferringInquiryIds above rather than from the messages themselves; the
+ * detail page still uses computeDisposition, since it has the thread in hand
+ * anyway.
  */
 export async function getInquiries(customer: Customer): Promise<Inquiry[]> {
-  const inquiries = await prisma.inquiry.findMany({
-    where: { customerId: customer.id },
-    orderBy: { startedAt: "desc" },
-    include: {
-      messages: { orderBy: [{ timestamp: "asc" }, { sortIndex: "asc" }] },
-    },
-  });
+  const [inquiries, deferring] = await Promise.all([
+    prisma.inquiry.findMany({
+      where: { customerId: customer.id },
+      orderBy: { startedAt: "desc" },
+    }),
+    deferringInquiryIds(customer.id),
+  ]);
 
   return inquiries.map((inq) => ({
     id: inq.id,
     source: inq.source,
     buyerContact: inq.buyerContact,
     status: toInquiryStatus(inq.status),
-    disposition: computeDisposition(inq.messages),
+    disposition: deferring.has(inq.id) ? "needs_you" : "auto_answered",
     title: inq.title,
     startedAt: toEpochSeconds(inq.startedAt),
   }));
