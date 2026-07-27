@@ -18,7 +18,7 @@ Last updated: 2026-07-27 (second `/inspect` sweep).
 
 **Verification record:** a second `/inspect` sweep on **2026-07-27** read all 91 in-scope tracked files on `main` plus the 4 genuinely-changed files on `chore/doc-consistency-checker` — 27 findings, all fixed. Before it, `/fastpassdocs` (same day) reconciled live systems and repo↔live parity but did not sweep tracked files.
 
-**⚠ Four plugins are AHEAD of their live copies right now.** The sweep changed `sync-to-webapp`, `sync-inquiries-to-webapp`, `active-listings-context` and `buyer-listings-context`; parity was re-run and all four now differ from the deployed copies (`listing-footer-reminder` is unchanged and still matches). Per the standing rule, merging deploys nothing — copy them into the profiles and restart the operator gateway **from your own PowerShell**, not from an agent session, which has caused an outage before.
+**Plugin deployment: done, same day.** The sweep changed four plugins (`sync-to-webapp`, `sync-inquiries-to-webapp`, `active-listings-context`, `buyer-listings-context`; `listing-footer-reminder` unchanged). They were copied into both profiles and the operator gateway restarted by the owner from their own PowerShell on 2026-07-27 19:58. Verified: parity 5/5, PID 6072 → 36868 with a start time 5 minutes *after* the newest plugin file was written (which is what proves new code rather than a cache), a clean log with `Gateway running with 2 platform(s)`, no errors, and the sweep's new "THIS PLUGIN IS INERT" warning correctly *not* firing — so the endpoints really are being derived. **The buyer profile's two copies are in place but unloaded; its gateway is stopped and its token revoked, so they take effect whenever it next starts.**
 
 ---
 
