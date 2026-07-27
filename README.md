@@ -65,6 +65,10 @@ it is locked down by construction rather than by prompt:
   every write stages for an approval nobody grants. No shell, file access, code
   execution, browser, web, vision, or memory.
 - Slash commands are restricted to non-privileged ones.
+- It holds **its own machine credential**, not the operator's. The reporting API
+  scopes each credential to its own routes, so the buyer instance can read listing
+  data and record inquiries but cannot write to the ingestion endpoint — extracting
+  its secret does not grant the ability to alter a customer's listings.
 
 Secrets never live in this repo. Per-customer credentials are generated at
 provisioning time and stored only as hashes.

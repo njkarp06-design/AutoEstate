@@ -2,7 +2,7 @@
 
 Next.js dashboard for a non-technical client to review what the AutoEstate agent has generated — one entry per WhatsApp/Telegram listing, the raw facts sent in, and the generated Instagram/Facebook/Yad2 content split into independently reviewable, editable sections. Not purely read-only: an agent can edit generated content, mark a platform as posted, and set an Instagram posting-mode preference (manual / auto-post immediately / auto-post after edit — the auto options are stored but inert pending a real Meta integration).
 
-**Status (2026-07-27):** everything through PR #37 is merged into `main` — the redesigned UI (#13), turn grouping (#15), the Listings page (#21), the buyer-inquiry Inquiries dashboard (#34), and the `/inspect` correctness sweep (#37: `Asia/Jerusalem` timestamps, integer-safe footer parsing, request-body guards, notification timeout). Still **only ever run locally** (`npm run dev`, port 4127); not deployed to Vercel Pro, which is a tracked next step.
+**Status (2026-07-27):** the redesigned UI (#13), turn grouping (#15), the Listings page (#21), the buyer-inquiry Inquiries dashboard (#34), two `/inspect` correctness sweeps (#37 and #43), and role-scoped machine credentials (#46) are all merged. Still **only ever run locally** (`npm run dev`, port 4127); not deployed to Vercel Pro, which is a tracked next step. (Deliberately not a running PR list — that goes stale on the next merge; `gh pr list --state all` is the source of truth.)
 
 ## Data source
 
