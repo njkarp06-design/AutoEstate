@@ -6,7 +6,8 @@ import { replyDefersToOperator } from "@/lib/inquiries";
 import { notifyOperatorOfLead } from "@/lib/notify-operator";
 
 // Inbound counterpart to /api/ingest. Same server-to-server bearer auth
-// (authenticateIngestRequest resolves the Customer), same discriminated-union
+// (authenticateMachineRequest resolves the Customer, scoped to the BUYER
+// role — a different credential from /api/ingest's), same discriminated-union
 // turn_started/turn_completed shape - but keyed on the SESSION (one Inquiry
 // per buyer conversation), not the turn, and carrying two buyer-only optional
 // fields the sync-inquiries-to-webapp plugin resolves best-effort:

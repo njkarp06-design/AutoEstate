@@ -35,9 +35,11 @@ enum PostMode {
 }
 
 // Lifecycle of a property the customer has advertised through Hermes. Rows
-// are matched/created at ingest time from the "Listing Record" footer both
-// listing-to-social and listing-status-update append to their replies (see
-// lib/listing-record.ts) - not a form the operator fills in.
+// are matched/created at ingest time from the "Listing Record" footer that
+// listing-to-social, listing-status-update and just-sold append to their
+// replies (see lib/listing-record.ts) - not a form the operator fills in.
+// just-sold is the only skill that ever writes SOLD; listing-reengagement
+// deliberately emits no footer, since nothing about the listing transitions.
 enum ListingStatus {
   ACTIVE
   UNDER_CONTRACT
@@ -171,9 +173,9 @@ model RunPlatformContent {
 
 // One row per property the customer has ever advertised through Hermes.
 // Matched/created at ingest time (see app/api/ingest/route.ts) by parsing the
-// "Listing Record" footer both listing-to-social and listing-status-update
-// append to their replies - not a form the operator fills in (no edit UI in
-// this pass; see app/listings).
+// "Listing Record" footer that listing-to-social, listing-status-update and
+// just-sold append to their replies - not a form the operator fills in (no
+// edit UI in this pass; see app/listings).
 model Listing {
   id              String        @id @default(cuid())
   customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -213,9 +215,15 @@ model Listing {
 // conversation is a genuine multi-turn back-and-forth we WANT kept together as
 // one lead, and on the isolated buyer instance one session is one buyer — so
 // each turn appends an InquiryMessage rather than starting a new Inquiry.
-// (Guaranteed-available choice; if Phase-0c's live Telegram spike shows
-// distinct buyers colliding into one session, switch this key to a resolved
-// `sender` handle instead — see the buyer-inquiry plan.)
+//
+// "One session is one buyer" is verified, not assumed. It was the open risk
+// this key was chosen under, with a fallback to a resolved `sender` handle
+// held in reserve; the fallback is no longer needed. Two real senders in the
+// 2026-07-25 Telegram spike produced two sessions keyed
+// agent:main:telegram:dm:<user_id>, and the 2026-07-26 live test with a
+// genuine non-operator account produced two separate Inquiry rows with no
+// bleed. Re-check this if the buyer channel ever moves to a transport whose
+// session key isn't per-sender.
 model Inquiry {
   id              String           @id @default(cuid())
   customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)

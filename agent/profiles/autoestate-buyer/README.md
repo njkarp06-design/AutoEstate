@@ -119,14 +119,22 @@ outbound skills that this whole profile exists to prevent.
 *absent* from this profile rather than disabled (see `.env.example`) — an
 inert-looking block would contend with the operator profile's paired device.
 
+## The third isolation layer: the credential
+
+Skills and tools constrain what the *agent* can do. They say nothing about what
+its *credential* is allowed to reach, and the two are orthogonal — which is why
+a shared secret survived a security-focused build here.
+
+This instance holds its **own** per-customer secret, not the operator's. The
+reporting app scopes each one to its own routes, so this one is valid only on
+`/api/inquiries` and `/api/listings/buyer-view` and returns **401 on
+`/api/ingest`**. Extracting it from this public box therefore grants no write
+access to the customer's `Listing` data. Never paste the operator instance's
+secret into this profile's `.env` to save a provisioning step — see
+`reporting-app/lib/ingest-auth.ts` and `.env.example`.
+
 ## Known production gates (not fixed here)
 
-- ~~**The ingestion secret is shared with the operator instance.**~~ **Fixed
-  2026-07-27.** This instance now holds its own credential, scoped by the
-  reporting app to `/api/inquiries` and `/api/listings/buyer-view`; presenting
-  it to `/api/ingest` returns 401, so extracting it from this public box no
-  longer carries write access to the customer's `Listing` data. See
-  `reporting-app/lib/ingest-auth.ts` and the `Customer` model comment.
 - **No OS-level isolation** (`terminal.backend: local`). The tool lockdown means
   there is no code-execution tool to abuse, but Hermes's own `SECURITY.md` is
   clear that OS isolation is the only real boundary. Containerize on the real
