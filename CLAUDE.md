@@ -19,6 +19,8 @@ Five checks, each earned by a real failure in this repo. Run them before telling
 4. **Cold-read test.** Read only this file's START HERE block plus the handoff, as a session that knows nothing. Do you know the state, the next action, and what not to touch — with nothing stale? If not, fix it now, not next time.
 5. **Is a claim verified or just written?** Anything stated as done should say *how* it was checked. "Verified" without a method is close to useless later, and this repo has twice recorded a cleanup that never happened.
 
+These five all *detect* staleness after the fact. §3 carries the one rule that **prevents** it: never write a commit count, PR range, "as of PR #N" status or file count as standing fact — name the command that computes it instead. Five of this repo's doc defects traced to that single habit.
+
 No automation enforces this — deliberately, see §3. It is a checklist because the alternative was a hook, and that was rejected on mechanism grounds, not quality ones.
 
 ---
@@ -53,6 +55,15 @@ I'm a full-stack engineer: JS/TS, Node/Express, Next.js, Python, PostgreSQL, AWS
 **The rule it enforced still stands — just follow it directly.** Keep this file, `TODO.md` and the current `session-handoff-YYYY-MM-DD.md` equal to the complete current truth, updated *at the moment* something changes rather than at end of turn, so a brand-new session reading only those three knows exactly where things stand. What counts as a change: a TODO item or phase changing status, anything changing in the systems this touches (Hermes profiles/skills/plugins/gateway config, `.env`, the WhatsApp bridge, Telegram, Terraform, the reporting app), outside news I report, and any decision, lesson, or deferral with its reasoning. Use absolute dates. Correct stale statements rather than appending to them. Routing is three-way, as `TODO.md` also states: brief/architecture/decisions/lessons here, task status and checklists there, stopping point in the handoff file — don't duplicate task status into this file.
 
 **How this is done in practice (agreed 2026-07-26).** Record real changes as part of finishing a task — a decision, a lesson, a status change, something that broke — and say in the turn summary which of the three files were touched. Not narration, not padding, no automation. The control is the existing git workflow: doc edits land in normal commits on a feature branch, are visible in the diff, and go through a PR before `main`, so nothing reaches the repo unreviewed. If I'd rather approve each doc edit up front instead, I'll say so and that becomes the rule.
+
+**Don't write a claim with a shelf life — point at the command that computes it.** The single most recurrent doc defect in this repo is a sentence that was true when written and silently false a merge later. Three separate occasions, same shape: a PR range enumerated in the handoff (removed in `46ef0f2`); "the chore branch has 1 unique commit" (false the moment that branch was touched, PR #44); "45 commits behind `main`" (56 by the time anyone looked, PR #48 — and that sentence *also* contained the words "commit count deliberately not stated", so it had become the contradiction it was written to prevent). A further two on 2026-07-27: `reporting-app/README.md` pinned to "everything through PR #37 is merged", and the handoff's deployment bullet and parity row pinned to #37 specifically.
+
+None of these was catchable by reading. They all read as confident and current. So the rule is about *writing*, not checking:
+
+- **Never state** a commit count, a behind/ahead count, a PR number range, an "as of PR #N" status, a live PID, or a file count as standing fact.
+- **Instead name the command**: `gh pr list`, `git log origin/main..`, `git rev-list --count <a>..<b>`, CLAUDE.md §5's parity recipe.
+- **When a status genuinely must be recorded** (a live-systems table, a verification record), date it and say what was run, so a reader can tell a historical observation from a current claim. "Read all 91 in-scope files on 2026-07-27" stays true forever; "the repo has 91 files" rots.
+- The five BEFORE YOU SAY DONE checks all *detect* this after the fact. This one prevents it, which is cheaper — and note check 3 applies here too: these claims are usually restated in two or three files, and fixing one copy is how the last two recurrences survived.
 
 `.gitignore` still carries `.claude/*` plus a `!.claude/settings.json` negation from when that file was tracked. Harmless — it now just permits a file that no longer exists. Left in place deliberately rather than swept up with the deletion.
 
@@ -311,7 +322,8 @@ Also on 2026-07-26: the dev buyer bot's gateway was **stopped** after testing, s
 - **What tools a profile's model actually gets** (never trust the config): resolve it. `HERMES_HOME=<profile> python -c` → `_get_platform_tools(load_config(), "telegram")` then `get_tool_definitions(enabled_toolsets=..., disabled_toolsets=...)` and print the names. This is what exposed `kanban` slipping past an explicit allowlist.
 - **Which skills a profile can see:** `HERMES_HOME=<profile> python -c "from tools.skills_tool import _find_all_skills; ..."`. Run it for **both** profiles — the isolation claim is about what each one *cannot* see.
 - **Who can run which slash command:** `policy_from_extra(cfg["platforms"]["telegram"]["extra"], "dm")` then `.can_run(<real user id>, cmd)` for a real operator id and a real stranger id.
-- **Repo↔live parity for plugins:** compare content with CRLF stripped (`git show HEAD:<path> | tr -d '' | md5sum` vs the live file) — this repo uses `core.autocrlf`, so a raw byte compare gives false mismatches.
+- **Repo↔live parity for plugins:** compare content with CRLF stripped (`git show HEAD:<path> | tr -d '
+' | md5sum` vs the live file) — this repo uses `core.autocrlf`, so a raw byte compare gives false mismatches.
 - **Repo↔live parity for a profile config:** parse both as YAML and compare key by key, ignoring the machine-written `onboarding.seen` **and the two keys marked `MACHINE-SPECIFIC` in the buyer config** (`skills.external_dirs`, `platforms.telegram.extra.allow_admin_from` / `group_allow_admin_from`) — those are deliberately real dev values that must change on deploy, so a mismatch there is expected, not drift. A textual diff is useless here because the gateway rewrites the file and strips comments.
 - **What the model was actually sent on a turn:** read `api_content` from the profile's `state.db` `messages` table. Reading the visible reply tells you what happened; `api_content` tells you *why*, including whether a plugin's context block was really injected.
 - **What kwargs a plugin hook really receives:** log `sorted(kwargs.keys())` once per process. Assuming the names cost a null `buyerContact` on every lead until this was actually printed.
