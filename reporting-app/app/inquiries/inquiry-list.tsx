@@ -22,7 +22,15 @@ export function InquiryList({ inquiries }: { inquiries: Inquiry[] }) {
     return true;
   });
 
-  const needsYouCount = inquiries.filter((i) => i.disposition === "needs_you").length;
+  // Same rule as the row badge below (and the detail page): a lead the
+  // operator has marked handled no longer "needs you", whatever its
+  // disposition says. Counting raw disposition here meant the header could
+  // read "3 need you" above a list showing zero "Needs you" badges - the
+  // identical two-places-disagreeing bug the badge comment describes, one
+  // level up.
+  const needsYouCount = inquiries.filter(
+    (i) => i.disposition === "needs_you" && i.status !== "handled",
+  ).length;
   const autoAnsweredCount = inquiries.length - needsYouCount;
   const whatsappCount = inquiries.filter((i) => i.source === "whatsapp").length;
   const telegramCount = inquiries.filter((i) => i.source === "telegram").length;

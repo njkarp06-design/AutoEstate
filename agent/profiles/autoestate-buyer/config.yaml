@@ -43,6 +43,23 @@ skills:
 curator:
   enabled: false
 
+# --- ⚠ BOTH LOCKDOWNS BELOW ARE TELEGRAM-ONLY ------------------------------
+# `platform_toolsets` and the slash-command gating are keyed BY PLATFORM. They
+# cover `telegram` (and `cli`) and nothing else. The buyer-channel transport is
+# still an open decision in TODO.md, currently leaning toward a second WhatsApp
+# eSIM - and switching to it without adding the equivalent `platforms.whatsapp.
+# extra.allow_admin_from` / `user_allowed_commands` block silently restores the
+# exact hole PR #34 was created to close: gating is enabled only by the presence
+# of an admin list, so with none set every stranger is back to admin tier on all
+# ~68 commands, /profile included, which hands them the operator's outbound
+# Listing-mutating skills.
+#
+# No `platforms.whatsapp` block is pre-added here on purpose - see the note at
+# the bottom of this file: WhatsApp must stay ABSENT from this profile, not
+# merely disabled, so it can never contend with the operator profile's paired
+# device. Add the gating at the same time as the transport, never before.
+# Tracked as a deploy gate in TODO.md.
+
 # --- Tool lockdown, layer 1: per-platform allowlist ------------------------
 # _get_platform_tools() uses DIRECT MEMBERSHIP when the saved list contains
 # real toolset keys (hermes_cli/tools_config.py) — so this is an allowlist,

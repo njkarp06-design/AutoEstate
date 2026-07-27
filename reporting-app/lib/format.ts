@@ -16,11 +16,30 @@ function zonedYmd(date: Date): string {
   return date.toLocaleDateString("en-CA", { timeZone: TIME_ZONE });
 }
 
+// Yesterday's calendar date IN TIME_ZONE, derived from today's Y/M/D rather
+// than by subtracting 24h of absolute time. An Israeli DST day is 23 or 25
+// hours long, so `now - 24h` lands on the wrong calendar date during the hour
+// after midnight on each transition - the same class of bug TIME_ZONE exists
+// to prevent, reintroduced by the arithmetic.
+//
+// Not theoretical; brute-forcing all of 2026 at 15-minute resolution found
+// exactly two one-hour windows, one per transition:
+//   00:00-00:59 on 2026-03-28 (spring forward) - "yesterday" resolved to the
+//     26th while today was the 28th, so anything sent on the 27th matched
+//     neither branch and fell through to the absolute date format.
+//   00:00-00:59 on 2026-10-25 (fall back) - "yesterday" resolved to the 25th,
+//     i.e. today, so a listing sent this morning would be labelled "Yesterday".
+// The second is the worse one: it doesn't fail to label, it mislabels.
+function zonedYesterday(now: Date): string {
+  const [y, m, d] = zonedYmd(now).split("-").map(Number);
+  const previous = new Date(Date.UTC(y, m - 1, d));
+  previous.setUTCDate(previous.getUTCDate() - 1);
+  return previous.toISOString().slice(0, 10);
+}
+
 export function formatRelativeDateTime(epochSeconds: number): string {
   const date = new Date(epochSeconds * 1000);
   const now = new Date();
-
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
   const time = date.toLocaleTimeString("en-GB", {
     timeZone: TIME_ZONE,
@@ -30,7 +49,7 @@ export function formatRelativeDateTime(epochSeconds: number): string {
 
   const target = zonedYmd(date);
   if (target === zonedYmd(now)) return `Today, ${time}`;
-  if (target === zonedYmd(yesterday)) return `Yesterday, ${time}`;
+  if (target === zonedYesterday(now)) return `Yesterday, ${time}`;
 
   return date.toLocaleString("en-GB", {
     timeZone: TIME_ZONE,

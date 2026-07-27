@@ -261,4 +261,6 @@ confirms in a later message.
       if more than one appeared in the request
 - [ ] Numbers use sqm and ₪ (unless told otherwise)
 - [ ] Every complete response ends with its own exact 7-line Listing Record
-      footer, `Status: Sold`, immediately after that listing's Yad2 section
+      footer, `Status: Sold`, immediately after that listing's Yad2 section —
+      **except** the no-stated-locator case above, where the footer is
+      deliberately withheld until the agent confirms in a later message

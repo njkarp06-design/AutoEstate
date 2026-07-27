@@ -32,10 +32,10 @@ export async function getCurrentCustomer(): Promise<Customer | null> {
   });
 }
 
-// Inline literal union rather than importing Prisma's generated `PostMode`
-// type, matching the same decoupling convention used in lib/db.ts. Customer
-// itself is already passed around as Prisma's raw generated type everywhere
-// in this app (unlike Run/RunMessage, which get translated) - this field
+// Inline literal union rather than Prisma's generated `PostMode` - see
+// lib/db.ts's DbPlatform for the convention. Worth noting the one asymmetry:
+// Customer itself IS passed around as Prisma's raw generated type throughout
+// this app (unlike Run/RunMessage, which get translated), so this field
 // follows that existing precedent rather than inventing a one-off exception.
 export type InstagramPostMode = "MANUAL" | "AUTO_IMMEDIATE" | "AUTO_AFTER_EDIT";
 

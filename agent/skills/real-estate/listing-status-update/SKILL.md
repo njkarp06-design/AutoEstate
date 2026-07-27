@@ -289,4 +289,6 @@ footer to produce, not this skill's.
 - [ ] Every complete response ends with its own exact 7-line Listing Record
       footer, with `Status` matching this update (`Active` for a price
       drop or `Under Contract`), immediately after that listing's Yad2
-      section — never `Sold`
+      section — never `Sold`. **Except** the no-stated-locator case above,
+      where the footer is deliberately withheld until the agent confirms in
+      a later message

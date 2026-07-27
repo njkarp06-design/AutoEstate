@@ -48,6 +48,20 @@ write_files:
           - sync-to-webapp
           - listing-footer-reminder
           - active-listings-context
+      # NO SLASH-COMMAND GATING HERE, and that is a known, accepted grant
+      # rather than an oversight. gateway/slash_access.py computes
+      # `enabled = bool(admin_ids)`, so with no `platforms.*.extra.
+      # allow_admin_from` set, gating is OFF and every ALLOWED caller gets
+      # admin tier on all ~68 commands - /yolo, /restart, /update, /profile.
+      # On this instance the only allowed caller is the customer themselves
+      # (WHATSAPP_ALLOWED_USERS is their own number) and the box is
+      # single-tenant, so the blast radius is their own server and their own
+      # ingestion secret - materially different from the buyer instance,
+      # where the same default meant every stranger held admin tier.
+      #
+      # Deliberately not "fixed" blind: this module has never been applied, so
+      # shipping untested gating into the first real provisioning run would be
+      # the riskier move. Settle it at first apply - tracked on TODO item 3.
 
   - path: /root/docker-compose.yml
     permissions: '0644'

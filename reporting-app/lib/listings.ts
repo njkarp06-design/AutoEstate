@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import type { Customer } from "@/prisma/generated/prisma/client";
 
-// DB-facing status value, kept as an inline literal union rather than an
-// import of Prisma's generated `ListingStatus` type - same decoupling
-// convention as lib/db.ts's DbPlatform/RunStatus handling.
+// Inline literal union rather than Prisma's generated `ListingStatus` - see
+// lib/db.ts's DbPlatform for the convention and why.
 type DbListingStatus = "ACTIVE" | "UNDER_CONTRACT" | "SOLD";
 
 export type ListingStatus = "active" | "under_contract" | "sold";

@@ -26,9 +26,14 @@ locals {
     for f in tolist(fileset(local.skills_dir, "**")) : f
     if !strcontains(f, "__pycache__")
   ])
+  # Buyer-only plugins are excluded from the hash as well as deleted remotely
+  # (see deploy_agent_content): they are never enabled on an operator box, so
+  # letting them into agent_content_hash meant editing a buyer plugin forced a
+  # pointless re-upload and gateway restart on every operator instance.
   plugin_files = sort([
     for f in tolist(fileset(local.plugins_dir, "**")) : f
     if !strcontains(f, "__pycache__")
+    && !anytrue([for p in local.buyer_only_plugins : startswith(f, "${p}/")])
   ])
   agent_content_hash = sha256(join("", concat(
     [for f in local.skill_files : filesha256("${local.skills_dir}/${f}")],
@@ -95,8 +100,16 @@ resource "hcloud_server" "hermes" {
 
 # Uploads the real-estate skills and the operator plugins over SSH after boot.
 #
-# This runs BEFORE null_resource.inject_secrets, which restarts the gateway -
-# so the container comes up once, with skills and plugins already on disk.
+# ORDER, precisely - an earlier version of this comment got it wrong. cloud-init
+# has ALREADY started the container by the time this runs (`docker compose up -d`
+# is the last runcmd), with /root/.hermes/skills and /root/.hermes/plugins not
+# yet in existence. This resource then clears and rewrites both directories
+# underneath the running gateway, and null_resource.inject_secrets restarts it
+# afterwards - the restart is what actually makes the content live, not the
+# upload. That is why inject_secrets triggers on agent_content_hash too: without
+# it, a re-apply after editing a SKILL.md uploaded the new file to a gateway
+# that never reloaded it, and the change silently did nothing.
+#
 # Hermes discovers skills under /root/.hermes/skills; plugins are NOT
 # discovered by a config pointer and must be physically present in
 # /root/.hermes/plugins AND named in config.yaml's plugins.enabled (both are
@@ -173,6 +186,15 @@ resource "null_resource" "inject_secrets" {
     secret_hash  = sha256(random_password.ingestion_secret.result)
     api_key_hash = sha256(var.anthropic_api_key)
     server_id    = hcloud_server.hermes.id
+    # This resource owns the only `docker compose restart`, so it must re-run
+    # whenever the uploaded content changes - `depends_on` alone only orders
+    # the two, it does not re-trigger this one when deploy_agent_content
+    # re-runs. Without this an edited SKILL.md or plugin was uploaded to a
+    # gateway that never reloaded it: the apply succeeded, the file on disk
+    # was correct, and the running agent kept executing the old code. That is
+    # the same "merging deploys nothing" failure this project already has a
+    # standing rule about, reproduced in Terraform.
+    agent_content_hash = local.agent_content_hash
   }
 
   connection {

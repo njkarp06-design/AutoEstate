@@ -43,6 +43,20 @@ INQUIRIES_URL = (
     else None
 )
 
+# Say so out loud. A URL that is set but doesn't end in /api/ingest (a trailing
+# slash is enough) leaves INQUIRIES_URL None, and every hook below then returns
+# early - no sync, no lead, and previously not one line anywhere explaining it.
+# Silent self-disablement on a misconfiguration is this project's most expensive
+# recurring failure shape; it produced both the footer-omission bug and the
+# null-buyerContact bug.
+if INGESTION_URL and not INQUIRIES_URL:
+    logger.warning(
+        "sync-inquiries: AUTOESTATE_INGESTION_URL=%r does not end in '/api/ingest', "
+        "so the inquiries endpoint cannot be derived - THIS PLUGIN IS INERT and no "
+        "buyer lead will be recorded.",
+        INGESTION_URL,
+    )
+
 SYNCED_PLATFORMS = {"whatsapp", "telegram"}
 
 # See sync-to-webapp for the full rationale; same policy, same reason. A
@@ -61,6 +75,19 @@ _logged_kwargs_once = False
 # spliced into one 11-digit run and captured as a phone number - defeating the
 # digit-count guard below using the very separator it relies on.
 _PHONE_RE = re.compile(r"\+?\d[\d \t\-]{7,}\d")
+
+# ...but excluding newlines only fixed half of it. The SAME splice happens on a
+# single line: "4 95 3 3950000" (rooms, sqm, floor, price - an entirely
+# ordinary thing to find in this domain) is 11 digits and passed the count
+# guard cleanly. So group shape is checked too: in a multi-group match every
+# separator-delimited group must carry at least 2 digits, and there are at most
+# 5 groups. Real numbers survive - "052-4419087", "+972 52 441 9087",
+# "050 123 4567", a bare "0524419087" - while any run containing a lone digit
+# is rejected. Verified against every real buyer message recorded in the live
+# buyer profile's state.db: identical decisions to the previous version on all
+# of them, including the one genuine captured contact.
+_MAX_PHONE_GROUPS = 5
+_MIN_DIGITS_PER_GROUP = 2
 
 
 def _now_iso() -> str:
@@ -81,21 +108,35 @@ def _extract_phone(text: str | None) -> str | None:
     ASKS for one when it defers. The buyer then types it into a message - so
     the message text is the only place it ever exists.
 
-    Digit-count is the discriminator, not the regex shape alone: strip the
-    separators and require 9-15 digits. That accepts "052-4419087" (10) and
-    "+972 52 441 9087" (12) while rejecting the things that otherwise look
-    phone-ish in this domain - a date like "2026-07-26" is 8 digits, a price
-    like "3950000" is 7, a size or floor is far shorter. Rejecting a real
-    number is recoverable (the agent calls the buyer back off the transcript);
-    storing a listing price as someone's phone number is not.
+    Two discriminators, because neither is sufficient alone:
+
+    1. Digit count - strip separators, require 9-15. Rejects a date
+       ("2026-07-26", 8), a price ("3950000", 7), a size or a floor.
+    2. Group shape - in a multi-group match, every separator-delimited group
+       must carry at least 2 digits, and there may be at most 5 groups. This
+       is what rejects "4 95 3 3950000" (rooms/sqm/floor/price on one line),
+       which is 11 digits and sails through the count check.
+
+    Rejecting a real number is recoverable - the agent calls the buyer back
+    off the transcript, which is right there. Storing a listing price as
+    someone's phone number is not.
     """
     if not text:
         return None
     for match in _PHONE_RE.finditer(str(text)):
-        raw = match.group(0)
+        raw = match.group(0).strip()
         digits = re.sub(r"\D", "", raw)
-        if 9 <= len(digits) <= 15:
-            return raw.strip()
+        if not (9 <= len(digits) <= 15):
+            continue
+
+        groups = [re.sub(r"\D", "", g) for g in re.split(r"[ \t\-]+", raw) if g]
+        if len(groups) > 1:
+            if len(groups) > _MAX_PHONE_GROUPS:
+                continue
+            if any(len(g) < _MIN_DIGITS_PER_GROUP for g in groups):
+                continue
+
+        return raw
     return None
 
 
@@ -195,8 +236,9 @@ def on_turn_started(session_id, turn_id, user_message, platform, **kwargs):
 
 
 def on_turn_completed(session_id, turn_id, user_message, assistant_response, platform, **kwargs):
+    # Explicit None, matching on_turn_started - see sync-to-webapp for why.
     if not (INQUIRIES_URL and INGESTION_SECRET) or platform not in SYNCED_PLATFORMS:
-        return
+        return None
     sender, buyer_contact = _resolve_lead(kwargs, user_message)
     _post_in_background({
         "event": "turn_completed",

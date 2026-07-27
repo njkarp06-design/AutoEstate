@@ -151,27 +151,45 @@ export async function POST(request: NextRequest) {
       const roomsKey = Math.round(record.rooms * 10) / 10;
       const sqmKey = Math.round(record.sqm * 10) / 10;
 
-      const existing = await prisma.listing.findFirst({
-        where: {
-          customerId: customer.id,
-          area: { equals: record.area.trim(), mode: "insensitive" },
-          rooms: roomsKey,
-          sqm: sqmKey,
-          NOT: { status: "SOLD" },
-        },
-      });
-
-      const listing = existing
-        ? await prisma.listing.update({
-            where: { id: existing.id },
-            data: {
-              status: record.status,
-              transactionType: record.transactionType || existing.transactionType,
-              floor: record.floor ?? existing.floor,
-              price: record.price ?? existing.price,
+      // Serializable, because this is a read-then-write with no unique
+      // constraint behind it. Two turns for the same property arriving close
+      // together - which the documented busy_input_mode: interrupt merge quirk
+      // makes a real scenario, not a theoretical one - could both miss the
+      // findFirst and both create, leaving duplicate Listing rows that no UI
+      // can merge or delete.
+      //
+      // A unique index would be the stronger fix but the obvious one is WRONG
+      // here: this lookup is case-insensitive AND excludes SOLD on purpose, so
+      // a sold row plus a relisted active row for the same property is two
+      // rows by design. Only a partial expression index
+      // (UNIQUE (customerId, lower(area), rooms, sqm) WHERE status <> 'SOLD')
+      // matches those semantics; it needs a migration and is tracked in
+      // TODO.md as the durable fix before the Vercel deploy.
+      const listing = await prisma.$transaction(
+        async (tx) => {
+          const existing = await tx.listing.findFirst({
+            where: {
+              customerId: customer.id,
+              area: { equals: record.area.trim(), mode: "insensitive" },
+              rooms: roomsKey,
+              sqm: sqmKey,
+              NOT: { status: "SOLD" },
             },
-          })
-        : await prisma.listing.create({
+          });
+
+          if (existing) {
+            return tx.listing.update({
+              where: { id: existing.id },
+              data: {
+                status: record.status,
+                transactionType: record.transactionType || existing.transactionType,
+                floor: record.floor ?? existing.floor,
+                price: record.price ?? existing.price,
+              },
+            });
+          }
+
+          return tx.listing.create({
             data: {
               customerId: customer.id,
               area: record.area.trim(),
@@ -183,6 +201,9 @@ export async function POST(request: NextRequest) {
               status: record.status,
             },
           });
+        },
+        { isolationLevel: "Serializable" },
+      );
 
       listingIds.push(listing.id);
     }

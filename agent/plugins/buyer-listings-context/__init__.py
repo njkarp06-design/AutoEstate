@@ -52,6 +52,20 @@ BUYER_VIEW_URL = (
     else None
 )
 
+# Say so out loud. A URL that is set but doesn't end in /api/ingest (a trailing
+# slash is enough) leaves BUYER_VIEW_URL None, and the hook below then returns
+# early on every turn. The skill's documented response to absent context is to
+# defer everything - so the failure looks like a polite, working receptionist
+# that simply never answers anything, on the one public surface in the product,
+# with previously not one line anywhere explaining why.
+if INGESTION_URL and not BUYER_VIEW_URL:
+    logger.warning(
+        "buyer-listings-context: AUTOESTATE_INGESTION_URL=%r does not end in "
+        "'/api/ingest', so the buyer-view endpoint cannot be derived - THIS PLUGIN IS "
+        "INERT and the skill will defer every single buyer question.",
+        INGESTION_URL,
+    )
+
 # Buyer traffic only ever arrives over a real messaging channel. hermes -z
 # (cli) sets neither platform, so this won't fire there — simulate the block
 # manually in the prompt when testing the skill via the CLI.

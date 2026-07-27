@@ -10,11 +10,23 @@
 // The email must match what Clerk shows for the customer's account (their
 // login email) - that's how their first login gets linked to this row.
 import { createHash } from "node:crypto";
+import path from "node:path";
 import { PrismaClient } from "../prisma/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import dotenv from "dotenv";
 
-dotenv.config({ path: ".env.local" });
+// Resolved against THIS FILE, never process.cwd(). The documented invocation
+// above (and in infra/modules/hermes-instance/README.md) runs this from
+// infra/customers/<slug>/, where a bare ".env.local" resolves to a path that
+// does not exist - so DATABASE_URL came back undefined and provisioning failed
+// at the exact moment a real customer was being onboarded, with only a Prisma
+// connection error to explain it.
+//
+// process.argv[1] rather than import.meta.url: this runs under tsx with no
+// "type": "module" in package.json, so ESM is not guaranteed and import.meta
+// would be a syntax error under CJS.
+const scriptDir = path.dirname(path.resolve(process.argv[1]));
+dotenv.config({ path: path.resolve(scriptDir, "..", ".env.local") });
 
 function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -42,20 +54,36 @@ async function main() {
 
   const secretHash = createHash("sha256").update(secret).digest("hex");
 
+  // Named explicitly rather than left to surface as an opaque Prisma
+  // connection error - this runs from another directory, so "which .env.local
+  // did it read?" is the first question when it fails.
+  if (!process.env.DATABASE_URL) {
+    console.error(
+      `DATABASE_URL is not set. Expected it in ${path.resolve(scriptDir, "..", ".env.local")}`,
+    );
+    process.exit(1);
+  }
+
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter });
 
-  const customer = await prisma.customer.upsert({
-    where: { email },
-    create: { email, ingestionSecretHash: secretHash },
-    update: { ingestionSecretHash: secretHash },
-  });
+  // finally, not a trailing call: the client is local to main(), so the
+  // catch handler below cannot reach it. Without this, a failed upsert left
+  // the connection open until process exit.
+  try {
+    const customer = await prisma.customer.upsert({
+      where: { email },
+      create: { email, ingestionSecretHash: secretHash },
+      update: { ingestionSecretHash: secretHash },
+    });
 
-  console.log(`Customer provisioned: ${customer.id} (${customer.email})`);
-  await prisma.$disconnect();
+    console.log(`Customer provisioned: ${customer.id} (${customer.email})`);
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
-main().catch(async (err) => {
+main().catch((err) => {
   console.error("Provisioning failed:", err);
   process.exit(1);
 });

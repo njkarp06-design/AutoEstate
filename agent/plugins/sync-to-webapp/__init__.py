@@ -125,8 +125,11 @@ def on_turn_started(session_id, turn_id, user_message, platform, **kwargs):
 
 
 def on_turn_completed(session_id, turn_id, user_message, assistant_response, platform, **kwargs):
+    # Explicit None, matching on_turn_started: post_llm_call's return value is
+    # unused, but a bare `return` beside a sibling that documents why its own
+    # return matters reads as a deliberate distinction, and there isn't one.
     if not (INGESTION_URL and INGESTION_SECRET) or platform not in SYNCED_PLATFORMS:
-        return
+        return None
     _post_in_background({
         "event": "turn_completed",
         "sessionId": session_id,

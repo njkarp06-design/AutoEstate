@@ -87,8 +87,8 @@ CVEs reachable. Buyers get a text-only receptionist.
 hermes profile create autoestate-buyer --no-skills --no-alias
 # then copy config.yaml + SOUL.md into the profile dir, and .env.example -> .env
 # with real values filled in
-cp agent/plugins/buyer-listings-context      "$PROFILE/plugins/"
-cp agent/plugins/sync-inquiries-to-webapp    "$PROFILE/plugins/"
+cp -r agent/plugins/buyer-listings-context      "$PROFILE/plugins/"
+cp -r agent/plugins/sync-inquiries-to-webapp    "$PROFILE/plugins/"
 hermes -p autoestate-buyer gateway
 ```
 
@@ -101,6 +101,23 @@ in `plugins.enabled`.
 `TELEGRAM_ALLOWED_USERS` must be an explicit `*`. An empty value passes the
 adapter's intake prefilter but then routes unknown DMs into a pairing flow that
 a stranger would never complete.
+
+## ⚠ Both lockdowns are per-platform, and both are Telegram-only
+
+`platform_toolsets` and the slash-command gating are keyed by platform name.
+They cover `telegram` (and `cli`). They do **not** cover WhatsApp.
+
+This matters because the buyer-channel transport is undecided and currently
+leans toward a second WhatsApp eSIM. Slash gating is switched on *by the
+presence of an admin list* — so a `platforms.whatsapp` block with no
+`allow_admin_from` puts every stranger back at admin tier on all ~68 commands,
+`/profile` included, which is precisely the escape route to the operator's
+outbound skills that this whole profile exists to prevent.
+
+**Add the gating in the same change as the transport, never after.** No
+`platforms.whatsapp` block is pre-added here, because WhatsApp must stay
+*absent* from this profile rather than disabled (see `.env.example`) — an
+inert-looking block would contend with the operator profile's paired device.
 
 ## Known production gates (not fixed here)
 
