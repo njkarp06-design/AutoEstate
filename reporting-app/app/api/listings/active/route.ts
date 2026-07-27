@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { authenticateIngestRequest } from "@/lib/ingest-auth";
+import { authenticateMachineRequest } from "@/lib/ingest-auth";
 
 // Called by a customer's own Hermes instance (agent/plugins/active-listings-context)
 // to fetch what to include in a weekly-digest reply. Deliberately narrower
@@ -8,7 +8,10 @@ import { authenticateIngestRequest } from "@/lib/ingest-auth";
 // auto-matching mistakes stay visible - this endpoint only ever returns
 // listings genuinely still on the market.
 export async function GET(request: NextRequest) {
-  const authResult = await authenticateIngestRequest(request);
+  // OPERATOR role only - this is the operator instance's digest/locator feed.
+  // The buyer instance reads /api/listings/buyer-view instead, which returns
+  // every status so the bot can be honest about a property being gone.
+  const authResult = await authenticateMachineRequest(request, "operator");
   if (!authResult.ok) {
     return NextResponse.json(
       { ok: false, error: authResult.error },

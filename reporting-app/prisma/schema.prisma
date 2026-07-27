@@ -57,12 +57,34 @@ enum InquiryStatus {
   HANDLED
 }
 
+// Two machine credentials per customer, deliberately NOT one.
+//
+// Every route a Hermes instance calls authenticates with a per-customer bearer
+// secret, and the lookup is scoped to the calling ROLE's column (see
+// lib/ingest-auth.ts) - so a secret is only ever valid on its own role's
+// routes, and a route cannot authenticate the wrong role even by mistake.
+//
+// The split exists because the BUYER instance is the only surface untrusted
+// people can reach. While both roles shared one secret, a compromise of that
+// public box carried write access to POST /api/ingest - the ability to create
+// and mutate Listing rows on the customer's real data, including flipping a
+// property to SOLD. The tool lockdown on that instance does nothing about it:
+// it constrains what the agent can do, not what the credential is allowed to
+// reach.
+//
+//   operatorSecretHash -> POST /api/ingest, GET /api/listings/active
+//   buyerSecretHash    -> POST /api/inquiries, GET /api/listings/buyer-view
+//
+// buyerSecretHash is nullable - a customer has one only once a buyer instance
+// is provisioned for them. Postgres allows many NULLs in a unique column,
+// which is what makes that work.
 model Customer {
   id                  String    @id @default(cuid())
   email               String    @unique // set by the operator at onboarding time
   clerkUserId         String?   @unique // backfilled on first login
   displayName         String?
-  ingestionSecretHash String    @unique // sha256(secret) - the secret itself is never stored
+  operatorSecretHash  String    @unique // sha256(secret) - the secret itself is never stored
+  buyerSecretHash     String?   @unique // sha256(secret); null until a buyer instance exists
   instagramPostMode   PostMode  @default(MANUAL)
   // Where this customer's "a buyer needs you" lead alerts are pushed. The app
   // sends via one shared notifier bot (OPERATOR_TELEGRAM_BOT_TOKEN env); this

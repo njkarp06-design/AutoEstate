@@ -2,7 +2,7 @@
 
 Task status, order, and sub-checklists. CLAUDE.md owns the brief/phase/architecture; the session-handoff file owns where work stopped. This file owns what's left to do.
 
-Last updated: 2026-07-27 (second `/inspect` sweep).
+Last updated: 2026-07-27 (second `/inspect` sweep; scoped buyer credential).
 
 **Status:** every planned feature is built, live-tested and merged — the last, buyer-inquiry, in PR #34. The `/inspect` forensic sweep (PR #37) then fixed 41 defects across infra, plugins and the reporting app. Those fixes were then **deployed to the live profiles and the operator gateway restarted (2026-07-27)** — merging alone would not have done it, since plugins are physical copies inside each profile. **Nothing is blocked on more building, and nothing is half-deployed.** Everything below is productionization.
 
@@ -32,14 +32,14 @@ Buyer-inquiry shipped on 2026-07-26 (PR #34), which was the last item on the mar
 
 1. `terraform apply` to a real Hetzner account (item 3) — needs an account, an account-level action.
 2. Deploy the reporting app to Vercel Pro (item 4) — also account-level.
-3. The public buyer instance's production security gates (items 5 and 6): container isolation, a scoped second ingestion secret so the buyer box does not hold one that can write to `/api/ingest`, and re-running `hermes security audit` once anything is publicly exposed.
+3. The public buyer instance's remaining production security gates (items 5 and 6): container isolation, and re-running `hermes security audit` once anything is publicly exposed. **The scoped second ingestion secret is done** (2026-07-27) — the buyer box no longer holds a credential that can write to `/api/ingest`.
 4. Re-confirm open-channel behaviour on **WhatsApp** — the spike and both live tests proved Telegram only.
 5. Settle the **buyer-channel transport** open decision below.
 
 Also outstanding and non-blocking: create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts actually push (the dashboard records leads either way).
 
 
-**Deferred to production (Phase 2/3):** public-instance security hardening (container isolation + a scoped 2nd ingestion secret — the tool-lockdown half is done and shipped in PR #34), and a Terraform 2nd instance per customer (`instance_role`).
+**Deferred to production (Phase 2/3):** public-instance container isolation, and a Terraform 2nd instance per customer (`instance_role`). The other two halves of that hardening are done: the tool lockdown (PR #34) and the scoped 2nd ingestion secret (2026-07-27).
 
 **OPEN DECISION — buyer-channel transport (per customer).** The buyer receptionist must be a *separate channel* from the operator's outbound bot — this is forced, not a preference: the Hermes allowlist is a hard adapter gate and sender identity isn't available to skills, so buyers cannot share the operator's number without exposing the outbound, DB-mutating skills (`just-sold`/price-drops) to strangers. So each fully-provisioned customer has **two channels**: the operator's outbound number (they message it) and a public buyer-facing channel (strangers message it). What that buyer channel *is* is still undecided:
   - **(i) 2nd WhatsApp eSIM per customer (Baileys)** — matches the rest of the prototype; but the Baileys ban risk now applies to a *public-facing* number strangers hit (materially riskier than the operator number only the operator messages), plus another eSIM to provision/pair/babysit per customer. Fine for the **pilot**.
@@ -129,7 +129,9 @@ These are **blocking** for a real deployment, not awareness items. Each is a rea
 
 - [ ] **Partial unique index on `Listing`** — the durable fix for the ingest dedupe race. The 2026-07-27 sweep shipped a `Serializable` transaction around the match-and-write, which removes the race on that code path without a migration. The database-level guarantee needs `UNIQUE (customerId, lower(area), rooms, sqm) WHERE status <> 'SOLD'` — a partial *expression* index, because a plain `@@unique([customerId, area, rooms, sqm])` is case-sensitive and status-blind and would wrongly block a legitimate relist of a sold property. Land it before the Vercel deploy (item 4).
 
-- [ ] **Scoped second ingestion secret** (see also item 5). The buyer `.env` carries the *same* secret that authenticates `POST /api/ingest`, so the one untrusted-input surface in the product holds a credential that can create and mutate `Run` and `Listing` rows — including flipping a property to `SOLD`. The tool lockdown does not mitigate this: it is credential scope, not agent capability. **This is the highest-consequence open item in the repo** and should land before any public exposure, in its own PR (schema column + provisioning + per-route authorization).
+- [x] **Scoped second ingestion secret — DONE 2026-07-27.** The buyer instance now has its own credential. `Customer.ingestionSecretHash` → `operatorSecretHash` (hand-written rename migration, so the live operator secret survived and needed no redeployment) plus a nullable unique `buyerSecretHash`; `authenticateMachineRequest(request, role)` takes the role as a required argument and queries only that role's column, with no cross-role fallback. Verified 15/15 against the real routes including all four negative directions, plus the real buyer credential getting **401 on `/api/ingest`** and 200 on `/api/listings/buyer-view`. The buyer profile's local `.env` was updated with its new secret. Remaining piece of item 5 is container isolation, which is genuinely separate.
+
+  *(What it was: the buyer `.env` carried the same secret that authenticates `POST /api/ingest`, so the one untrusted-input surface in the product held a credential able to create and mutate `Run` and `Listing` rows, including flipping a property to `SOLD`. The tool lockdown never mitigated it — credential scope and agent capability are orthogonal, which is why it outlived a security-focused build.)*
 
 > Both config keys above are left at their real dev values on purpose, so the repo copy stays a verbatim match of the deployed file and CLAUDE.md's parity recipe keeps working. **Exclude `skills.external_dirs` and `allow_admin_from`/`group_allow_admin_from` from that key-by-key comparison**, alongside the machine-written `onboarding.seen`.
 

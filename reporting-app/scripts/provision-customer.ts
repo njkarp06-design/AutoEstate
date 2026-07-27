@@ -1,11 +1,23 @@
-// Registers a new customer in the reporting webapp's database: creates or
-// updates their Customer row with the given email and the SHA-256 hash of
-// their Terraform-generated ingestion secret (the secret itself is never
-// stored). Run once, right after `terraform apply` for a new customer
-// instance:
+// Registers a customer's machine credential in the reporting webapp's
+// database: creates or updates their Customer row with the SHA-256 hash of a
+// secret (the secret itself is never stored).
+//
+// There are TWO credentials per customer, scoped by role - see
+// lib/ingest-auth.ts and the Customer model comment for why:
+//
+//   operator (default) - POST /api/ingest, GET /api/listings/active
+//   buyer              - POST /api/inquiries, GET /api/listings/buyer-view
+//
+// Operator, right after `terraform apply` for a new customer instance:
 //
 //   cd infra/customers/<customer>
-//   terraform output -raw ingestion_secret | npx tsx ../../../reporting-app/scripts/provision-customer.ts customer@email.com
+//   terraform output -raw operator_ingestion_secret | npx tsx ../../../reporting-app/scripts/provision-customer.ts customer@email.com
+//
+// Buyer, once that customer has a buyer instance. Mint a secret, register it,
+// and put the same value in the buyer profile's AUTOESTATE_INGESTION_SECRET:
+//
+//   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+//   echo <that-secret> | npx tsx scripts/provision-customer.ts customer@email.com --role buyer
 //
 // The email must match what Clerk shows for the customer's account (their
 // login email) - that's how their first login gets linked to this row.
@@ -37,12 +49,23 @@ function readStdin(): Promise<string> {
   });
 }
 
+const USAGE =
+  "Usage: <secret> | npx tsx scripts/provision-customer.ts <email> [--role operator|buyer]";
+
 async function main() {
-  const email = process.argv[2];
+  const args = process.argv.slice(2);
+  const email = args.find((a) => !a.startsWith("--"));
+
+  const roleIndex = args.indexOf("--role");
+  const role = roleIndex === -1 ? "operator" : args[roleIndex + 1];
+  if (role !== "operator" && role !== "buyer") {
+    console.error(`Unknown role ${JSON.stringify(role)}. Expected "operator" or "buyer".`);
+    console.error(USAGE);
+    process.exit(1);
+  }
+
   if (!email) {
-    console.error(
-      "Usage: terraform output -raw ingestion_secret | npx tsx scripts/provision-customer.ts <email>",
-    );
+    console.error(USAGE);
     process.exit(1);
   }
 
@@ -71,13 +94,49 @@ async function main() {
   // catch handler below cannot reach it. Without this, a failed upsert left
   // the connection open until process exit.
   try {
+    const existing = await prisma.customer.findUnique({ where: { email } });
+
+    // A buyer credential is an ADDITION to an existing customer, never the
+    // thing that creates one: Customer.operatorSecretHash is non-null, so a
+    // buyer-first create would have to invent one. Fail loudly rather than
+    // half-provision a customer whose operator instance can never authenticate.
+    if (role === "buyer" && !existing) {
+      console.error(
+        `No customer found for ${email}. Provision the operator credential first ` +
+          `(omit --role), then add the buyer one.`,
+      );
+      process.exit(1);
+    }
+
+    // Reject a secret already registered as this customer's OTHER role.
+    // Registering one value for both roles would look like a correct
+    // two-credential setup while silently rebuilding the single shared
+    // credential the split exists to eliminate.
+    if (existing) {
+      const otherHash =
+        role === "operator" ? existing.buyerSecretHash : existing.operatorSecretHash;
+      if (otherHash === secretHash) {
+        console.error(
+          `That secret is already registered as this customer's ` +
+            `${role === "operator" ? "buyer" : "operator"} credential. The two roles must ` +
+            `use different secrets - sharing one defeats the split entirely.`,
+        );
+        process.exit(1);
+      }
+    }
+
     const customer = await prisma.customer.upsert({
       where: { email },
-      create: { email, ingestionSecretHash: secretHash },
-      update: { ingestionSecretHash: secretHash },
+      create: { email, operatorSecretHash: secretHash },
+      update:
+        role === "operator"
+          ? { operatorSecretHash: secretHash }
+          : { buyerSecretHash: secretHash },
     });
 
-    console.log(`Customer provisioned: ${customer.id} (${customer.email})`);
+    console.log(
+      `Customer provisioned: ${customer.id} (${customer.email}) — ${role} credential set`,
+    );
   } finally {
     await prisma.$disconnect();
   }

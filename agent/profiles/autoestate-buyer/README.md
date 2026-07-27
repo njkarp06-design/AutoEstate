@@ -121,9 +121,12 @@ inert-looking block would contend with the operator profile's paired device.
 
 ## Known production gates (not fixed here)
 
-- **The ingestion secret is shared with the operator instance.** It currently
-  also grants write access to `/api/ingest`. A public box should carry a scoped,
-  read-limited second secret.
+- ~~**The ingestion secret is shared with the operator instance.**~~ **Fixed
+  2026-07-27.** This instance now holds its own credential, scoped by the
+  reporting app to `/api/inquiries` and `/api/listings/buyer-view`; presenting
+  it to `/api/ingest` returns 401, so extracting it from this public box no
+  longer carries write access to the customer's `Listing` data. See
+  `reporting-app/lib/ingest-auth.ts` and the `Customer` model comment.
 - **No OS-level isolation** (`terminal.backend: local`). The tool lockdown means
   there is no code-execution tool to abuse, but Hermes's own `SECURITY.md` is
   clear that OS isolation is the only real boundary. Containerize on the real

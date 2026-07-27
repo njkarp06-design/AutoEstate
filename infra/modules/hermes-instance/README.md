@@ -75,7 +75,7 @@ terraform apply
 ### 3. Register the customer in the reporting webapp's database
 
 ```bash
-terraform output -raw ingestion_secret | \
+terraform output -raw operator_ingestion_secret | \
   npx tsx ../../../reporting-app/scripts/provision-customer.ts <customer-email>
 ```
 
@@ -103,16 +103,16 @@ docker compose -f /root/docker-compose.yml restart gateway
 Send a real listing to the customer's WhatsApp Business number and confirm
 it shows up in the reporting webapp once they log in.
 
-## Rotating the ingestion secret
+## Rotating the operator ingestion secret
 
 Tainting `random_password.ingestion_secret` and re-applying regenerates the
-secret and re-runs the injection step *without* rebuilding the server
+**operator** secret and re-runs the injection step *without* rebuilding the server
 (`user_data` itself is untouched, so `hcloud_server` isn't recreated):
 
 ```bash
 terraform taint 'module.hermes.random_password.ingestion_secret'
 terraform apply
-terraform output -raw ingestion_secret | \
+terraform output -raw operator_ingestion_secret | \
   npx tsx ../../../reporting-app/scripts/provision-customer.ts <customer-email>
 ```
 
@@ -125,3 +125,23 @@ terraform output -raw ingestion_secret | \
 - **DNS / a stable hostname per customer** - not needed yet; the instance
   is reached by IP for SSH only, and it never receives inbound traffic
   from the reporting webapp (only sends outbound to it).
+
+## The buyer instance's secret is separate
+
+This module provisions the **operator** role only. A customer's buyer instance
+authenticates with its own credential, scoped by the reporting app to
+`/api/inquiries` and `/api/listings/buyer-view` — presenting it to `/api/ingest`
+returns 401. That is deliberate: the buyer box is the one public surface, and a
+shared secret there meant write access to the customer's `Listing` data.
+
+It is minted at provisioning time rather than generated here, because there is no
+buyer Terraform module yet (`instance_role`, see TODO.md) and generating it in the
+operator module would force a future buyer module to read the operator's state:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+echo <that-secret> | npx tsx ../../../reporting-app/scripts/provision-customer.ts <customer-email> --role buyer
+```
+
+Then set the same value as `AUTOESTATE_INGESTION_SECRET` in the buyer profile's
+`.env`. The customer must already exist — register the operator credential first.
