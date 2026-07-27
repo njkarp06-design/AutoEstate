@@ -19,18 +19,23 @@ __pycache__/
 Thumbs.db
 
 # Local Claude Code tooling state.
-# Everything under .claude/ stays local EXCEPT the shared doc-sync tooling —
-# settings.json (the hooks) and doc-consistency-check.sh (the background checker
-# the Stop hook invokes) — which are meant to be version-controlled. Note the
-# pattern must be `.claude/*` rather than `.claude/` — git does not descend into
-# an excluded directory, so a negation under a `.claude/` rule would never match.
+# Everything under .claude/ stays local EXCEPT doc-consistency-check.sh, the
+# on-demand pre-PR doc checker, which is the one file this branch exists to
+# carry. NOTE the pattern must be `.claude/*` rather than `.claude/` — git does
+# not descend into an excluded directory, so a negation under a `.claude/` rule
+# would never match.
+#
+# There is deliberately no `!.claude/settings.json` negation: that file held
+# hooks, all hooks were removed from this repo on 2026-07-26, and it was
+# deleted from this branch on 2026-07-27. The checker is run by hand, not by a
+# hook. Do not re-add it.
 .claude/*
-!.claude/settings.json
 !.claude/doc-consistency-check.sh
 # Personal per-machine overrides stay ignored.
 .claude/settings.local.json
-# Transient output of the background checker: a scratch note to action and
-# delete, not a record worth versioning.
+# Transient output of the checker: a scratch note to action and delete, plus
+# its log and the run stamp and lock it manages itself.
 .claude/doc-findings.md
 .claude/doc-check.log
 .claude/.doc-check-stamp
+.claude/.doc-check-lock/

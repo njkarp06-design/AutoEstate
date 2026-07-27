@@ -1,9 +1,24 @@
 #!/usr/bin/env bash
-# Background doc-consistency checker for AutoEstate.
+# On-demand doc-consistency checker for AutoEstate.
 #
-# Spawned by the Stop hook (async, non-blocking) after each turn. Reads
-# CLAUDE.md, TODO.md and the current session-handoff file against the repo's
-# real state and REPORTS contradictions to .claude/doc-findings.md. It
+#   Usage:  .claude/doc-consistency-check.sh [--force]
+#
+# RUN IT BY HAND, typically before opening a PR. There is no hook in this repo
+# and this script must not acquire one: all Claude Code hooks were removed on
+# 2026-07-26 at the owner's request, and PR #33 — which wired this script to a
+# Stop hook — was closed on those grounds. That was a mechanism objection, not
+# a quality one, which is exactly why the script survived and the hook did not.
+# The `.claude/settings.json` that used to sit beside this file (restoring BOTH
+# the Stop hook and a UserPromptSubmit prompt-injector) was deleted on
+# 2026-07-27. Do not reintroduce either.
+#
+# --force skips the "nothing changed since last run" short-circuit. A manual
+# pre-PR run usually wants it: without it the script exits silently whenever
+# HEAD hasn't moved and the tree is clean, which is a perfectly ordinary state
+# to be in when you are about to open a PR.
+#
+# Reads CLAUDE.md, TODO.md and the current session-handoff file against the
+# repo's real state and REPORTS contradictions to .claude/doc-findings.md. It
 # deliberately never edits the docs and never commits:
 #
 #   - the main thread writes the reasoning (why a decision was made, what a
@@ -16,12 +31,21 @@
 #   - only one writer touches the docs, so there are no lost edits, and the
 #     repo's branch-and-PR workflow is never bypassed by a background process
 #
-# Recursion guard: this script spawns `claude`, whose own Stop hook would
-# spawn it again. AUTOESTATE_DOC_CHECK short-circuits the nested run.
+# Recursion guard: this script spawns `claude`, and AUTOESTATE_DOC_CHECK
+# short-circuits a nested run. Vestigial while there is no hook, kept because
+# it costs nothing and is exactly right if anyone ever invokes this from a
+# session that could re-enter it.
 
 set -u
 
 [ -n "${AUTOESTATE_DOC_CHECK:-}" ] && exit 0
+
+FORCE=""
+case "${1:-}" in
+  --force) FORCE=1 ;;
+  "") ;;
+  *) echo "usage: $(basename "$0") [--force]" >&2; exit 2 ;;
+esac
 
 # Derive the project root from this script's own location rather than
 # hardcoding it — the hook may be invoked from any cwd, and by a bash whose
@@ -32,13 +56,29 @@ FINDINGS="$PROJECT_DIR/.claude/doc-findings.md"
 LOG="$PROJECT_DIR/.claude/doc-check.log"
 STAMP_FILE="$PROJECT_DIR/.claude/.doc-check-stamp"
 
+LOCK_DIR="$PROJECT_DIR/.claude/.doc-check-lock"
+
 cd "$PROJECT_DIR" || exit 0
 
-# Nothing committed or changed since the last check means nothing to compare.
+# One run at a time. mkdir is atomic on every filesystem that matters, unlike
+# a test-then-touch on a lockfile. Two concurrent runs would both write
+# $FINDINGS and both append $LOG, and the slower one would silently win -
+# discarding the other's report with nothing to show a report was lost.
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  echo "[$(date '+%Y-%m-%d %H:%M')] another doc check is already running, skipping" >> "$LOG"
+  exit 0
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
+
+# Nothing committed or changed since the last check means nothing to compare -
+# unless --force, which a deliberate pre-PR run almost always wants: HEAD not
+# having moved is the normal state when you are about to open a PR, and the
+# silent exit looks identical to a clean bill of health.
 HEAD_NOW="$(git rev-parse HEAD 2>/dev/null)"
 DIRTY="$(git status --porcelain 2>/dev/null | head -c 1)"
 LAST="$(cat "$STAMP_FILE" 2>/dev/null || echo none)"
-if [ "$HEAD_NOW" = "$LAST" ] && [ -z "$DIRTY" ]; then
+if [ -z "$FORCE" ] && [ "$HEAD_NOW" = "$LAST" ] && [ -z "$DIRTY" ]; then
+  echo "nothing changed since the last check; re-run with --force to check anyway." >&2
   exit 0
 fi
 
@@ -47,7 +87,12 @@ fi
 HANDOFF="$(ls -1 "$PROJECT_DIR"/session-handoff-*.md 2>/dev/null | sort | tail -n 1)"
 HANDOFF_NAME="$(basename "${HANDOFF:-none}")"
 
-read -r -d '' PROMPT <<EOF
+# `read -d ''` ALWAYS exits non-zero here: it stops at EOF without ever seeing
+# the NUL delimiter it was told to wait for. That is expected and the variable
+# is fully populated regardless - but it only survives because this script sets
+# `set -u` and not `set -e`. The `|| true` makes that explicit, so adding `-e`
+# later (the obvious hardening instinct) doesn't kill the script on this line.
+read -r -d '' PROMPT <<EOF || true
 You are auditing this repository's documentation for internal consistency.
 Report only — do NOT edit CLAUDE.md, TODO.md or the handoff file, do NOT commit,
 and do NOT create branches. Another process owns all writes.
