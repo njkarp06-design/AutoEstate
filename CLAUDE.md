@@ -1,5 +1,16 @@
 # CLAUDE.md — Project Brief
 
+## ▶ START HERE on a fresh session
+
+**Before doing anything else, read these two files:**
+
+1. **The most recent `session-handoff-*.md`** in the repo root — where the last session stopped, the verified state of the live systems, and what to do next. It ends with a "How to resume" block; follow it.
+2. **`TODO.md`** — the ordered task list, with what is blocked and on whom.
+
+This file (the brief, architecture and engineering history) is long and is *reference*, not a starting point. If I just say **"resume"** or **"continue"**, that means: read those two, then tell me the current state and the next action before starting work. Don't begin an account-level or costly step without asking.
+
+---
+
 > **Decided — project name:** AutoEstate.
 >
 > **Decided — target industry:** independent real estate agents in Tel Aviv (not big franchises/agencies). Rationale: sharp recurring pain (constant listing content, no time to produce it), WhatsApp/Facebook-group-native distribution fits the local market, ~450-570 agents in Tel Aviv is a large enough market with warm local network access for a pilot.
