@@ -9,6 +9,18 @@
 
 This file (the brief, architecture and engineering history) is long and is *reference*, not a starting point. If I just say **"resume"** or **"continue"**, that means: read those two, then tell me the current state and the next action before starting work. Don't begin an account-level or costly step without asking.
 
+## ▶ BEFORE YOU SAY "DONE"
+
+Five checks, each earned by a real failure in this repo. Run them before telling me a session is finished — not as a ritual, but because every one of them has caught something that would otherwise have reached a future session as a lie.
+
+1. **Did anything merge this turn?** Re-read the handoff's own claims about PR and branch state. They were written *before* the merge and are now probably wrong. (2026-07-27: the handoff called a merged branch "open, not merged" in two places, including the resume prompt.)
+2. **Did a plugin, skill or profile config change?** Merging deploys **nothing** — plugins are physical copies inside each Hermes profile. Run the parity recipe in §5 and redeploy. (2026-07-27: 4 of 5 plugins were still pre-fix hours after the fix was on `main`.)
+3. **Corrected a fact?** Grep for *every other copy* of it — `CLAUDE.md`, `TODO.md` and the handoff all restate the same things. Fixing one of three is how the docs went stale originally. Renumbering a TODO item counts: check the cross-references still resolve.
+4. **Cold-read test.** Read only this file's START HERE block plus the handoff, as a session that knows nothing. Do you know the state, the next action, and what not to touch — with nothing stale? If not, fix it now, not next time.
+5. **Is a claim verified or just written?** Anything stated as done should say *how* it was checked. "Verified" without a method is close to useless later, and this repo has twice recorded a cleanup that never happened.
+
+No automation enforces this — deliberately, see §3. It is a checklist because the alternative was a hook, and that was rejected on mechanism grounds, not quality ones.
+
 ---
 
 > **Decided — project name:** AutoEstate.
