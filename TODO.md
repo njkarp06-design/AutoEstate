@@ -8,7 +8,7 @@ Last updated: 2026-07-27 (`/docs` reconciliation after the scoped-credential PR)
 
 **Blocked on the owner (account-level, cannot be done for you):** creating a Hetzner account so `terraform apply` can run (item 3), and setting up Vercel Pro to deploy the reporting app (item 4). These two gate a real pilot customer.
 
-**Not blocked, but must happen before a real customer:** hardening the public buyer instance (items 5–6), re-confirming open-channel behaviour on WhatsApp rather than Telegram alone, and settling the buyer-channel transport decision below.
+**Must happen before a real customer:** hardening the public buyer instance (items 5–6) and settling the buyer-channel transport decision below — neither is blocked. Re-confirming open-channel behaviour on WhatsApp rather than Telegram alone **is** blocked: it needs a runnable buyer instance, and that needs a fresh bot token or a transport decision (item 10).
 
 **Both former open questions are answered (owner, 2026-07-27), and both have consequences:**
 - **The dev buyer bot's Telegram token is REVOKED** — and this is now *verified*, not just reported: calling Telegram's `getMe` with the token still sitting in the buyer profile's `.env` returns **401 Unauthorized** (2026-07-27). Good hygiene, and the buyer gateway was already stopped, so nothing broke. But **the buyer instance can no longer be started** — a new BotFather token (or a buyer-channel transport decision) gates any further buyer testing, including the outstanding WhatsApp open-channel re-confirmation. See item 10.
@@ -33,8 +33,8 @@ Buyer-inquiry shipped on 2026-07-26 (PR #34), which was the last item on the mar
 1. `terraform apply` to a real Hetzner account (item 3) — needs an account, an account-level action.
 2. Deploy the reporting app to Vercel Pro (item 4) — also account-level.
 3. The public buyer instance's remaining production security gates (items 5 and 6): container isolation, and re-running `hermes security audit` once anything is publicly exposed. **The scoped second ingestion secret is done** (2026-07-27) — the buyer box no longer holds a credential that can write to `/api/ingest`.
-4. Re-confirm open-channel behaviour on **WhatsApp** — the spike and both live tests proved Telegram only.
-5. Settle the **buyer-channel transport** open decision below.
+4. Settle the **buyer-channel transport** open decision below. It now carries a security gate — the buyer profile's lockdowns are Telegram-only, so the gating must land in the same change as the transport.
+5. Re-confirm open-channel behaviour on **WhatsApp** — the spike and both live tests proved Telegram only. **Blocked** until the buyer instance can start again (item 10), so it follows whichever of a fresh token or the transport decision lands first.
 
 Also outstanding and non-blocking: create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts actually push (the dashboard records leads either way).
 
