@@ -30,7 +30,7 @@ Verified **2026-07-28** by listing processes, hashing files, calling the routes 
 | Repo↔live plugin parity | 5/5 as of PR #59 (re-checked either side of the `buyer-listings-context` 1.2 copy), split by role — operator has `sync-to-webapp` / `listing-footer-reminder` / `active-listings-context`, buyer has `buyer-listings-context` / `sync-inquiries-to-webapp` |
 | Repo↔live buyer `config.yaml` | no drift (parsed YAML, excluding the `MACHINE-SPECIFIC` keys) |
 | Terraform template ↔ dev operator profile | 0 drift on product-decision keys (new recipe, CLAUDE.md §5) |
-| Dev database | 1 customer; **24 runs (1 of them the first-ever Telegram run)**; **5 listings, all carrying ref codes** — 3 ACTIVE (Rothschild *with features*, Neve Tzedek, Shenkin `REF-QTPT4`), 2 SOLD (Ben Gurion, Dizengoff); **5 inquiries**, one linked to Rothschild by ref code |
+| Dev database | 1 customer; **24 runs (1 of them the first-ever Telegram run)**; **5 listings, all carrying ref codes** — 3 ACTIVE (Rothschild *with features*, Neve Tzedek, Shenkin `REF-QTPT4`), 2 SOLD (Ben Gurion, Dizengoff); **6 inquiries**, two linked to Rothschild by ref code, one of them a genuine third party **with a captured contact** |
 | Reporting-app schema | migration `20260728193000_add_listing_ref_code_and_buyer_number` applied 2026-07-28; `prisma migrate status` clean, dev server restarted after |
 | `lint` / `tsc` / `terraform fmt` / `validate` | all clean |
 
@@ -43,9 +43,9 @@ Two account-level steps remain the real gate for a pilot — both need the owner
 
 **Then, before any real customer:**
 
-3. **Harden the public buyer instance** (items 5–6): OS-level isolation, and re-running `hermes security audit` once anything is exposed. Also resolve the **global `.env`** that puts the owner's Gmail credential on that box (known issue in TODO).
+3. **Harden the public buyer instance** (items 5–6): OS-level isolation, and re-running `hermes security audit` once anything is exposed. *(The "global `.env` puts a Gmail credential on that box" item was **disproved 2026-07-28** by running Hermes's own env loader — profiles do not inherit it, and the buyer profile resolves no `email` platform and no `EMAIL_PASSWORD`. Nothing to do; see TODO.)*
 4. **Add `WHATSAPP_ALLOW_ALL_USERS=true`** to any buyer instance Terraform provisions — with `dm_policy: open` Hermes refuses to boot without it. It blocked the dev instance and will block the first real one identically.
-5. **Have a genuine third party message the buyer's WhatsApp number.** The path ran end to end, but from the owner's own number; the allowlist is `*` so no sender is privileged, and a real stranger did test Telegram — WhatsApp is the one untested combination. Cheap to close.
+5. ~~**Have a genuine third party message the buyer's WhatsApp number.**~~ **DONE 2026-07-28.** A real stranger tapped a real ad link: the ref code resolved on his first message, the defer sentence switched correctly from "what's your number" to "I've passed your details along" once he gave one, his number was **captured** (the first third-party `buyerContact` ever), his thread stayed isolated from the owner's, and the slash lockdown denied him everything but `help`/`whoami`. See TODO item 10.
 
 **Non-blocking:** create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts push. The dashboard records leads either way.
 
