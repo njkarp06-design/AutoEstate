@@ -94,6 +94,15 @@ platform_toolsets:
 agent:
   max_turns: 12
   reasoning_effort: medium
+  # How soon the holding phrase (display.status_phrases below) first appears,
+  # and how often it refreshes. Hermes defaults to 180s, which for a buyer
+  # reply that lands in 10-20s means it would NEVER show - the buyer just
+  # watches "typing…" and wonders. 10s puts one short human line in front of
+  # them while the answer is being prepared. It edits a single bubble rather
+  # than sending a new one each interval. On Telegram cleanup_progress then
+  # removes it; on WhatsApp it cannot (no delete_message), so the line stays
+  # above the answer - which reads fine, but know that it persists there.
+  gateway_notify_interval: 10
   disabled_toolsets:
     - terminal
     - file
@@ -228,6 +237,44 @@ platforms:
       # hardcoded _ALWAYS_ALLOWED_FOR_USERS floor of /help and /whoami.
       user_allowed_commands: []
       group_user_allowed_commands: []
+
+# --- Customer-facing presentation ------------------------------------------
+# A buyer is a member of the public, not an operator watching an agent work.
+# Hermes's defaults leak the machinery at them, so every key below is a
+# deliberate opt-down. All were verified live on 2026-07-28 by a real buyer
+# conversation that surfaced each one.
+#
+# Why WhatsApp needed this and Telegram mostly didn't: display defaults are
+# per-platform TIERS (gateway/display_config.py). Telegram is pinned to
+# tool_progress "off", but WhatsApp defaults to TIER_MEDIUM ("new") because
+# the Baileys bridge supports message editing - which is why a real buyer saw
+# "📚 Reading skill buyer-inquiry" mid-answer.
+display:
+  platforms:
+    whatsapp: &buyer_channel_display
+      # No tool breadcrumbs. A buyer must never see which skill was loaded.
+      tool_progress: off
+      # No mid-turn commentary or verbose busy-ack; final answer only.
+      interim_assistant_messages: false
+      busy_ack_detail: false
+      # "generic" = a short human holding phrase (from status_phrases below)
+      # instead of "⏳ Working — N min", which reads as machinery.
+      long_running_notifications: generic
+      # Remove the holding bubble once the real answer lands.
+      # ⚠ TELEGRAM ONLY, verified live 2026-07-28: the Baileys WhatsApp
+      # adapter implements edit_message but NOT delete_message, so this
+      # silently no-ops there and the holding line stays above the answer.
+      # Left enabled because it is correct for Telegram and harmless on
+      # WhatsApp - but do not read it as "the bubble disappears everywhere".
+      cleanup_progress: true
+      status_phrases:
+        # replace, not append: the built-in catalog ("on it", "one sec") is
+        # fine for an operator but too curt for a stranger being kept waiting.
+        mode: replace
+        status:
+          - "Just checking that now — one moment."
+          - "Still looking into that for you — won't be long."
+    telegram: *buyer_channel_display
 
 # --- Memory off ------------------------------------------------------------
 # On a public instance, agent memory and the user profile are a poisoning
