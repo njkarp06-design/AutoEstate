@@ -194,6 +194,7 @@ Discussed 2026-07-28. Nothing built, no schema change, no decision. The buyer bo
 - [ ] One lawyer hour on §9 + electronic signature validity — the only thing that can kill this outright.
 - [ ] Then decide self-hosted audit trail vs a pay-per-envelope e-sign API behind the same UX.
 - Sequencing: this moves the product from marketing automation into contract execution, so not before the Hetzner apply (item 3) and the Vercel deploy (item 4) are live.
+- **Shares a mechanism with item 13 — design them together, not independently.** Both depend on `MEDIA:<abs path>` outbound delivery and on the same constraint it now carries: after PR #67 only files beneath the buyer profile's **cache roots** are deliverable, and the buyer instance cannot produce a file itself (3 tools, no file/terminal/code toolset). So whatever item 13 builds to get listing media onto that box is the same machinery a contract PDF would need. The doc's paragraph (a) was written before that lockdown merged and has been corrected in place.
 
 ---
 
