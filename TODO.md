@@ -2,9 +2,9 @@
 
 Task status, order, and sub-checklists. CLAUDE.md owns the brief/phase/architecture; the session-handoff file owns where work stopped. This file owns what's left to do.
 
-Last updated: 2026-07-28 (`/fastpassdocs` after a six-PR session: dual channel, presentation fixes, listing features).
+Last updated: 2026-07-28 (channel-consolidation decision — item 12).
 
-**Status:** every planned feature is built, live-tested and merged — the last, buyer-inquiry, in PR #34. The `/inspect` forensic sweep (PR #37) then fixed 41 defects across infra, plugins and the reporting app. Those fixes were then **deployed to the live profiles and the operator gateway restarted (2026-07-27)** — merging alone would not have done it, since plugins are physical copies inside each profile. **Nothing is blocked on more building.** Everything below is productionization. **Nothing is half-deployed** — see the deployment paragraph below, and re-run the parity recipe rather than trusting either.
+**Status:** every planned feature is built, live-tested and merged — the last, buyer-inquiry, in PR #34. The `/inspect` forensic sweep (PR #37) then fixed 41 defects across infra, plugins and the reporting app. Those fixes were then **deployed to the live profiles and the operator gateway restarted (2026-07-27)** — merging alone would not have done it, since plugins are physical copies inside each profile. **No roadmap feature is outstanding** — everything from the original marketing-automation roadmap is shipped. Most of what follows is productionization, with one exception: the **channel-consolidation decision of 2026-07-28 (item 12)** added new build work, and two parts of it (12a, 12d) are unblocked. **Nothing is half-deployed** — see the deployment paragraph below, and re-run the parity recipe rather than trusting either.
 
 **Blocked on the owner (account-level, cannot be done for you):** creating a Hetzner account so `terraform apply` can run (item 3), and setting up Vercel Pro to deploy the reporting app (item 4). These two gate a real pilot customer.
 
@@ -39,7 +39,7 @@ Buyer-inquiry shipped on 2026-07-26 (PR #34), which was the last item on the mar
 1. `terraform apply` to a real Hetzner account (item 3) — needs an account, an account-level action.
 2. Deploy the reporting app to Vercel Pro (item 4) — also account-level.
 3. The public buyer instance's remaining production security gates (items 5 and 6): container isolation, and re-running `hermes security audit` once anything is publicly exposed. **The scoped second ingestion secret is done** (2026-07-27) — the buyer box no longer holds a credential that can write to `/api/ingest`.
-4. ~~Settle the buyer-channel transport.~~ **Done 2026-07-28** — both Telegram and WhatsApp, with the gating landed in the same change as the transport. The equivalent gate is now open only for `whatsapp_cloud`.
+4. ~~Settle the buyer-channel transport.~~ **Done 2026-07-28** — both Telegram and WhatsApp, with the gating landed in the same change as the transport. The equivalent gate is now open only for `whatsapp_cloud`. **Superseded in direction the same day by the channel-consolidation decision (item 12): operator → Telegram, buyer → Cloud API, one number per customer.** Today's arrangement stays as-is and keeps working; 12 is the target state, not a rollback.
 5. Re-confirm open-channel behaviour on **WhatsApp with a genuine third party**. No longer blocked — both channels are paired and the WhatsApp path ran end to end on 2026-07-28, but from the **owner's own number**. The allowlist is `*`, so no sender is privileged for messaging, and a real stranger did test Telegram on 07-26; a third-party sender on WhatsApp is the one untested combination. Cheap to close: have someone else message the buyer number.
 
 Also outstanding and non-blocking: create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts actually push (the dashboard records leads either way).
@@ -58,6 +58,42 @@ The original option list is kept below for the reasoning, now historical:
   - **(ii) Official WhatsApp Business Cloud API** — the right long-term home for a public receptionist: no ban risk, uses the number the customer already advertises. Costs Meta Business Verification per customer + real per-message pricing. Overlaps with item 7 (currently scoped there only for the *operator* side; the *buyer* side is the stronger reason to migrate, since it's the public one that can't be a throwaway).
   - **(iii) Non-WhatsApp buyer channel** (Telegram bot / web-chat widget linked from the Instagram/Yad2 ad) — zero WhatsApp numbers, no ban risk; but loses "reply on WhatsApp," the native local buyer behavior.
   - Leaning: **(i) for the pilot, (ii) at scale for the buyer side specifically.** Decide at deployment; the buyer instance itself is transport-agnostic so no code depends on this yet.
+
+---
+
+## 📞 12. Channel consolidation — one number per customer (DECIDED 2026-07-28)
+
+**The problem:** each fully-provisioned customer currently costs **two** new phone numbers — the operator-facing bot they message, and the public buyer-facing bot. Cloud API alone does **not** fix this: number count is **roles × customers**, and the two roles are forced by Hermes's gating, not by WhatsApp. Cloud API changes the cost of each number, not how many. Full reasoning, including the rejected options, is in CLAUDE.md's channel-consolidation entry.
+
+**Decided: operator → Telegram, buyer → Cloud API.** Result is **one number per customer**, minted from Meta rather than a SIM shop.
+
+### 12a. Operator channel → Telegram (not blocked, config not code)
+Telegram bots need **no phone number**, are free and unlimited, and the path is already built and live-tested. Safe to ask of an operator (a paying customer being onboarded) in a way it would never be safe to ask of a buyer who just tapped a Yad2 ad.
+- [ ] Decide whether this replaces the operator's WhatsApp bot or runs alongside it during transition. Accepted cost: it cuts against the brief's "WhatsApp-native, no habit change" premise **for the agent** — not for the buyer, where it actually matters.
+- [ ] Stand up an operator Telegram bot on the dev `autoestate` profile and live-test the full outbound flow (all five skills, footer → ingest → `Listing`).
+- [ ] Slash-command gating: the operator profile currently sets no `allow_admin_from`, so gating is **off**. Same open question as item 3's bullet — settle both together.
+- [ ] Parameterise in the Terraform template once it holds.
+
+### 12b. Buyer channel → official WhatsApp Cloud API (blocked on Hetzner)
+One Meta app / WABA hosts **many numbers**, each with its own `phone_number_id`, all delivering to **one webhook**. No eSIM, no handset, no OTP, no 14-day keepalive, no ban risk, and the customer advertises their real business number. Hermes already ships the adapter — see item 7, which this absorbs.
+- [ ] **Blocked:** needs a public HTTPS webhook (`:8090/whatsapp/webhook` by default). The Terraform firewall allows no inbound but operator SSH, and this laptop can't serve one. Gated on item 3.
+- [ ] **Close the `whatsapp_cloud` lockdown gate in the same change** — see the deploy-gate section below. Non-negotiable: it is a distinct platform name, so neither `platform_toolsets` nor slash gating covers it, and an ungated block returns every stranger to admin tier.
+- [ ] Per-customer **Meta business verification** is the real onboarding friction — it replaces "buy an eSIM" with "get the customer through Meta". This is what makes 12c worth having.
+- [ ] Re-check current Meta pricing before committing. Templates are billed; free-form replies inside a buyer-opened 24h window are free, and a receptionist is purely inbound-driven — but Meta has changed this twice.
+
+### 12c. Shared buyer number via deep-link ref codes — REJECTED as the destination, kept for two uses
+Mechanism: each listing gets a short `refCode`; the ad's contact link is a deep link with prefilled text (`wa.me/<number>?text=…REF-4821`), so message one identifies the customer *and* the property. Binding is sticky and server-side — one `POST /api/buyer-context` endpoint resolves session → customer, binding on the buyer's **phone** as well as the session so a returning buyer needs no code.
+**Rejected as the destination because an unbound buyer is a lost lead** — people routinely clear prefilled text and type "hi", leaving no listings, no agent identity and no operator to notify. Also: the conversation sits on AutoEstate's brand, not the agent's; and one number carrying every customer's stranger traffic is a single point of failure that is **disqualifying on Baileys** (one ban takes down every customer), so it only makes sense layered on 12b.
+- [ ] **Use 1 — onboarding bridge.** Per-customer Meta verification is slow; a shared number lets a new customer go live the day they sign, then migrate to their own Cloud number once verification clears. Removes a multi-day gate from the sales cycle.
+- [ ] **Use 2 — cheap/trial tier.** Shared number for trial, dedicated number as the upgrade; the missing own-brand becomes the upsell.
+- [ ] **Verify before building anything on it:** that one Hermes instance genuinely keeps tenants apart. Sessions are keyed per sender (`agent:main:whatsapp:dm:<user_id>`) so it looks right — *prove it, don't assume it.* Note the shared box would need an **instance-level** credential able to read any customer's listings, replacing the per-customer `buyerSecretHash` — a real blast-radius increase to weigh.
+
+### 12d. Per-listing ref codes — worth doing regardless (the sensible first step)
+Independent of whether 12c is ever built, and a prerequisite if it is. A code in the deep link means the bot knows the exact listing from message one, so `buyer-inquiry`'s disambiguation branch — the one rewritten in v0.2.0 after it offered SOLD listings as if on the menu — mostly stops firing. UX win, none of 12c's downsides.
+- [ ] `Listing` gains a short unique `refCode` (schema migration — apply **before** deploying any plugin that reads it, per the standing ordering rule).
+- [ ] Surface the code + deep link in the reporting app so the agent can paste it into a Yad2/Instagram ad.
+- [ ] Teach `buyer-inquiry` to resolve a code from message one; keep the existing disambiguation branch as the fallback, don't delete it.
+- **Not started. No schema change made, nothing account-level actioned** (no numbers bought, no Meta verification begun).
 
 ---
 
@@ -89,9 +125,9 @@ Still `npm run dev`-only (local, port 4127).
 `hermes security audit` flagged 48–50 CVEs in pinned upstream packages (several HIGH). None currently reachable (no exposed HTTP surface, no MCP servers, no real image processing, allowlist-gated senders). `hermes update` doesn't touch the upstream-locked versions.
 - [ ] Re-run `hermes security audit` and reassess once public exposure and/or MCP servers make any of these bugs reachable.
 
-### 7. Official WhatsApp Business Cloud API
+### 7. Official WhatsApp Business Cloud API — now tracked as item 12b
 Currently on the **Baileys/QR bridge** (unofficial, carries a ban risk, mitigated by a throwaway eSIM number). Fine for the prototype; a real public product needs the official API.
-- [ ] Migrate to the official WhatsApp Business Cloud API (needs a real public server + Meta Business Verification).
+- [ ] Migrate to the official WhatsApp Business Cloud API (needs a real public server + Meta Business Verification). **Superseded by item 12b**, which owns the checklist — this migration is now half of the channel-consolidation decision rather than a standalone item. Note Hermes already ships the adapter (`gateway/platforms/whatsapp_cloud.py`), so no adapter needs writing.
 
 ---
 
@@ -146,7 +182,7 @@ These are **blocking** for a real deployment, not awareness items. Each is a rea
 - [ ] **The buyer profile hardcodes the operator's own Telegram user id** as `allow_admin_from` (and `group_allow_admin_from`). Shipped unchanged to every customer, one personal account would hold admin-tier slash-command access — including `/profile` — on every buyer bot. Marked `MACHINE-SPECIFIC`. Needs parameterising when Terraform grows `instance_role`.
 - [x] **The buyer profile's lockdowns cover Telegram AND WhatsApp — closed 2026-07-28.** `platform_toolsets.whatsapp` and a `platforms.whatsapp.extra` block with `allow_admin_from` landed in the *same change* as the transport, which is what this gate demanded. Verified by resolution: `whatsapp` yields the same 3 tools as `telegram`, gating is on, and a stranger is denied `/profile`/`/model`/`/yolo`/`/restart`.
 
-- [ ] **STILL OPEN — the lockdowns do not cover `whatsapp_cloud`.** The official Meta Cloud API registers as a **distinct platform name**, so neither `platform_toolsets` nor the slash gating applies to it. Slash gating is switched on *by the presence of an admin list*, so a `platforms.whatsapp_cloud` block without `allow_admin_from` returns every stranger to admin tier on all ~68 commands — `/profile` included, which hands them the operator's outbound `Listing`-mutating skills, i.e. exactly what PR #34 exists to prevent. **Add the gating in the same change as the transport, never after.** Deliberately not pre-added: the Cloud admin id is unknowable until a real Cloud sender exists, and untested gating config would manufacture the false confidence this gate exists to prevent. Documented in the config, the profile README and CLAUDE.md.
+- [ ] **STILL OPEN — the lockdowns do not cover `whatsapp_cloud`.** **Now sits directly on the planned path** — item 12b makes Cloud API the buyer channel, so this gate stops being hypothetical. The official Meta Cloud API registers as a **distinct platform name**, so neither `platform_toolsets` nor the slash gating applies to it. Slash gating is switched on *by the presence of an admin list*, so a `platforms.whatsapp_cloud` block without `allow_admin_from` returns every stranger to admin tier on all ~68 commands — `/profile` included, which hands them the operator's outbound `Listing`-mutating skills, i.e. exactly what PR #34 exists to prevent. **Add the gating in the same change as the transport, never after.** Deliberately not pre-added: the Cloud admin id is unknowable until a real Cloud sender exists, and untested gating config would manufacture the false confidence this gate exists to prevent. Documented in the config, the profile README and CLAUDE.md.
   Note the **data plane is already Cloud-ready** (2026-07-28): `whatsapp_cloud` is in all five plugin platform sets and both API Zod enums, so a migration won't silently no-op every plugin. That is explicitly *not* the same as being security-ready.
 
 - [ ] **A public instance will not start without `WHATSAPP_ALLOW_ALL_USERS=true`.** Found the hard way 2026-07-28: with `dm_policy: open`, Hermes **refuses to boot** — `Refusing to start: whatsapp has dm_policy/group_policy set to 'open' but neither GATEWAY_ALLOW_ALL_USERS nor WHATSAPP_ALLOW_ALL_USERS is enabled` (`gateway/run.py::_own_policy_open_startup_violation`). An allowlist of `*` is deliberately **not** sufficient: open policy requires a second, explicit opt-in. Good design — it fails **closed**, refusing to run rather than quietly serving the public — but it will block the first real buyer instance exactly as it blocked the dev one. Use the platform-scoped `WHATSAPP_ALLOW_ALL_USERS`, **not** `GATEWAY_ALLOW_ALL_USERS`, which opens every platform at once. Set in the dev buyer `.env`; it must be added to any buyer instance Terraform eventually provisions.

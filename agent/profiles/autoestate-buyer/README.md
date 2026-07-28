@@ -27,12 +27,18 @@ work); both are excluded from that comparison rather than templated.
 ## Why a second instance exists at all
 
 The Hermes sender allowlist is enforced **inside the vendored adapter, upstream
-of every hook and skill**, and sender identity is not passed to plugin hooks.
+of every hook and skill**, and sender identity **never reaches a skill**.
 So a skill cannot tell an operator from a stranger. Widening the operator bot's
 allowlist to admit buyers would hand strangers the outbound skills that mutate
 the `Listing` table (`just-sold`, `listing-status-update`, …). Role-by-channel
 isolation is therefore forced, not preferred: **the dangerous skills are simply
 not loaded here.**
+
+Plugin *hooks* do receive `sender_id` (`pre_llm_call` and `post_llm_call` both;
+`sync-inquiries-to-webapp` uses it). That does not weaken the above and must not
+be mistaken for a way to gate by role: a plugin can only inject text, and text
+does not reliably stop the model taking an action — proven three times in this
+project. Isolation stays structural.
 
 ## The two isolation layers
 
