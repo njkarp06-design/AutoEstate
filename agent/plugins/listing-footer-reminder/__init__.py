@@ -41,7 +41,13 @@ context. The rule has to live here, in the channel the model demonstrably
 obeys, not only in the skill file.
 """
 
-SYNCED_PLATFORMS = {"whatsapp", "telegram"}
+# "whatsapp" is the Baileys bridge; "whatsapp_cloud" is the official Meta Cloud
+# API, which Hermes ships a separate adapter for and which registers under that
+# DISTINCT name. Listed ahead of any migration on purpose: this set cannot be
+# shared with the other plugins (each is a standalone copy inside a profile's
+# plugins/ dir), so a missing entry would silently no-op this plugin on a Cloud
+# instance rather than fail visibly.
+SYNCED_PLATFORMS = {"whatsapp", "whatsapp_cloud", "telegram"}
 
 LISTING_RECORD_REMINDER = (
     "Listing Record footer format (authoritative - use this exact format, "

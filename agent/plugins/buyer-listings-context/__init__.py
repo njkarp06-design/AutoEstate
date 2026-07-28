@@ -72,7 +72,13 @@ if INGESTION_URL and not BUYER_VIEW_URL:
 # Buyer traffic only ever arrives over a real messaging channel. hermes -z
 # (cli) sets neither platform, so this won't fire there — simulate the block
 # manually in the prompt when testing the skill via the CLI.
-BUYER_PLATFORMS = {"whatsapp", "telegram"}
+# "whatsapp" is the Baileys bridge; "whatsapp_cloud" is the official Meta Cloud
+# API, which Hermes ships a separate adapter for and which registers under that
+# DISTINCT name. Listed ahead of any migration on purpose: this set cannot be
+# shared with the other plugins (each is a standalone copy inside a profile's
+# plugins/ dir), so a missing entry would silently no-op this plugin on a Cloud
+# instance rather than fail visibly.
+BUYER_PLATFORMS = {"whatsapp", "whatsapp_cloud", "telegram"}
 TIMEOUT_SECONDS = 3
 
 # The fields a row must carry to be describable at all. A row missing any of
