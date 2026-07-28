@@ -8,7 +8,7 @@ const turnStartedSchema = z.object({
   event: z.literal("turn_started"),
   sessionId: z.string().min(1),
   turnId: z.string().min(1),
-  platform: z.enum(["whatsapp", "telegram"]),
+  platform: z.enum(["whatsapp", "whatsapp_cloud", "telegram"]),
   userMessage: z.string().nullish(),
   occurredAt: z.string().datetime(),
 });
@@ -17,7 +17,7 @@ const turnCompletedSchema = z.object({
   event: z.literal("turn_completed"),
   sessionId: z.string().min(1),
   turnId: z.string().min(1),
-  platform: z.enum(["whatsapp", "telegram"]),
+  platform: z.enum(["whatsapp", "whatsapp_cloud", "telegram"]),
   userMessage: z.string().min(1),
   assistantResponse: z.string().min(1),
   occurredAt: z.string().datetime(),

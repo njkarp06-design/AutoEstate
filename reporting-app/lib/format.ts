@@ -61,8 +61,16 @@ export function formatRelativeDateTime(epochSeconds: number): string {
   });
 }
 
+// "whatsapp" (the Baileys bridge) and "whatsapp_cloud" (the official Meta Cloud
+// API) are two distinct Hermes platforms, but they are the same channel to a
+// customer — both render as "WhatsApp". Use isWhatsAppSource for counting, so a
+// migration between the two never splits one channel across two figures.
+export function isWhatsAppSource(source: string): boolean {
+  return source === "whatsapp" || source === "whatsapp_cloud";
+}
+
 export function sourceLabel(source: string): string {
-  if (source === "whatsapp") return "WhatsApp";
+  if (isWhatsAppSource(source)) return "WhatsApp";
   if (source === "telegram") return "Telegram";
   return source;
 }

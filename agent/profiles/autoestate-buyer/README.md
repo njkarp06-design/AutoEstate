@@ -102,22 +102,60 @@ in `plugins.enabled`.
 adapter's intake prefilter but then routes unknown DMs into a pairing flow that
 a stranger would never complete.
 
-## ⚠ Both lockdowns are per-platform, and both are Telegram-only
+## ⚠ Both lockdowns are per-platform — now Telegram **and** WhatsApp
 
 `platform_toolsets` and the slash-command gating are keyed by platform name.
-They cover `telegram` (and `cli`). They do **not** cover WhatsApp.
+They cover `telegram`, `whatsapp` and `cli`.
 
-This matters because the buyer-channel transport is undecided and currently
-leans toward a second WhatsApp eSIM. Slash gating is switched on *by the
-presence of an admin list* — so a `platforms.whatsapp` block with no
-`allow_admin_from` puts every stranger back at admin tier on all ~68 commands,
-`/profile` included, which is precisely the escape route to the operator's
-outbound skills that this whole profile exists to prevent.
+Slash gating is switched on *by the presence of an admin list* — so any future
+platform block with no `allow_admin_from` puts every stranger back at admin tier
+on all ~68 commands, `/profile` included, which is precisely the escape route to
+the operator's outbound skills that this whole profile exists to prevent.
+**Add the gating in the same change as the transport, never after.**
 
-**Add the gating in the same change as the transport, never after.** No
-`platforms.whatsapp` block is pre-added here, because WhatsApp must stay
-*absent* from this profile rather than disabled (see `.env.example`) — an
-inert-looking block would contend with the operator profile's paired device.
+**Still uncovered, deliberately: `whatsapp_cloud`.** The official Meta Cloud API
+(which Hermes ships an adapter for) registers under that *distinct* platform
+name, so neither lockdown applies to it. Its admin id cannot be known until a
+real Cloud sender exists, and shipping untested gating would manufacture exactly
+the false confidence this section exists to prevent. Tracked as a deploy gate in
+`TODO.md`.
+
+### Two channels, one instance
+
+Buyers who found the property on **Yad2 or Instagram** reply on WhatsApp; buyers
+who found it on **Facebook** reply on Telegram. One Hermes gateway serves both
+simultaneously.
+
+The former rule here — *WhatsApp must be absent from this profile, never merely
+disabled, or it would contend with the operator profile's paired device* — was
+retired on 2026-07-28, not forgotten. Its rationale is now satisfied
+structurally: a **separate number**, a **separate session dir** (already
+profile-scoped) and a **separate bridge port**. Nothing is left to contend over.
+
+Two things about that port are worth knowing before touching this config:
+
+- `bridge_port: 3001` is **load-bearing**. The adapter defaults to 3000 and, on
+  gateway start, kills whatever holds that port to clear stale bridges — and on
+  the dev laptop 3000 is the **live operator bridge**.
+- **Pairing is safe regardless.** `hermes whatsapp` runs `bridge.js --pair-only`,
+  which starts no HTTP server at all, so pairing can be done at any time without
+  disturbing the operator bot.
+
+### Pairing the WhatsApp channel
+
+1. Get an SMS-capable number on a **dedicated** line — never the operator's,
+   never a personal one. This bot is public, and a Baileys ban takes that
+   number's WhatsApp with it.
+2. Register it on the WhatsApp Business app. You do **not** log the operator bot
+   out to do this; you need a free *slot* (a spare handset, or the multi-account
+   support in WhatsApp/WhatsApp Business).
+3. `hermes -p autoestate-buyer whatsapp` → choose **separate bot number** mode →
+   scan the QR from Settings → Linked Devices.
+4. Uncomment the three `WHATSAPP_*` vars in `.env`.
+
+**Keepalive:** a linked device is logged out if its primary phone account goes
+**14 days** without opening WhatsApp. If that happens the bridge silently drops
+and the buyer bot goes dark — an argument for leaving a spare device powered on.
 
 ## The third isolation layer: the credential
 

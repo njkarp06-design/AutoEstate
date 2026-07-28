@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Inquiry, InquiryStatus } from "@/lib/inquiries";
-import { formatRelativeDateTime, sourceLabel } from "@/lib/format";
+import { formatRelativeDateTime, isWhatsAppSource, sourceLabel } from "@/lib/format";
 import { StatTile } from "@/lib/stat-tile";
 
 type StatusFilter = "all" | InquiryStatus;
@@ -32,7 +32,7 @@ export function InquiryList({ inquiries }: { inquiries: Inquiry[] }) {
     (i) => i.disposition === "needs_you" && i.status !== "handled",
   ).length;
   const autoAnsweredCount = inquiries.length - needsYouCount;
-  const whatsappCount = inquiries.filter((i) => i.source === "whatsapp").length;
+  const whatsappCount = inquiries.filter((i) => isWhatsAppSource(i.source)).length;
   const telegramCount = inquiries.filter((i) => i.source === "telegram").length;
 
   return (

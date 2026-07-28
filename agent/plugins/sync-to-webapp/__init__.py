@@ -39,7 +39,13 @@ logger = logging.getLogger("plugins.sync-to-webapp")
 
 INGESTION_URL = os.getenv("AUTOESTATE_INGESTION_URL")
 INGESTION_SECRET = os.getenv("AUTOESTATE_INGESTION_SECRET")
-SYNCED_PLATFORMS = {"whatsapp", "telegram"}
+# "whatsapp" is the Baileys bridge; "whatsapp_cloud" is the official Meta Cloud
+# API, which Hermes ships a separate adapter for and which registers under that
+# DISTINCT name. It is listed here ahead of any migration on purpose: this set
+# cannot be shared with the other plugins (each is a standalone copy inside a
+# profile's plugins/ dir), so a missing entry here would silently no-op the
+# whole plugin on a Cloud instance rather than fail visibly.
+SYNCED_PLATFORMS = {"whatsapp", "whatsapp_cloud", "telegram"}
 
 # A dropped turn is permanent data loss - the Run, its messages, and any
 # Listing transition in that reply are simply never recorded, with nothing but

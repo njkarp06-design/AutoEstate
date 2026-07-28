@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Run } from "@/lib/db";
-import { formatRelativeDateTime, sourceLabel } from "@/lib/format";
+import { formatRelativeDateTime, isWhatsAppSource, sourceLabel } from "@/lib/format";
 import { StatTile } from "@/lib/stat-tile";
 
 type SourceFilter = "all" | "whatsapp" | "telegram";
@@ -15,7 +15,8 @@ export function RunList({ runs }: { runs: Run[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const filtered = runs.filter((run) => {
-    if (sourceFilter !== "all" && run.source !== sourceFilter) return false;
+    if (sourceFilter === "whatsapp" && !isWhatsAppSource(run.source)) return false;
+    if (sourceFilter === "telegram" && run.source !== "telegram") return false;
     if (statusFilter !== "all" && run.status !== statusFilter) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -27,7 +28,7 @@ export function RunList({ runs }: { runs: Run[] }) {
 
   const completedCount = runs.filter((r) => r.status === "completed").length;
   const inProgressCount = runs.length - completedCount;
-  const whatsappCount = runs.filter((r) => r.source === "whatsapp").length;
+  const whatsappCount = runs.filter((r) => isWhatsAppSource(r.source)).length;
   const telegramCount = runs.filter((r) => r.source === "telegram").length;
 
   return (

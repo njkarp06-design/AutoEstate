@@ -117,7 +117,7 @@ model Run {
   // being merged into whatever session it happens to share with unrelated
   // earlier or later listings.
   hermesTurnId    String
-  source          String // "whatsapp" | "telegram"
+  source          String // "whatsapp" | "whatsapp_cloud" | "telegram"
   displayName     String?
   startedAt       DateTime
   title           String?
@@ -240,7 +240,7 @@ model Inquiry {
   // never deletes the lead.
   listing         Listing?         @relation(fields: [listingId], references: [id], onDelete: SetNull)
   listingId       String?
-  source          String // "whatsapp" | "telegram"
+  source          String // "whatsapp" | "whatsapp_cloud" | "telegram"
   status          InquiryStatus    @default(NEEDS_OPERATOR)
   title           String?
   startedAt       DateTime

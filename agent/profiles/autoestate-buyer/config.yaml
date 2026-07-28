@@ -43,22 +43,25 @@ skills:
 curator:
   enabled: false
 
-# --- ⚠ BOTH LOCKDOWNS BELOW ARE TELEGRAM-ONLY ------------------------------
+# --- ⚠ BOTH LOCKDOWNS BELOW ARE KEYED BY PLATFORM --------------------------
 # `platform_toolsets` and the slash-command gating are keyed BY PLATFORM. They
-# cover `telegram` (and `cli`) and nothing else. The buyer-channel transport is
-# still an open decision in TODO.md, currently leaning toward a second WhatsApp
-# eSIM - and switching to it without adding the equivalent `platforms.whatsapp.
-# extra.allow_admin_from` / `user_allowed_commands` block silently restores the
-# exact hole PR #34 was created to close: gating is enabled only by the presence
-# of an admin list, so with none set every stranger is back to admin tier on all
-# ~68 commands, /profile included, which hands them the operator's outbound
-# Listing-mutating skills.
+# now cover `telegram` and `whatsapp` (plus `cli`) - the buyer-channel transport
+# decision was settled as BOTH channels, because Facebook-sourced buyers reply
+# on Telegram while Yad2/Instagram-sourced buyers reply on WhatsApp.
 #
-# No `platforms.whatsapp` block is pre-added here on purpose - see the note at
-# the bottom of this file: WhatsApp must stay ABSENT from this profile, not
-# merely disabled, so it can never contend with the operator profile's paired
-# device. Add the gating at the same time as the transport, never before.
-# Tracked as a deploy gate in TODO.md.
+# The rule that produced this shape still stands for any FUTURE platform:
+# gating is enabled only by the presence of an admin list, so adding a platform
+# without an `extra.allow_admin_from` block silently restores the exact hole
+# PR #34 was created to close - every stranger back to admin tier on all ~68
+# commands, /profile included, which hands them the operator's outbound
+# Listing-mutating skills. Add the gating in the SAME change as the transport.
+#
+# STILL OPEN, and deliberately so: `whatsapp_cloud` (the official Meta Cloud
+# API, which Hermes ships an adapter for) registers as a DISTINCT platform name
+# and is covered by NEITHER lockdown below. Its admin id is unknowable until a
+# real Cloud sender exists, so writing untested gating for it now would create
+# exactly the false sense of safety this note exists to prevent. Tracked as a
+# deploy gate in TODO.md.
 
 # --- Tool lockdown, layer 1: per-platform allowlist ------------------------
 # _get_platform_tools() uses DIRECT MEMBERSHIP when the saved list contains
@@ -69,6 +72,13 @@ curator:
 # proven via hermes -z.
 platform_toolsets:
   telegram:
+    - skills
+  # WhatsApp needs its OWN entry: without one it falls back to the platform
+  # default, which resolves to [clarify, skills] rather than [skills]. Verified
+  # by resolving both before and after adding this line - with it, whatsapp and
+  # telegram both resolve to the identical 3 tools (skills_list, skill_view,
+  # skill_manage) and nothing non-configurable is recovered into it.
+  whatsapp:
     - skills
   cli:
     - skills
@@ -157,6 +167,68 @@ platforms:
       group_user_allowed_commands:
         - start
 
+  # --- WhatsApp (the Yad2 / Instagram buyer channel) ----------------------
+  # Buyers who found the property on Yad2 or Instagram reply on WhatsApp;
+  # Facebook-sourced buyers reply on Telegram. Both channels run from this one
+  # instance - a Hermes gateway serves multiple platforms simultaneously (the
+  # operator profile has done so since 2026-07-22).
+  #
+  # This runs the UNOFFICIAL Baileys bridge against a dedicated second number,
+  # never the operator's and never a personal one: a public bot auto-replying
+  # to strangers is the highest ban-exposure surface in the product, and a ban
+  # kills that number's WhatsApp outright. The official Cloud API has no ban
+  # risk and Hermes ships an adapter for it, but it needs a public HTTPS
+  # webhook, so it is blocked behind the Hetzner deploy. See TODO.md.
+  whatsapp:
+    extra:
+      # ⚠ DESTRUCTIVE IF WRONG - do not "tidy" this back to the default.
+      # The adapter defaults to bridge_port 3000 and, on gateway start, calls
+      # _kill_port_process(bridge_port) to clear orphaned bridges. Port 3000 is
+      # the LIVE OPERATOR bridge on the dev laptop. Session dirs are already
+      # profile-scoped, so the port is the ONLY thing that collides.
+      # (Pairing is safe regardless: `hermes whatsapp` runs bridge.js
+      # --pair-only, which explicitly starts no HTTP server.)
+      # On a dedicated per-customer buyer box there is no operator bridge to
+      # collide with, so this is dev-laptop coexistence, not a production need.
+      bridge_port: 3001
+      # Strangers must reach the agent directly. dm_policy defaults to
+      # "pairing", which would answer a buyer's first message with a pairing
+      # prompt they can never complete - the WhatsApp equivalent of the empty-
+      # allowlist trap that bit the Telegram spike.
+      dm_policy: open
+      # Groups OFF - deliberately unlike the Telegram block above. A public
+      # WhatsApp number gets added to groups by spammers, and the receptionist
+      # has no business participating in one. Telegram's block allows groups
+      # because a bot cannot be added to a Telegram group the same way.
+      group_policy: disabled
+      # MACHINE-SPECIFIC - change per deployment. The dev operator's real
+      # WhatsApp identity, read from the operator profile's own state.db, not
+      # guessed: WhatsApp identifies senders by LID, not by phone number.
+      #
+      # The "@lid" suffix is REQUIRED and was resolved, not assumed: against
+      # the real policy code, "107186009169928@lid" grants admin while the bare
+      # "107186009169928" does not - the slash layer does no normalising, even
+      # though the bridge's own allowlist does.
+      #
+      # Residual: that value is what Hermes RECORDS as the session user_id for
+      # real WhatsApp traffic, which is the best evidence available before a
+      # live buyer sends a slash command. If the runtime form ever differs, it
+      # fails CLOSED - the list's PRESENCE is what switches gating on, so the
+      # operator would merely lose admin here (they still have Telegram/CLI)
+      # and no stranger gains anything.
+      allow_admin_from:
+        - "107186009169928@lid"
+      group_allow_admin_from:
+        - "107186009169928@lid"
+      # Empty ON PURPOSE, and not a copy of Telegram's `start`. Telegram needed
+      # `start` because it is the button shown in every new bot chat, and
+      # omitting it made a real buyer's first tap a permissions refusal.
+      # WhatsApp has no such entry point - verified: the WhatsApp adapter
+      # registers no commands at all. Strangers therefore get only the
+      # hardcoded _ALWAYS_ALLOWED_FOR_USERS floor of /help and /whoami.
+      user_allowed_commands: []
+      group_user_allowed_commands: []
+
 # --- Memory off ------------------------------------------------------------
 # On a public instance, agent memory and the user profile are a poisoning
 # vector: a stranger could write durable state that colours later replies to
@@ -179,9 +251,17 @@ plugins:
     - buyer-listings-context
     - sync-inquiries-to-webapp
 
-# NOTE: there is deliberately no `whatsapp:` block and no WHATSAPP_* env.
-# WhatsApp is not merely disabled — it is absent, so this instance can never
-# contend with the operator profile's paired device.
+# NOTE: WhatsApp is now a real second buyer channel (block above). The former
+# invariant here - "WhatsApp must be ABSENT, never merely disabled, so this
+# instance can never contend with the operator profile's paired device" - was
+# retired deliberately on 2026-07-28, not forgotten. Its rationale is satisfied
+# structurally instead: a SEPARATE number (its own WhatsApp account), a
+# SEPARATE session dir (already profile-scoped) and a SEPARATE bridge port. The
+# two instances therefore have nothing left to contend over.
+#
+# What still holds from it: `WHATSAPP_ENABLED=false` does NOT stop Hermes
+# attempting a connection, so the WHATSAPP_* vars ship COMMENTED OUT in
+# .env.example and are uncommented only once a number is actually paired.
 
 # --- First-contact onboarding note OFF ---------------------------------------
 # Hermes injects a note into the very first message ever for a profile telling

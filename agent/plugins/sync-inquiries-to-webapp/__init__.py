@@ -63,7 +63,13 @@ if INGESTION_URL and not INQUIRIES_URL:
         INGESTION_URL,
     )
 
-SYNCED_PLATFORMS = {"whatsapp", "telegram"}
+# "whatsapp" is the Baileys bridge; "whatsapp_cloud" is the official Meta Cloud
+# API, which Hermes ships a separate adapter for and which registers under that
+# DISTINCT name. Listed ahead of any migration on purpose: this set cannot be
+# shared with the other plugins (each is a standalone copy inside a profile's
+# plugins/ dir), so a missing entry would silently no-op this plugin on a Cloud
+# instance rather than fail visibly.
+SYNCED_PLATFORMS = {"whatsapp", "whatsapp_cloud", "telegram"}
 
 # See sync-to-webapp for the full rationale; same policy, same reason. A
 # dropped buyer turn loses the lead itself, which is the one thing this
