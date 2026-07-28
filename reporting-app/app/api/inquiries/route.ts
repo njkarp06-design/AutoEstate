@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authenticateMachineRequest } from "@/lib/ingest-auth";
 import { replyDefersToOperator } from "@/lib/inquiries";
+import { extractRefCodes } from "@/lib/ref-code";
 import { notifyOperatorOfLead } from "@/lib/notify-operator";
 
 // Inbound counterpart to /api/ingest. Same server-to-server bearer auth
@@ -215,11 +216,12 @@ async function fillBuyerContactIfEmpty(
 }
 
 // Conservative, best-effort: link the inquiry to a listing only when exactly
-// one of the customer's listing areas is named by the BUYER. The buyer skill
-// emits no Listing Record footer (it only reads), so unlike /api/ingest
-// there's no structured marker to parse - this is a soft area-mention match,
-// deliberately no-op unless it's unambiguous. Never overwrites an existing
-// link (once pinned, it stays).
+// the BUYER either quotes a listing's ref code or names its area. The code is
+// exact and is tried first; the area match is a soft mention match and is
+// deliberately a no-op unless unambiguous. The buyer skill emits no Listing
+// Record footer (it only reads), so unlike /api/ingest there is no structured
+// marker in the reply to parse. Never overwrites an existing link (once
+// pinned, it stays).
 //
 // Matches the buyer's own message only, NOT the bot's reply. Since
 // buyer-inquiry v0.2.0 the bot proactively names ACTIVE candidates the buyer
@@ -243,8 +245,34 @@ async function maybeLinkListing(
 
   const listings = await prisma.listing.findMany({
     where: { customerId },
-    select: { id: true, area: true },
+    select: { id: true, area: true, refCode: true },
   });
+
+  // A ref code is checked FIRST and wins outright: it is an exact identifier
+  // the buyer carried from the property's own ad, not an inference from prose.
+  //
+  // This is not an optimisation, it repairs a gap ref codes themselves opened.
+  // The area match below reads the buyer's message, and a buyer who arrives by
+  // ad link never types an area - their whole first message is "Hi, I'm
+  // interested in REF-V42TS". So the best-identified lead in the system, the
+  // one who came off a real ad, was the one lead that failed to link. Found by
+  // a live test on 2026-07-28; no dry run covered it, because the ingest-side
+  // tests exercised Listing tracking rather than this linker.
+  //
+  // Same "exactly one distinct match" conservatism as below: two codes in one
+  // message is real ambiguity and links nothing.
+  // A code matching nothing deliberately falls THROUGH to the area match below
+  // rather than returning: it may be a typo or point at a deleted listing, and
+  // the buyer may still have named the area in the same message.
+  const codes = new Set(extractRefCodes(buyerMessage));
+  const byCode = listings.filter((l) => l.refCode && codes.has(l.refCode));
+  if (new Set(byCode.map((l) => l.id)).size === 1) {
+    await prisma.inquiry.update({
+      where: { id: inquiryId },
+      data: { listingId: byCode[0].id },
+    });
+    return;
+  }
   // Match on the area's leading segment, not the whole stored string. Areas
   // are stored as "Rothschild Boulevard, Tel Aviv" (the skills' footer format)
   // but nobody types the city, and most don't type the street type either -
