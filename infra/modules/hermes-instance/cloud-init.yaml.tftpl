@@ -15,6 +15,14 @@ write_files:
       AUTOESTATE_CUSTOMER_ID=${customer_id}
       AUTOESTATE_INGESTION_URL=${ingestion_api_url}
       WHATSAPP_ALLOWED_USERS=${whatsapp_allowed_users}
+      # Suppresses the one-time "📬 No home channel is set … Type /sethome"
+      # prompt, which fires on any session with no history - i.e. the
+      # customer's very first message to their own new bot. Pointed at their
+      # own number (the only allowed sender), so any future cron output goes
+      # to them. Setting it to ANY value suppresses the prompt; the exact
+      # chat-id format only matters once cron delivery is actually used, so
+      # re-check it then rather than assuming - see TODO item 3.
+      WHATSAPP_HOME_CHANNEL=${whatsapp_allowed_users}
       # ANTHROPIC_API_KEY and AUTOESTATE_INGESTION_SECRET are deliberately
       # not written here - the null_resource.inject_secrets provisioner in
       # main.tf injects both post-boot over SSH instead, so either can be
@@ -48,6 +56,31 @@ write_files:
           - sync-to-webapp
           - listing-footer-reminder
           - active-listings-context
+      # Presentation. Hermes's WhatsApp defaults are TIER_MEDIUM
+      # (gateway/display_config.py) because the Baileys bridge supports
+      # message editing - which surfaces tool breadcrumbs like
+      # "📚 Reading skill listing-to-social" mid-answer. A customer is not
+      # watching an agent work; they want the captions. Verified on the dev
+      # instance 2026-07-28 after a real conversation showed exactly that.
+      agent:
+        # First holding message after 10s instead of Hermes's 180s default -
+        # caption generation takes 10-30s, so at the default the customer
+        # would only ever see "typing…". It edits one bubble rather than
+        # sending a new message per interval.
+        gateway_notify_interval: 10
+      display:
+        platforms:
+          whatsapp:
+            tool_progress: off
+            interim_assistant_messages: false
+            busy_ack_detail: false
+            long_running_notifications: generic
+            cleanup_progress: true
+            status_phrases:
+              mode: replace
+              status:
+                - "Working on that now — one moment."
+                - "Still on it — nearly there."
       # NO SLASH-COMMAND GATING HERE, and that is a known, accepted grant
       # rather than an oversight. gateway/slash_access.py computes
       # `enabled = bool(admin_ids)`, so with no `platforms.*.extra.

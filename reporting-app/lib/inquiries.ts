@@ -21,16 +21,28 @@ function toInquiryStatus(status: DbInquiryStatus): InquiryStatus {
   return status === "HANDLED" ? "handled" : "needs_operator";
 }
 
-// Stable fragments of the buyer-inquiry skill's canonical defer sentence, in
-// each language. Matched as substrings rather than the whole sentence so a
-// stray punctuation/quote difference can't silently drop a real defer. This is
-// a REAL COUPLING with
+// Stable fragments of the buyer-inquiry skill's canonical defer sentences, in
+// each language. Matched as substrings rather than whole sentences so a stray
+// punctuation/quote difference can't silently drop a real defer. This is a
+// REAL COUPLING with
 // agent/skills-buyer/real-estate/buyer-inquiry/SKILL.md's "Deferring to the
-// agent + capturing the lead" section - if the canonical sentence there
+// agent + capturing the lead" section - if the canonical wording there
 // changes, change these.
+//
+// That section defines TWO variants (before vs. after the buyer has given a
+// contact). Match on the clause they SHARE, not on either variant in full.
 const DEFER_FRAGMENTS = [
-  "passed your details along to the agent", // English
-  "העברתי את הפרטים שלך לסוכן", // Hebrew
+  // The clause BOTH defer variants share, and the one to match on going
+  // forward. The skill has two variants because claiming "I've passed your
+  // details along" before the buyer has given any is a lie the bot was
+  // actually telling (fixed 2026-07-28) - but both end with this clause.
+  "get back to you personally", // English  - shared by both variants
+  "יחזור אליך באופן אישי", // Hebrew   - shared by both variants
+  // Kept deliberately: replies stored BEFORE the two-variant split contain
+  // only these. Dropping them would silently reclassify every historical
+  // lead as auto_answered, hiding leads an operator still owes a call.
+  "passed your details along to the agent", // English (legacy)
+  "העברתי את הפרטים שלך לסוכן", // Hebrew (legacy)
 ];
 
 /**
