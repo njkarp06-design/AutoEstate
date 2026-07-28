@@ -2,7 +2,7 @@
 
 Next.js dashboard for a non-technical client to review what the AutoEstate agent has generated — one entry per WhatsApp/Telegram listing, the raw facts sent in, and the generated Instagram/Facebook/Yad2 content split into independently reviewable, editable sections. Not purely read-only: an agent can edit generated content, mark a platform as posted, and set an Instagram posting-mode preference (manual / auto-post immediately / auto-post after edit — the auto options are stored but inert pending a real Meta integration).
 
-**Status (2026-07-27):** the redesigned UI (#13), turn grouping (#15), the Listings page (#21), the buyer-inquiry Inquiries dashboard (#34), two `/inspect` correctness sweeps (#37 and #43), and role-scoped machine credentials (#46) are all merged. Still **only ever run locally** (`npm run dev`, port 4127); not deployed to Vercel Pro, which is a tracked next step. (Deliberately not a running PR list — that goes stale on the next merge; `gh pr list --state all` is the source of truth.)
+**Status (2026-07-28):** the redesigned UI, turn grouping, the Listings and Inquiries pages, two `/inspect` correctness sweeps, role-scoped machine credentials, and listing `features` are all merged. Still **only ever run locally** (`npm run dev`, port 4127); not deployed to Vercel Pro, which is a tracked next step. (Deliberately not a running PR list — that goes stale on the next merge; `gh pr list --state all` is the source of truth.)
 
 ## Data source
 
@@ -29,14 +29,14 @@ To register a new customer after provisioning their Hermes instance (see `infra/
 
 ## Structure
 
-- `prisma/schema.prisma` — `Customer` (incl. `instagramPostMode`, `operatorTelegramChatId`), `Run`, `RunMessage`, `RunPlatformContent`, `Listing` (+ `ListingStatus`), and `Inquiry`/`InquiryMessage` (+ `InquiryStatus`) models.
+- `prisma/schema.prisma` — `Customer` (incl. `instagramPostMode`, `operatorTelegramChatId`), `Run`, `RunMessage`, `RunPlatformContent`, `Listing` (+ `ListingStatus`, + nullable free-text `features`), and `Inquiry`/`InquiryMessage` (+ `InquiryStatus`) models.
 - `lib/listings.ts` + `lib/listing-record.ts` — the `Listing` lifecycle. Skills append a fixed-format "Listing Record" footer to their replies; `listing-record.ts` parses **every** footer in a reply (not just the last), and `/api/ingest` matches on `(customerId, area, rooms, sqm)` to update in place rather than duplicate.
 - `lib/inquiries.ts` — buyer leads. Two deliberately separate axes: stored `status` (operator triage, NEEDS_OPERATOR→HANDLED) and computed display-only `disposition` (did any bot reply in the thread defer to a human?). **`replyDefersToOperator` is a real coupling with the `buyer-inquiry` skill** — it matches fragments of that skill's canonical defer sentence in both languages, so if the sentence changes, this matcher must too.
 - `lib/notify-operator.ts` — best-effort Telegram push to the operator when a lead defers, routed per customer via `Customer.operatorTelegramChatId`. Inert until `OPERATOR_TELEGRAM_BOT_TOKEN` is set.
 - `lib/ingest-auth.ts` — shared bearer-secret auth for the machine-facing routes.
 - `app/api/inquiries/route.ts` — inbound buyer turns from the locked-down buyer instance. One `Inquiry` per **session** (a buyer thread is one lead to keep together) — the opposite of `Run`'s per-turn key.
 - `app/api/listings/active/route.ts` — ACTIVE only, read by the operator instance for digests and locator lookup.
-- `app/api/listings/buyer-view/route.ts` — **all** statuses including SOLD, so the buyer bot can be honest about a property being gone.
+- `app/api/listings/buyer-view/route.ts` — **all** statuses including SOLD, so the buyer bot can be honest about a property being gone. Also the only route exposing `Listing.features`, which is what lets it answer amenity questions instead of deferring.
 - `app/listings/` and `app/inquiries/` — the Listings and Inquiries pages (the latter with a stat strip, search/status filter, full thread and mark-handled).
 - `proxy.ts` — Clerk middleware; the machine-facing API routes above are explicitly listed as public (they use bearer auth, not a Clerk session).
 - `lib/db.ts` — customer-scoped Prisma queries and mutations (`getRuns`, `getRun`, `setPlatformEditedContent`, `resetPlatformEditedContent`, `setPlatformPosted`). Both `getRuns`/`getRun` group per-turn `Run` rows into per-listing display groups via `lib/run-grouping.ts` before returning anything.

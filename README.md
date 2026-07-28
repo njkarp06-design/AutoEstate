@@ -5,8 +5,8 @@ Marketing automation for independent real estate agents in Tel Aviv.
 An agent sends listing facts to a WhatsApp number and gets back ready-to-post,
 bilingual (Hebrew + English) content for Instagram, Facebook and Yad2 — written
 only from the facts they actually gave, never invented. Prospective buyers
-message a separate public number and get honest answers about a property 24/7,
-captured as leads. Both sides show up in a web dashboard the agent logs into.
+message a separate public bot — on WhatsApp or Telegram — and get honest answers
+about a property 24/7, captured as leads. Both sides show up in a web dashboard the agent logs into.
 
 Built on [Hermes](https://github.com/NousResearch/hermes), an open-source CLI
 agent, with one dedicated instance per customer.
@@ -26,9 +26,11 @@ place") instead of restating every fact. Posting stays manual — the agent
 reviews and publishes.
 
 **Inbound — for buyers.** A separate, locked-down instance answers strangers'
-questions about a property from real listing data, is honest when something is
-already sold, defers anything human (a viewing, an offer, a fact it wasn't
-given) to the agent, and captures the buyer's contact details as a lead.
+questions about a property from real listing data — including stated amenities
+like parking or a lift — is honest when something is already sold, defers
+anything human (a viewing, an offer, a fact it wasn't given) to the agent, and
+captures the buyer's contact details as a lead. It runs on WhatsApp and Telegram
+together, because buyers reply on whichever platform the ad reached them on.
 
 **The dashboard.** A Next.js app where the agent reviews generated content
 per platform, edits it, marks it posted, sees their live listings, and works
@@ -37,8 +39,7 @@ through buyer leads.
 ## Current state
 
 **All planned features are built, live-tested against real WhatsApp and
-Telegram traffic, and merged.** The last of them, the buyer-inquiry
-receptionist, shipped in PR #34 on 2026-07-26.
+Telegram traffic, and merged.**
 
 **Not yet deployed.** Everything runs locally today: the reporting app via
 `npm run dev`, the agent instances on a development machine. The Terraform
