@@ -51,7 +51,7 @@ Two account-level steps remain the real gate for a pilot — both need the owner
 
 **Channel consolidation (TODO item 12), decided 2026-07-28.** Two halves of it need nothing from Hetzner or Meta and are the obvious next build:
 
-- **12a — operator channel to Telegram.** Config, not code; the Telegram path is already built and live-tested. Halves the per-customer number count on its own.
+- **12a — operator channel to Telegram.** Scoped 2026-07-28 and **smaller than it looked**: the dev operator profile already runs Telegram on a **live** token (`@autoestate_test_bot`, verified via `getMe`), so nothing needs standing up. The real gap is that the **Terraform template ships no Telegram at all** — customers get WhatsApp only. Blocked on one decision that changes the diff: does Telegram *replace* the operator's WhatsApp bot (which is what saves the number) or run alongside it? Note CLAUDE.md §5's operator-parity recipe would not have caught this — it doesn't compare platform blocks.
 - **12d — per-listing ref codes. BUILT 2026-07-28**, migration applied to dev and the 4 existing listings backfilled. `buyer-inquiry` 0.4.0, `buyer-listings-context` 1.2. **Two things left:** copy the plugin into the live `autoestate-buyer` profile after merge (merging deploys nothing — but that gateway is stopped by design, so it picks it up on next start), and get a real person to tap a real ad link, which has never happened.
 
 12b (buyer → Cloud API) is blocked on Hetzner: it needs a public HTTPS webhook, which the module's no-inbound-but-SSH firewall forbids. When it happens, **close the `whatsapp_cloud` lockdown gate in the same change** — it is a distinct platform name, so neither `platform_toolsets` nor slash gating covers it today.

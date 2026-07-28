@@ -67,12 +67,24 @@ The original option list is kept below for the reasoning, now historical:
 
 **Decided: operator → Telegram, buyer → Cloud API.** Result is **one number per customer**, minted from Meta rather than a SIM shop.
 
-### 12a. Operator channel → Telegram (not blocked, config not code)
-Telegram bots need **no phone number**, are free and unlimited, and the path is already built and live-tested. Safe to ask of an operator (a paying customer being onboarded) in a way it would never be safe to ask of a buyer who just tapped a Yad2 ad.
-- [ ] Decide whether this replaces the operator's WhatsApp bot or runs alongside it during transition. Accepted cost: it cuts against the brief's "WhatsApp-native, no habit change" premise **for the agent** — not for the buyer, where it actually matters.
-- [ ] Stand up an operator Telegram bot on the dev `autoestate` profile and live-test the full outbound flow (all five skills, footer → ingest → `Listing`).
-- [ ] Slash-command gating: the operator profile currently sets no `allow_admin_from`, so gating is **off**. Same open question as item 3's bullet — settle both together.
-- [ ] Parameterise in the Terraform template once it holds.
+### 12a. Operator channel → Telegram (not blocked, and smaller than it looked)
+
+Telegram bots need **no phone number**, are free and unlimited. Safe to ask of an operator (a paying customer being onboarded) in a way it would never be safe to ask of a buyer who just tapped a Yad2 ad.
+
+**Scoped 2026-07-28 by inspecting the real profile and the real module, and it is mostly a Terraform gap, not a Hermes one:**
+
+- **The dev operator profile ALREADY runs Telegram.** `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALLOWED_USERS` are both set and the gateway reports 2 platforms. The token is **live**, verified via `getMe` rather than assumed → `@autoestate_test_bot` ("AutoEstate Test Bot", id 8962589159). So there is nothing to stand up here; the channel exists and is reachable today.
+- **But it is the disposable pre-eSIM stand-in bot from 2026-07-21**, still named "Test Bot". Fine for testing, wrong on a customer's screen. BotFather's `/setname` and `/setabout` change this **without changing the token**, so no re-provisioning — but decide the product name first.
+- **The Terraform template ships NO Telegram at all** — zero references in `cloud-init.yaml.tftpl` or the module's `.tf` files. **Customers get WhatsApp only.** This is the real work in 12a, and it is the same drift class as PR #37 (the module lagging the dev profile).
+- **Blind spot worth knowing:** CLAUDE.md §5's operator-config parity recipe would **not** have caught this. It deliberately compares only `plugins.enabled`, `agent.gateway_notify_interval` and `display.platforms.whatsapp.*` — a missing *platform block* isn't in scope. Widen it, or check platforms separately.
+- **`can_join_groups: True`** on this bot too — same spam surface already flagged for the buyer bot in item 10.
+
+**Remaining checklist:**
+- [ ] **Decide first, because it changes the Terraform diff: does Telegram REPLACE the operator's WhatsApp bot, or run alongside it?** Replacing is what actually saves the number; running both saves nothing but eases transition. Accepted cost of replacing: it cuts against the brief's "WhatsApp-native, no habit change" premise **for the agent** — not for the buyer, where it actually matters.
+- [ ] Rename the bot via BotFather (`/setname`, `/setabout`) once a product name is chosen — token unchanged, no redeployment.
+- [ ] Add Telegram to `infra/modules/hermes-instance/` (env vars + platform block), and drop WhatsApp there if the decision above is "replace". A per-customer bot token becomes a Terraform variable.
+- [ ] Live-test the full outbound flow over Telegram on the dev profile — all five skills, and footer → ingest → `Listing`. The DB has **0** Telegram runs: that channel has never carried a real listing, because its only use predates the sync plugin.
+- [ ] Slash-command gating: the operator profile sets no `allow_admin_from`, so gating is **off** and the allowlisted operator holds all ~68 commands. Same open question as item 3's last bullet — settle both together, with a real instance in front of you.
 
 ### 12b. Buyer channel → official WhatsApp Cloud API (blocked on Hetzner)
 One Meta app / WABA hosts **many numbers**, each with its own `phone_number_id`, all delivering to **one webhook**. No eSIM, no handset, no OTP, no 14-day keepalive, no ban risk, and the customer advertises their real business number. Hermes already ships the adapter — see item 7, which this absorbs.
