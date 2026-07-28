@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentCustomer } from "@/lib/customer";
 import { updateInstagramPostModeAction } from "./actions";
 import { TelegramChatIdForm } from "./telegram-chat-id-form";
+import { BuyerNumberForm } from "./buyer-number-form";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +109,21 @@ export default async function SettingsPage() {
         </p>
 
         <TelegramChatIdForm defaultValue={customer.operatorTelegramChatId ?? ""} />
+      </section>
+
+      <section className="mt-10 border-t border-card-border pt-6">
+        <h2 className="font-mono text-xs uppercase tracking-widest text-brand">
+          Your buyer WhatsApp number
+        </h2>
+        <p className="mt-1.5 text-sm text-status-muted">
+          The number buyers message when they tap the link in your ad. Add it
+          and every listing gets a ready-to-paste ad link that opens WhatsApp
+          with its reference code already filled in, so the assistant knows
+          exactly which property they&apos;re asking about. Leave blank and
+          your listings still show their code, just without a link.
+        </p>
+
+        <BuyerNumberForm defaultValue={customer.buyerWhatsappNumber ?? ""} />
       </section>
 
       <section className="mt-10 border-t border-card-border pt-6">

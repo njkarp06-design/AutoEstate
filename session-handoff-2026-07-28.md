@@ -30,7 +30,8 @@ Verified **2026-07-28** by listing processes, hashing files, calling the routes 
 | Repo↔live plugin parity | 5/5, split by role — operator has `sync-to-webapp` / `listing-footer-reminder` / `active-listings-context`, buyer has `buyer-listings-context` / `sync-inquiries-to-webapp` |
 | Repo↔live buyer `config.yaml` | no drift (parsed YAML, excluding the `MACHINE-SPECIFIC` keys) |
 | Terraform template ↔ dev operator profile | 0 drift on product-decision keys (new recipe, CLAUDE.md §5) |
-| Dev database | 1 customer; 23 runs; 4 listings (2 ACTIVE — Rothschild *with features*, Neve Tzedek; 2 SOLD — Ben Gurion, Dizengoff); **4 inquiries** (2 Telegram, 2 WhatsApp), 2 with a captured contact |
+| Dev database | 1 customer; 23 runs; 4 listings (2 ACTIVE — Rothschild *with features*, Neve Tzedek; 2 SOLD — Ben Gurion, Dizengoff), **all 4 now carrying ref codes**; **4 inquiries** (2 Telegram, 2 WhatsApp), 2 with a captured contact |
+| Reporting-app schema | migration `20260728193000_add_listing_ref_code_and_buyer_number` applied 2026-07-28; `prisma migrate status` clean, dev server restarted after |
 | `lint` / `tsc` / `terraform fmt` / `validate` | all clean |
 
 ### What to do next
@@ -51,7 +52,7 @@ Two account-level steps remain the real gate for a pilot — both need the owner
 **Channel consolidation (TODO item 12), decided 2026-07-28.** Two halves of it need nothing from Hetzner or Meta and are the obvious next build:
 
 - **12a — operator channel to Telegram.** Config, not code; the Telegram path is already built and live-tested. Halves the per-customer number count on its own.
-- **12d — per-listing ref codes.** Worth doing whether or not the shared-number idea (12c) is ever built, and a prerequisite if it is: a code in the deep link means the bot knows the exact listing from message one, so `buyer-inquiry`'s disambiguation branch mostly stops firing. Needs a `Listing.refCode` migration — **apply it before deploying any plugin that reads it**, per the standing ordering rule.
+- **12d — per-listing ref codes. BUILT 2026-07-28**, migration applied to dev and the 4 existing listings backfilled. `buyer-inquiry` 0.4.0, `buyer-listings-context` 1.2. **Two things left:** copy the plugin into the live `autoestate-buyer` profile after merge (merging deploys nothing — but that gateway is stopped by design, so it picks it up on next start), and get a real person to tap a real ad link, which has never happened.
 
 12b (buyer → Cloud API) is blocked on Hetzner: it needs a public HTTPS webhook, which the module's no-inbound-but-SSH firewall forbids. When it happens, **close the `whatsapp_cloud` lockdown gate in the same change** — it is a distinct platform name, so neither `platform_toolsets` nor slash gating covers it today.
 

@@ -139,6 +139,18 @@ def inject_buyer_listings_context(session_id, turn_id, user_message, platform, *
             "answer — say so and defer to the agent. Never answer \"no\" about a "
             "feature just because it isn't listed, and never infer one from the "
             "area, the price or the other features.",
+            # Also lives here rather than only in SKILL.md, for the same reason
+            # as the features rule: a conversation already in progress never
+            # reloads the skill file, so an in-flight buyer would otherwise
+            # never benefit from code matching.
+            "REF CODES: a listing may show a code like REF-K7M2P. Buyers arrive "
+            "from an ad link that prefills that code, so if their message "
+            "contains one, it identifies the property EXACTLY — use that "
+            "listing and do not ask which one they mean. A code always wins "
+            "over a guess from the area. If the code in their message matches "
+            "no listing here, say you can't find that reference and defer — "
+            "never fall back to picking a property that looks similar. If they "
+            "mention two different codes, ask which one they mean.",
         ]
         lines = list(header)
         for listing in listings:
@@ -161,8 +173,19 @@ def inject_buyer_listings_context(session_id, turn_id, user_message, platform, *
                 if isinstance(raw_features, str) and raw_features.strip()
                 else ""
             )
+            # Deliberately NOT in REQUIRED_FIELDS, same reasoning as features:
+            # rows created before the column existed have no code, and treating
+            # that as malformed would drop real listings out of the buyer's
+            # context entirely - a far worse outcome than one row that can only
+            # be matched by area.
+            raw_code = listing.get("refCode")
+            code = (
+                f"REF-{raw_code.strip()} — "
+                if isinstance(raw_code, str) and raw_code.strip()
+                else ""
+            )
             lines.append(
-                f"- {listing['area']}, {listing['rooms']} rooms, {listing['sqm']} sqm, "
+                f"- {code}{listing['area']}, {listing['rooms']} rooms, {listing['sqm']} sqm, "
                 f"{floor}, {price} ({listing['transactionType']}) "
                 f"— STATUS: {listing['status']}{features}"
             )

@@ -3,6 +3,32 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authenticateMachineRequest } from "@/lib/ingest-auth";
 import { parseListingRecords } from "@/lib/listing-record";
+import { generateRefCode } from "@/lib/ref-code";
+
+/**
+ * A ref code that no listing currently holds.
+ *
+ * Runs inside the caller's Serializable transaction, so the check-then-use is
+ * not racy the way it would be at READ COMMITTED, and the column's unique
+ * constraint is the backstop if it ever were. Retries because the alphabet is
+ * deliberately small and human-readable rather than collision-proof by size.
+ *
+ * Returns null rather than throwing when it can't find a free code: a listing
+ * with no code is a listing you can't deep-link to, which is a degraded
+ * feature. Failing here instead would abort the transaction and lose the
+ * Listing row entirely, which is a lost listing - strictly worse, and the
+ * exact silent-untracked-listing failure this file has produced twice before.
+ */
+async function allocateRefCode(
+  tx: { listing: { findUnique: (a: { where: { refCode: string } }) => Promise<unknown> } },
+): Promise<string | null> {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = generateRefCode();
+    if (!(await tx.listing.findUnique({ where: { refCode: code } }))) return code;
+  }
+  console.error("ingest: could not allocate a unique listing refCode after 8 attempts");
+  return null;
+}
 
 const turnStartedSchema = z.object({
   event: z.literal("turn_started"),
@@ -206,6 +232,12 @@ export async function POST(request: NextRequest) {
               price: record.price,
               status: record.status,
               features: record.features,
+              // Only ever set on CREATE. A code that has been printed in a
+              // live ad must keep resolving to the same property for as long
+              // as that ad exists, so the update branch above deliberately
+              // leaves it alone - reissuing one would silently break every
+              // buyer who taps an older link.
+              refCode: await allocateRefCode(tx),
             },
           });
         },

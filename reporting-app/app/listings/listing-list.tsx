@@ -10,6 +10,8 @@ import {
   transactionTypeLabel,
 } from "@/lib/format";
 import { StatTile } from "@/lib/stat-tile";
+import { CopyButton } from "@/lib/copy-button";
+import { buildBuyerDeepLink, formatRefCode } from "@/lib/ref-code";
 
 type StatusFilter = "all" | ListingStatus;
 
@@ -19,7 +21,13 @@ function statusToneClasses(status: ListingStatus): string {
   return "border-status-muted text-status-muted";
 }
 
-export function ListingList({ listings }: { listings: Listing[] }) {
+export function ListingList({
+  listings,
+  buyerWhatsappNumber,
+}: {
+  listings: Listing[];
+  buyerWhatsappNumber: string | null;
+}) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -27,7 +35,10 @@ export function ListingList({ listings }: { listings: Listing[] }) {
     if (statusFilter !== "all" && listing.status !== statusFilter) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      if (!listing.area.toLowerCase().includes(q)) return false;
+      // Search the ref code as well as the area: an agent looking at an ad
+      // has the code in front of them, not necessarily the street name.
+      const haystack = `${listing.area} ${listing.refCode ?? ""}`.toLowerCase();
+      if (!haystack.includes(q.replace(/^ref[\s:_-]*/i, ""))) return false;
     }
     return true;
   });
@@ -67,7 +78,7 @@ export function ListingList({ listings }: { listings: Listing[] }) {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Area…"
+              placeholder="Area or ad code…"
               className="border-b border-line-strong bg-transparent pb-1 font-sans text-sm normal-case tracking-normal text-foreground placeholder:text-status-muted focus:outline-none"
             />
           </label>
@@ -138,20 +149,45 @@ export function ListingList({ listings }: { listings: Listing[] }) {
               </>
             );
 
+            // Deliberately rendered OUTSIDE the <Link> below: a button nested
+            // inside an anchor is invalid markup, and a click on it would
+            // navigate to the run instead of copying.
+            const deepLink = listing.refCode
+              ? buildBuyerDeepLink(listing.refCode, buyerWhatsappNumber)
+              : null;
+
             return (
               <li key={listing.id} className="border-b border-card-border">
                 {listing.latestRunId ? (
                   <Link
                     href={`/runs/${listing.latestRunId}`}
-                    className="flex items-center justify-between gap-4 py-4 transition hover:bg-card"
+                    className="flex items-center justify-between gap-4 pt-4 transition hover:bg-card"
                   >
                     {rowContent}
                   </Link>
                 ) : (
-                  <div className="flex items-center justify-between gap-4 py-4">
+                  <div className="flex items-center justify-between gap-4 pt-4">
                     {rowContent}
                   </div>
                 )}
+
+                {listing.refCode ? (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pb-4 pt-2 font-mono text-xs uppercase tracking-wide text-status-muted">
+                    <span>
+                      Ad code ·{" "}
+                      <span className="text-foreground">
+                        {formatRefCode(listing.refCode)}
+                      </span>
+                    </span>
+                    {deepLink ? (
+                      <CopyButton value={deepLink} label="Copy ad link" />
+                    ) : (
+                      <Link href="/settings" className="border-b border-line-strong">
+                        Add your buyer number to get a link
+                      </Link>
+                    )}
+                  </div>
+                ) : null}
               </li>
             );
           })}
