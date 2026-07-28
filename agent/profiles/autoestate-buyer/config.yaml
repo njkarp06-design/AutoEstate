@@ -290,6 +290,61 @@ memory:
 session_reset:
   mode: none
 
+# --- Outbound media delivery: STRICT -----------------------------------------
+# THIRD isolation layer, and it is NOT covered by either of the other two.
+#
+# Outbound file delivery is triggered by the MODEL EMITTING `MEDIA:<abs path>`
+# in its reply TEXT — the gateway strips the tag and dispatches the file
+# (gateway/run.py -> adapter.extract_media -> send_video/send_multiple_images).
+# It is not a tool, so this instance's 3-tool lockdown does not constrain it
+# and `agent.disabled_toolsets` says nothing about it. A prompt-injected buyer
+# who gets the model to emit one path gets that file delivered to themselves.
+#
+# `strict: false` (the Hermes DEFAULT) accepts any existing regular file not on
+# a credential denylist — and that denylist is scoped to the ACTIVE profile plus
+# the shared root, so it does NOT cover a sibling profile. Verified by running
+# validate_media_delivery_path with HERMES_HOME set here, not by reading it:
+#
+#   strict=False -> BLOCKED:   autoestate-buyer/.env, hermes/auth.json
+#   strict=False -> DELIVERED: autoestate-buyer/state.db  (every buyer's
+#                              messages + captured phone numbers)
+#   strict=False -> DELIVERED: autoestate/.env            (the OPERATOR's
+#                              Anthropic key, bot token, ingestion secret)
+#   strict=False -> DELIVERED: autoestate/state.db        (operator history)
+#
+# Hermes's own docstring says strict mode is "suitable for public-facing bots
+# where prompt injection from one user shouldn't be able to exfiltrate the
+# host's secrets to that same user". That is exactly this instance.
+#
+# Cost of enabling: none that we need. The cache/allowlist roots are honoured
+# BEFORE the denylist is consulted, so the per-profile cache dirs
+# (cache/{images,audio,videos,documents}, image_cache/, video_cache/, ...) stay
+# deliverable — which is where any future listing-media feature would put files
+# anyway. Only paths outside those roots stop being deliverable.
+#
+# `gateway.strict` has exactly one consumer (gateway/run.py sets
+# HERMES_MEDIA_DELIVERY_STRICT from it) — it does not tighten anything else.
+#
+# `trust_recent_files: false` IS LOAD-BEARING — strict mode ALONE does not
+# close this, and that was found by testing the case rather than trusting the
+# first passing result. Strict mode keeps a recency fallback: any file modified
+# within `trust_recent_files_seconds` (DEFAULT 600s, and the fallback is ON by
+# default) is delivered even outside the allowlist. Its docstring justifies
+# that with "prompt-injection paths point at pre-existing host files ... with
+# mtimes measured in days or months" — which is true of /etc/passwd and FALSE
+# of the file that matters most here: this profile's own `state.db` is rewritten
+# on EVERY turn, so while the gateway is running it is permanently inside the
+# window. Measured: with strict alone, a freshly-touched state.db came back
+# DELIVERED. With trust_recent_files off, blocked.
+#
+# Cost: an agent-generated artifact written outside the cache roots is no longer
+# deliverable. Nothing on this instance produces one — it has 3 tools and no
+# file/terminal/code toolset — and any future listing-media feature should write
+# into the cache roots, which are allowlisted unconditionally.
+gateway:
+  strict: true
+  trust_recent_files: false
+
 # --- Plugins ---------------------------------------------------------------
 # Copied into this profile's plugins/ dir (plugins are NOT discovered via a
 # config pointer the way skills are — see CLAUDE.md).
