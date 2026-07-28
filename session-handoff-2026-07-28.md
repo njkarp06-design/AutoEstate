@@ -51,7 +51,7 @@ PIDs are a dated observation, not a standing fact — re-derive rather than trus
 
 ### Open questions for the owner
 
-**None.** Both long-standing questions were answered on 2026-07-27 — the buyer bot token is revoked, and Anthropic auto-reload billing is confirmed **off**, which makes the recurring credit-exhaustion outage a matter of when, not if (TODO item 9). Asked again the same day whether anything had changed outside the repo — Hetzner, Vercel, auto-reload, a new bot token, the transport decision — and the answer was **nothing has changed**.
+**None.** The buyer bot token is revoked (a fresh one is being minted). Anthropic auto-reload billing, long the outstanding one, was **enabled by the owner on 2026-07-28** — closing the most recurrent live-outage mode this project has had (TODO item 9). Owner-reported; it has no API surface to verify from here. Asked again the same day whether anything had changed outside the repo — Hetzner, Vercel, auto-reload, a new bot token, the transport decision — and the answer was **nothing has changed**.
 
 ### Working conventions
 
@@ -68,7 +68,7 @@ PIDs are a dated observation, not a standing fact — re-derive rather than trus
 - Per-profile logs: `%LOCALAPPDATA%\hermes\profiles\<profile>\logs\gateway.log`. Not the shared path (which has misled a session), and not `session-run.log` (stdout is unflushed and it stays near-empty).
 - **After ANY schema change, restart the `next dev` server on 4127.** The generated Prisma client loads at server *start*, never by hot-reload. Symptom: machine routes return **500 where they used to return 401** — and while it lasts, the live gateway's sync POSTs fail, so a real WhatsApp turn is lost outright.
 - **Don't run `npm run build` while the dev server is up** — they share `.next/`. Use `lint` + `tsc` for a routine check, and remember `next build` catches things neither does (it alone caught a `"use server"` export error).
-- **Anthropic credits on this key have run dry repeatedly and caused live outages, and auto-reload is confirmed OFF.** Expect it again. If the live bot starts returning credit-balance errors, that is this, not a code fault — top up at console.anthropic.com.
+- **Anthropic credits on this key have run dry repeatedly and caused live outages. Auto-reload was ENABLED on 2026-07-28**, which should end that. If the live bot ever returns credit-balance errors again, that is still this rather than a code fault — check console.anthropic.com before debugging code.
 
 ### How to resume
 
