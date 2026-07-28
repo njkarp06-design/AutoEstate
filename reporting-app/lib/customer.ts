@@ -1,5 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { normalizeWhatsappNumber } from "@/lib/ref-code";
 import type { Customer } from "@/prisma/generated/prisma/client";
 
 /**
@@ -62,5 +63,25 @@ export async function updateOperatorTelegramChatId(
   await prisma.customer.update({
     where: { id: customer.id },
     data: { operatorTelegramChatId: trimmed === "" ? null : trimmed },
+  });
+}
+
+/**
+ * The buyer-facing WhatsApp number used to build listing ad links. Stored
+ * normalized to digits so the stored value is exactly what wa.me needs and
+ * link-building never has to re-parse a formatting variant; the action layer
+ * rejects anything that can't normalize, so this is only reached with a value
+ * that already passed.
+ */
+export async function updateBuyerWhatsappNumber(
+  customer: Customer,
+  rawNumber: string,
+): Promise<void> {
+  const trimmed = rawNumber.trim();
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: {
+      buyerWhatsappNumber: trimmed === "" ? null : normalizeWhatsappNumber(trimmed),
+    },
   });
 }

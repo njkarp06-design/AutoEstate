@@ -79,7 +79,28 @@ terraform output -raw operator_ingestion_secret | \
   npx tsx ../../../reporting-app/scripts/provision-customer.ts <customer-email>
 ```
 
-### 4. Pair WhatsApp (manual - cloud-init can't automate this)
+### 4. Pick the customer's agent-facing channel(s)
+
+The agent-facing bot can run on **Telegram, WhatsApp, or both** (decided
+2026-07-28, TODO 12a). They are independent - set either, neither or both.
+
+**Telegram costs no phone number**, which is the whole point: it is the route
+to one number per customer rather than two. Create a bot in BotFather, then set
+`telegram_bot_token` and `telegram_allowed_users` (the customer's own numeric
+Telegram user id). No pairing step, no SIM, nothing to keep alive - the token
+is injected post-boot like the other secrets, so rotating it never rebuilds
+the server. Leave `telegram_bot_token` empty and no Telegram adapter starts.
+
+**WhatsApp costs an eSIM per customer** that must stay alive (a linked device
+is logged out after 14 days of its primary account not opening WhatsApp) and
+carries Baileys' unofficial-use ban risk. Step 5 below is its pairing dance.
+
+Both are wired deliberately while it is still unknown whether Tel Aviv agents
+will actually work in Telegram. If that answer turns out to be yes, dropping
+the WhatsApp half is a small, contained edit - `variables.tf` says exactly
+which pieces to remove.
+
+### 5. Pair WhatsApp (manual - cloud-init can't automate this; skip for a Telegram-only customer)
 
 Wait a minute or two after `apply` for cloud-init to finish (Docker
 install, image pull, container start), then:
@@ -98,10 +119,13 @@ effect in the running process:
 docker compose -f /root/docker-compose.yml restart gateway
 ```
 
-### 5. Verify
+### 6. Verify
 
-Send a real listing to the customer's WhatsApp Business number and confirm
-it shows up in the reporting webapp once they log in.
+Send a real listing to whichever channel(s) you configured - the customer's
+WhatsApp Business number and/or their Telegram bot - and confirm it shows up
+in the reporting webapp once they log in. Check the `Listing` row was created
+too, not just the reply: a correct-looking caption with no tracked listing is
+the exact failure PR #23 exists to prevent.
 
 ## Rotating the operator ingestion secret
 

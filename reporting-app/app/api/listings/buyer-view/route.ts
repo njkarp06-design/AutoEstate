@@ -29,6 +29,11 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     listings: listings.map((l) => ({
+      // The public code from the buyer's ad link. Exposed HERE and not on
+      // /api/listings/active: it exists so the buyer bot can resolve a
+      // property from message one instead of guessing, and the outbound
+      // skills have no use for it. Null on rows that predate the column.
+      refCode: l.refCode,
       area: l.area,
       transactionType: l.transactionType,
       rooms: l.rooms,

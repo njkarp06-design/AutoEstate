@@ -8,11 +8,12 @@ Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history;
 
 ### Where things stand
 
-- **Every planned feature is built, live-tested and merged.** Nothing is blocked on more building; everything remaining is productionization.
+- **Every roadmap feature is built, live-tested and merged.** Most of what remains is productionization — the exception is the channel-consolidation decision below, which added new build work, two parts of it unblocked.
 - **The buyer bot runs on both Telegram and WhatsApp**, paired and live-tested (2026-07-28). Facebook-sourced buyers reply on Telegram, Yad2/Instagram-sourced on WhatsApp — the owner's own market observation, which settled TODO's long-open transport decision. Its tool and slash-command lockdowns landed in the *same change* as the transport, as the deploy gate demanded.
 - **The buyer bot answers amenity questions**, not just the seven structured fields. An optional `Features:` line on the Listing Record footer carries parking/elevator/balcony through to it. Verified live in both directions: it answers a listed feature and **defers** on an unlisted one rather than inferring absence.
 - **Nothing is half-deployed.** Plugin parity is 5/5 and both gateways have been restarted onto the current code by the owner. Re-run CLAUDE.md §5's parity recipe rather than trusting this line — the next plugin change invalidates it.
 - **Nothing is hosted.** The reporting app runs only via `npm run dev` (port 4127). The Terraform module is `validate`-clean but has **never been applied** — there is no Hetzner account.
+- **A target channel architecture was decided (2026-07-28), not built.** Each customer currently costs **two** new phone numbers; the decision is **operator → Telegram, buyer → Cloud API**, giving **one number per customer**. Cloud API alone does *not* reduce the count — number count is roles × customers, and the roles are forced by Hermes's gating. A shared buyer number resolved by deep-link ref codes was **rejected as the destination** (an unbound buyer is a lost lead) but kept as an onboarding bridge and a cheap tier. TODO item 12 owns the checklist; CLAUDE.md owns the reasoning. **Nothing was implemented and nothing account-level was actioned.**
 - **Whether a PR is open is deliberately not stated here** — it changes the moment anything merges, which is how this sentence has already gone stale once. Run `gh pr list`. Merged branches are deleted on merge, so `git branch -a` corroborates it.
 
 ### Live systems
@@ -29,12 +30,13 @@ Verified **2026-07-28** by listing processes, hashing files, calling the routes 
 | Repo↔live plugin parity | 5/5, split by role — operator has `sync-to-webapp` / `listing-footer-reminder` / `active-listings-context`, buyer has `buyer-listings-context` / `sync-inquiries-to-webapp` |
 | Repo↔live buyer `config.yaml` | no drift (parsed YAML, excluding the `MACHINE-SPECIFIC` keys) |
 | Terraform template ↔ dev operator profile | 0 drift on product-decision keys (new recipe, CLAUDE.md §5) |
-| Dev database | 1 customer; 23 runs; 4 listings (2 ACTIVE — Rothschild *with features*, Neve Tzedek; 2 SOLD — Ben Gurion, Dizengoff); **4 inquiries** (2 Telegram, 2 WhatsApp), 2 with a captured contact |
+| Dev database | 1 customer; 23 runs; 4 listings (2 ACTIVE — Rothschild *with features*, Neve Tzedek; 2 SOLD — Ben Gurion, Dizengoff), **all 4 now carrying ref codes**; **4 inquiries** (2 Telegram, 2 WhatsApp), 2 with a captured contact |
+| Reporting-app schema | migration `20260728193000_add_listing_ref_code_and_buyer_number` applied 2026-07-28; `prisma migrate status` clean, dev server restarted after |
 | `lint` / `tsc` / `terraform fmt` / `validate` | all clean |
 
 ### What to do next
 
-**Everything that can be done without an account is done.** The two account-level steps are the real gate, both need the owner, and both cost money:
+Two account-level steps remain the real gate for a pilot — both need the owner, both cost money — plus the unblocked halves of item 12 below, which need neither:
 
 1. **Create a Hetzner account, then `terraform apply`** (TODO item 3). Three things there have **never run**: the operator SSH key must be uploaded to the project once beforehand (Hetzner rejects a duplicate public key, so the module looks it up); skills and plugins arrive via post-boot SSH upload rather than cloud-init, so confirm they landed; and operator slash-command access is ungated by default on that box — a deliberate accepted grant to settle with a real instance in front of you.
 2. **Deploy the reporting app to Vercel Pro** (item 4). **Land the partial unique index on `Listing` first** — the current `Serializable` transaction removes the ingest dedupe race on that code path, but the durable guarantee needs `UNIQUE (customerId, lower(area), rooms, sqm) WHERE status <> 'SOLD'`, and the obvious plain `@@unique` is wrong because it would block a legitimate relist of a sold property.
@@ -46,6 +48,13 @@ Verified **2026-07-28** by listing processes, hashing files, calling the routes 
 5. **Have a genuine third party message the buyer's WhatsApp number.** The path ran end to end, but from the owner's own number; the allowlist is `*` so no sender is privileged, and a real stranger did test Telegram — WhatsApp is the one untested combination. Cheap to close.
 
 **Non-blocking:** create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts push. The dashboard records leads either way.
+
+**Channel consolidation (TODO item 12), decided 2026-07-28.** Two halves of it need nothing from Hetzner or Meta and are the obvious next build:
+
+- **12a — operator channel to Telegram. DECIDED and BUILT 2026-07-28: both channels, drop WhatsApp later.** The dev profile already ran Telegram on a **live** token (`@autoestate_test_bot`, verified via `getMe`); the real gap was that the **Terraform template shipped no Telegram at all**, so customers would have been WhatsApp-only. Now wired alongside WhatsApp — empty token means no adapter starts, and `variables.tf` names exactly what to delete when WhatsApp goes. Rendered in `terraform console`, `fmt`/`validate` clean, **never applied**. Left to do: rename the bot in BotFather (it is still the "Test Bot"), and live-test the outbound flow over Telegram — the DB has **0** Telegram runs, so that channel has never carried a real listing.
+- **12d — per-listing ref codes. BUILT 2026-07-28**, migration applied to dev and the 4 existing listings backfilled. `buyer-inquiry` 0.4.0, `buyer-listings-context` 1.2. **Two things left:** copy the plugin into the live `autoestate-buyer` profile after merge (merging deploys nothing — but that gateway is stopped by design, so it picks it up on next start), and get a real person to tap a real ad link, which has never happened.
+
+12b (buyer → Cloud API) is blocked on Hetzner: it needs a public HTTPS webhook, which the module's no-inbound-but-SSH firewall forbids. When it happens, **close the `whatsapp_cloud` lockdown gate in the same change** — it is a distinct platform name, so neither `platform_toolsets` nor slash gating covers it today.
 
 ### Open questions for the owner
 
@@ -60,6 +69,7 @@ Verified **2026-07-28** by listing processes, hashing files, calling the routes 
 
 ### Environment gotchas
 
+- **`sender_id` *is* available to plugin hooks** (`pre_llm_call` and `post_llm_call` both — `agent/turn_context.py:740`). Docs said otherwise until 2026-07-28; two sites corrected. It does **not** let you gate by role — a plugin can only inject text, and text doesn't reliably stop the model acting. Sender identity still never reaches a *skill*, which is what forces role-by-channel isolation.
 - **A skill edit never reaches a conversation already in progress.** A running session answers from the copy it loaded at session start — proven again 2026-07-28 (one `skill_view` call in a session's whole life). Use `/new` to pick a change up, or test with a fresh sender. New buyers get changes automatically; existing threads don't.
 - **Never let the buyer gateway run with the default WhatsApp `bridge_port`.** The adapter defaults to 3000 and kills whatever holds that port on start — 3000 is the **live operator bridge**. The buyer config pins `3001`; do not "tidy" it. Pairing is unaffected (`--pair-only` starts no HTTP server).
 - **`gateway run` is foreground, `gateway start` is the detached service.** Using `run` on the operator briefly made a production bot depend on a PowerShell window staying open.
@@ -72,4 +82,4 @@ Verified **2026-07-28** by listing processes, hashing files, calling the routes 
 
 ### How to resume
 
-> Read session-handoff-2026-07-28.md and continue. Everything is built and merged; verify with `git log origin/main..` and `gh pr list --state all` rather than trusting any branch/PR claim here, and re-run CLAUDE.md §5's parity recipes rather than trusting the parity lines. What's left is productionization, starting with whichever account-level step I authorize — Hetzner + `terraform apply` (TODO item 3) or the Vercel deploy (item 4). **Don't start either without me:** both cost money and neither account exists. Three things to know before planning. **The buyer bot is fully paired on both channels but its gateway is stopped** — it is public whenever it runs, so start it only to test and stop it after. **Its WhatsApp `bridge_port` must stay 3001**, because the adapter kills whatever holds its port on startup and its default is 3000, the live operator bridge. And **a skill edit does not reach a conversation already in progress** — use `/new` or a fresh sender. If a dev server is running from an older checkout, restart it: the Prisma client loads at start, so it will 500 on every machine route until you do.
+> Read session-handoff-2026-07-28.md and continue. Everything is built and merged; verify with `git log origin/main..` and `gh pr list --state all` rather than trusting any branch/PR claim here, and re-run CLAUDE.md §5's parity recipes rather than trusting the parity lines. What's left is productionization, starting with whichever account-level step I authorize — Hetzner + `terraform apply` (TODO item 3) or the Vercel deploy (item 4). **Don't start either without me:** both cost money and neither account exists. **A channel-consolidation target was decided on 2026-07-28 and not built** (TODO item 12: operator → Telegram, buyer → Cloud API, one number per customer instead of two) — 12a and 12d need no account and are the obvious next build; 12b is Hetzner-gated. Three things to know before planning. **The buyer bot is fully paired on both channels but its gateway is stopped** — it is public whenever it runs, so start it only to test and stop it after. **Its WhatsApp `bridge_port` must stay 3001**, because the adapter kills whatever holds its port on startup and its default is 3000, the live operator bridge. And **a skill edit does not reach a conversation already in progress** — use `/new` or a fresh sender. If a dev server is running from an older checkout, restart it: the Prisma client loads at start, so it will 500 on every machine route until you do.

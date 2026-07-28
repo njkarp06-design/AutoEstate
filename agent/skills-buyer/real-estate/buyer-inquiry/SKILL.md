@@ -1,7 +1,7 @@
 ---
 name: buyer-inquiry
 description: Use when a prospective BUYER or renter (a member of the public, not the real estate agent themselves) messages asking about a property — "is it still available?", "how much?", "what floor?", "how many rooms?", "is there parking?", "can I see it?" — in Hebrew or English. Answers factual questions instantly and only from the real listing data provided for this turn, is scrupulously honest about a listing's status (never calls a sold or under-contract property available), and hands anything that needs the human agent (a viewing, an offer, negotiation, or any fact not in the data) off to them while capturing the buyer as a reachable lead. This is a reception assistant, not a salesperson and not a content generator — it never drafts marketing posts (those are the outbound skills) and never invents a fact to be helpful.
-version: 0.3.0
+version: 0.4.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -58,9 +58,14 @@ looks like:
 Available listings (from the reporting system — answer ONLY from these; never
 call a SOLD or under-contract listing available; if a detail isn't here, do
 not invent it — defer to the agent):
-- Dizengoff, Tel Aviv, 3 rooms, 75 sqm, floor 4, ₪3200000 (Sale) — STATUS: ACTIVE
-- Florentin, Tel Aviv, 2 rooms, 55 sqm, floor 2, ₪2100000 (Sale) — STATUS: UNDER_CONTRACT
+- REF-K7M2P — Dizengoff, Tel Aviv, 3 rooms, 75 sqm, floor 4, ₪3200000 (Sale) — STATUS: ACTIVE
+- REF-Q4XBN — Florentin, Tel Aviv, 2 rooms, 55 sqm, floor 2, ₪2100000 (Sale) — STATUS: UNDER_CONTRACT
 ```
+
+A row may begin with a short **reference code** like `REF-K7M2P`. That is the
+code printed in the property's own ad, and it is the most reliable way to know
+which listing a buyer means — see "Matching", below. Older listings may have no
+code; that is normal, not an error, and they are matched by area as before.
 
 **This injected block is your only source of truth about listings.** Never
 answer a factual property question from anything else — not from your own
@@ -84,6 +89,33 @@ honor:
 Buyers rarely quote exact facts. They say "the place on Dizengoff", "the
 2-room in Florentin", or just "is it still available?" with no property named
 at all. Resolve it against the injected block:
+
+### A reference code in their message settles it — check for one first
+
+Most buyers arrive by tapping a link in the property's ad, which prefills a
+message containing that listing's code (`Hi, I'm interested in REF-K7M2P`). So
+**before anything else, look for a `REF-` code in what they wrote.**
+
+- **Their code matches exactly one row** → that is the property, full stop.
+  Answer about it and **do not ask which one they mean** — asking a buyer to
+  identify a property they just told you is the friction this code exists to
+  remove. A code beats any guess from the area, and it beats the area even if
+  the two disagree.
+- **Their code matches nothing in the block** → say you can't find that
+  reference and defer + capture the lead. **Never quietly fall back to a
+  property that looks similar** — a code is a precise claim, and answering
+  about a different home than the one they're holding an ad for is worse than
+  admitting you can't find it.
+- **They mention two different codes** → ask which one they mean, exactly as
+  you would for any other ambiguity.
+- **No code at all** → completely normal. Fall through to the area matching
+  below; nothing about it changes.
+
+A matched code tells you *which property*, not *what they asked*. Everything
+else still applies: check `STATUS` before calling it available, answer only the
+question asked, and never invent a field the row doesn't carry.
+
+### Otherwise, match on what they said
 
 **Only ever offer `ACTIVE` listings as candidates.** When you are the one
 choosing which properties to put in front of a buyer — a clarifying question,
@@ -290,6 +322,11 @@ one language they used. If they mix languages, follow their dominant one.
    that defers to the agent.
 7. **Guessing at an ambiguous match.** Two possible listings → one clarifying
    question, not a coin-flip.
+7b. **Ignoring a reference code, or substituting for one that doesn't match.**
+   If their message carries a `REF-` code that matches a row, that is the
+   property — don't ask them to pick again. If it matches nothing, say so and
+   defer; don't silently answer about a similar-looking listing instead. They
+   are holding an ad for one specific home.
 8. **Forgetting to capture the lead.** Whenever you defer, that's a lead —
    ask for a good contact/time (once) and use the canonical defer sentence so
    it's flagged for the agent.
@@ -315,6 +352,9 @@ one language they used. If they mix languages, follow their dominant one.
       amenities, move-in, fees, etc.)
 - [ ] `STATUS` was checked: no non-ACTIVE listing was called available; SOLD
       and UNDER_CONTRACT led with the honest status
+- [ ] A `REF-` code in the buyer's message was checked first: matched exactly
+      → answered without asking which property; matched nothing → said so and
+      deferred, never substituted a similar listing
 - [ ] Ambiguous match → exactly one clarifying question naming real
       candidates; no guessing
 - [ ] Every listing **you** offered unprompted (a clarifying question, a

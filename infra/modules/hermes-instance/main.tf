@@ -88,6 +88,7 @@ resource "hcloud_server" "hermes" {
     customer_id            = var.customer_id
     ingestion_api_url      = var.ingestion_api_url
     whatsapp_allowed_users = var.whatsapp_allowed_users
+    telegram_allowed_users = var.telegram_allowed_users
     hermes_model           = var.hermes_model
     hermes_image_tag       = var.hermes_image_tag
   })
@@ -160,11 +161,13 @@ resource "null_resource" "deploy_agent_content" {
   }
 }
 
-# Injects AUTOESTATE_INGESTION_SECRET and ANTHROPIC_API_KEY after boot,
-# separately from the main cloud-init payload, so either can be rotated
-# (change the trigger, re-apply) without forcing hcloud_server to recreate
-# the whole instance - changing user_data on an existing server forces a
-# rebuild, which would lose the paired WhatsApp session.
+# Injects AUTOESTATE_INGESTION_SECRET, ANTHROPIC_API_KEY and
+# TELEGRAM_BOT_TOKEN after boot, separately from the main cloud-init payload,
+# so any of them can be rotated (change the trigger, re-apply) without forcing
+# hcloud_server to recreate the whole instance - changing user_data on an
+# existing server forces a rebuild, which would lose the paired WhatsApp
+# session. An empty TELEGRAM_BOT_TOKEN is written as an empty value and simply
+# starts no Telegram adapter, which is the correct WhatsApp-only behaviour.
 #
 # `cloud-init status --wait` blocks until cloud-init's write_files stage has
 # actually finished, so this never races the file into existence. The grep
@@ -185,7 +188,11 @@ resource "null_resource" "inject_secrets" {
   triggers = {
     secret_hash  = sha256(random_password.ingestion_secret.result)
     api_key_hash = sha256(var.anthropic_api_key)
-    server_id    = hcloud_server.hermes.id
+    # Without this, swapping a customer's Telegram bot token would write the
+    # new value into no plan at all - this resource owns the only path that
+    # gets it onto the box, and triggers are the only thing that re-runs it.
+    telegram_token_hash = sha256(var.telegram_bot_token)
+    server_id           = hcloud_server.hermes.id
     # This resource owns the only `docker compose restart`, so it must re-run
     # whenever the uploaded content changes - `depends_on` alone only orders
     # the two, it does not re-trigger this one when deploy_agent_content
@@ -215,6 +222,7 @@ resource "null_resource" "inject_secrets" {
     content     = <<-EOT
       AUTOESTATE_INGESTION_SECRET=${random_password.ingestion_secret.result}
       ANTHROPIC_API_KEY=${var.anthropic_api_key}
+      TELEGRAM_BOT_TOKEN=${var.telegram_bot_token}
     EOT
     destination = "/root/.hermes/.env.secrets"
   }
@@ -222,7 +230,7 @@ resource "null_resource" "inject_secrets" {
   provisioner "remote-exec" {
     inline = [
       "chmod 600 /root/.hermes/.env.secrets",
-      "grep -v -e '^AUTOESTATE_INGESTION_SECRET=' -e '^ANTHROPIC_API_KEY=' /root/.hermes/.env > /root/.hermes/.env.tmp",
+      "grep -v -e '^AUTOESTATE_INGESTION_SECRET=' -e '^ANTHROPIC_API_KEY=' -e '^TELEGRAM_BOT_TOKEN=' /root/.hermes/.env > /root/.hermes/.env.tmp",
       "cat /root/.hermes/.env.secrets >> /root/.hermes/.env.tmp",
       "grep -q '^AUTOESTATE_CUSTOMER_ID=' /root/.hermes/.env.tmp",
       "mv /root/.hermes/.env.tmp /root/.hermes/.env",

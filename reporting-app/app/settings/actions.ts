@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import {
   getCurrentCustomer,
+  updateBuyerWhatsappNumber,
   updateInstagramPostMode,
   updateOperatorTelegramChatId,
   type InstagramPostMode,
 } from "@/lib/customer";
+import { normalizeWhatsappNumber } from "@/lib/ref-code";
 
 const VALID_MODES: readonly InstagramPostMode[] = ["MANUAL", "AUTO_IMMEDIATE", "AUTO_AFTER_EDIT"];
 
@@ -62,5 +64,45 @@ export async function updateOperatorTelegramChatIdAction(
   return {
     status: "saved",
     message: raw === "" ? "Cleared - leads will show on the dashboard only." : "Saved.",
+  };
+}
+
+/**
+ * The buyer-facing WhatsApp number, used only to build each listing's ad link.
+ * Same result-returning shape as the chat id above and for the same reason: a
+ * silently-discarded value here means every listing keeps showing "no link
+ * yet" with nothing explaining why.
+ */
+export async function updateBuyerWhatsappNumberAction(
+  _prevState: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  const customer = await getCurrentCustomer();
+  if (!customer) {
+    return { status: "error", message: "Your account isn't linked yet." };
+  }
+
+  const raw = String(formData.get("buyerWhatsappNumber") ?? "").trim();
+  // Validate through the same normalizer that builds the links, so anything
+  // accepted here is guaranteed to produce a working wa.me URL - a second,
+  // looser rule in the UI layer is how you get a stored value that passes the
+  // form and then silently fails to render a link.
+  if (raw !== "" && normalizeWhatsappNumber(raw) === null) {
+    return {
+      status: "error",
+      message:
+        "That doesn't look like a phone number - use the international form, e.g. +972 52 441 9087.",
+    };
+  }
+
+  await updateBuyerWhatsappNumber(customer, raw);
+  revalidatePath("/settings");
+  revalidatePath("/listings");
+  return {
+    status: "saved",
+    message:
+      raw === ""
+        ? "Cleared - your listings will show their code without a link."
+        : "Saved. Your listings now show a ready-to-paste ad link.",
   };
 }

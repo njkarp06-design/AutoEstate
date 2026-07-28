@@ -93,6 +93,16 @@ model Customer {
   // is the per-customer destination chat. Null = no push (the lead still shows
   // in the dashboard). Set by the customer on the Settings page.
   operatorTelegramChatId String?
+  // The customer's public buyer-facing WhatsApp number, in international form.
+  // Used only to build the wa.me deep link shown next to each listing's ref
+  // code (see lib/ref-code.ts) so the agent can paste a working link into a
+  // Yad2/Instagram ad. Null = the Listings page shows the code without a link
+  // rather than a link to nobody. Set by the customer on the Settings page.
+  //
+  // Deliberately NOT the same thing as which channel the buyer bot runs on -
+  // this is a display value for building links, not configuration the gateway
+  // reads. The gateway's own number comes from its profile .env.
+  buyerWhatsappNumber String?
   createdAt           DateTime  @default(now())
   runs                Run[]
   listings            Listing[]
@@ -206,6 +216,19 @@ model Listing {
   // (customerId, area, rooms, sqm): editing a feature must update the listing,
   // never create a second one.
   features        String?
+  // Short public reference code ("K7M2P") that identifies this exact property
+  // in a buyer-facing ad. Assigned at create time in /api/ingest; see
+  // lib/ref-code.ts for the alphabet, the REF- display prefix, and why
+  // uniqueness is GLOBAL rather than per-customer (a future shared buyer
+  // number must resolve a code to a customer BEFORE it knows whose data to
+  // read - TODO 12c).
+  //
+  // Nullable for one reason only: rows created before 2026-07-28 predate the
+  // column and are backfilled by script, and Postgres permits many NULLs in a
+  // unique column, which is what makes an additive migration possible at all.
+  // Every new row gets one. Treat null as "legacy row", never as a state the
+  // product can produce.
+  refCode         String?       @unique
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   runs            Run[]

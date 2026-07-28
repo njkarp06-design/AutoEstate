@@ -28,7 +28,10 @@ export default async function ListingsPage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
-      <ListingList listings={listings} />
+      <ListingList
+        listings={listings}
+        buyerWhatsappNumber={customer.buyerWhatsappNumber}
+      />
     </main>
   );
 }

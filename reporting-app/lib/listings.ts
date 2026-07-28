@@ -26,6 +26,10 @@ export type Listing = {
   // can see exactly what their buyer-facing bot answers questions from - there
   // is no listing-edit UI, so this view is the only audit surface for it.
   features: string | null;
+  // Public reference code for this property's ad link (see lib/ref-code.ts).
+  // Null only on rows created before the column existed - the UI shows those
+  // without a code rather than inventing one.
+  refCode: string | null;
   updatedAt: number; // epoch seconds - same convention as lib/db.ts's Run
   // The Run whose generated posts (Instagram/Facebook/Yad2) this listing
   // came from, most-recent first - lets the UI link out to /runs/[id].
@@ -67,6 +71,7 @@ export async function getListings(customer: Customer): Promise<Listing[]> {
     price: l.price,
     status: toListingStatus(l.status),
     features: l.features,
+    refCode: l.refCode,
     updatedAt: Math.floor(l.updatedAt.getTime() / 1000),
     latestRunId: l.runs[0]?.id ?? null,
   }));
