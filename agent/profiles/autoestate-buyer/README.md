@@ -10,12 +10,16 @@ value stripped. They live in the repo so the lockdown is reviewable and
 reproducible — a security posture that exists only on one laptop is not a
 deliverable, and Terraform's future per-customer buyer instance ships from here.
 
-## Two keys that are machine-specific — change them on deploy
+## The machine-specific keys — change them on deploy
 
-Both are marked `MACHINE-SPECIFIC` in `config.yaml` and tracked as deploy gates
+All are marked `MACHINE-SPECIFIC` in `config.yaml` and tracked as deploy gates
 in TODO.md. They are left at their real dev values so this file stays a verbatim
 copy of the deployed one (which is what makes the parity check in CLAUDE.md
-work); both are excluded from that comparison rather than templated.
+work); all are excluded from that comparison rather than templated.
+
+**Read the markers in `config.yaml` rather than trusting this list** — there is
+one `allow_admin_from` pair per platform block, so every future channel adds two
+more. As of 2026-07-28 there are three markers:
 
 - **`skills.external_dirs`** is an absolute Windows path. On a Linux instance it
   resolves to nothing and the profile discovers **zero** skills — a public
@@ -23,6 +27,10 @@ work); both are excluded from that comparison rather than templated.
 - **`platforms.telegram.extra.allow_admin_from`** (and the `group_` twin) is the
   dev operator's own Telegram user id. Shipped as-is to every customer, it would
   grant one personal account admin-tier slash-command access to every buyer bot.
+- **`platforms.whatsapp.extra.allow_admin_from`** (and its `group_` twin) is the
+  same thing for WhatsApp, and takes the operator's **LID** with the `@lid`
+  suffix — the bare number does not grant admin. Added 2026-07-28 with the
+  second buyer channel.
 
 ## Why a second instance exists at all
 
@@ -50,8 +58,12 @@ discovers 1 skill, the operator profile discovers 5, neither sees the other's.
 **Tools.** Two mechanisms, and the second is load-bearing rather than
 belt-and-braces:
 
-1. `platform_toolsets.telegram: [skills]` — an allowlist by direct membership
-   (`hermes_cli/tools_config.py::_get_platform_tools`).
+1. `platform_toolsets.<platform>: [skills]` — an allowlist by direct membership
+   (`hermes_cli/tools_config.py::_get_platform_tools`). **One entry per channel,
+   currently `telegram` and `whatsapp`.** A platform with no entry of its own
+   falls back to the platform default, which resolves to `[clarify, skills]`
+   rather than `[skills]` — so adding a channel without adding its entry
+   silently widens the tool surface.
 2. `agent.disabled_toolsets` — a final, unconditional subtraction
    (`model_tools.py::_compute_tool_definitions`).
 
