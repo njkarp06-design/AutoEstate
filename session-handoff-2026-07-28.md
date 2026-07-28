@@ -43,7 +43,7 @@ Two account-level steps remain the real gate for a pilot — both need the owner
 
 **Then, before any real customer:**
 
-3. **Harden the public buyer instance** (items 5–6): OS-level isolation, and re-running `hermes security audit` once anything is exposed. Also resolve the **global `.env`** that puts the owner's Gmail credential on that box (known issue in TODO).
+3. **Harden the public buyer instance** (items 5–6): OS-level isolation, and re-running `hermes security audit` once anything is exposed. *(The "global `.env` puts a Gmail credential on that box" item was **disproved 2026-07-28** by running Hermes's own env loader — profiles do not inherit it, and the buyer profile resolves no `email` platform and no `EMAIL_PASSWORD`. Nothing to do; see TODO.)*
 4. **Add `WHATSAPP_ALLOW_ALL_USERS=true`** to any buyer instance Terraform provisions — with `dm_policy: open` Hermes refuses to boot without it. It blocked the dev instance and will block the first real one identically.
 5. **Have a genuine third party message the buyer's WhatsApp number.** The path ran end to end, but from the owner's own number; the allowlist is `*` so no sender is privileged, and a real stranger did test Telegram — WhatsApp is the one untested combination. Cheap to close.
 
