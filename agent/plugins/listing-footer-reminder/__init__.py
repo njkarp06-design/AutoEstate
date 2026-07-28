@@ -14,7 +14,7 @@ gap, not a stale-fact gap, and no in-context instruction reliably closes it
 once a session has done the task "enough times" to feel routine.
 
 This hook sidesteps the problem rather than re-litigating it: it injects
-the exact 7-line footer format directly into context on every
+the exact footer format directly into context on every
 relevant-platform turn via pre_llm_call - the same mechanism
 active-listings-context already uses - so footer presence stops depending
 on whether the model decides to reload the skill that turn.
@@ -64,13 +64,32 @@ LISTING_RECORD_REMINDER = (
     "Size: <number> sqm\n"
     "Floor: <number, or N/A>\n"
     "Price: <₪ amount, or N/A>\n"
-    "Status: Active\n\n"
+    "Status: Active\n"
+    "Features: <comma-separated amenities, or omit the line>\n\n"
+    "About the Features line - it must be LAST, and it must be facts only:\n"
+    "- ALWAYS the final line of the footer, after Status. It is the only "
+    "free-text field, so it is the only one that can run long, and the "
+    "parser stops at the first line it doesn't recognise - a wrapped "
+    "Features line placed above Status would cost that listing its "
+    "tracking entirely. Last means a wrap costs only the features.\n"
+    "- ONE line, comma-separated, no line breaks.\n"
+    "- ONLY concrete amenities the sender actually stated: elevator, "
+    "parking, balcony, air conditioning, renovated kitchen, sea view, "
+    "distance to the beach. NEVER marketing language you wrote for the "
+    "caption. If the caption says \"stunning renovated kitchen in a "
+    "sought-after building\", the Features line is \"renovated kitchen\" - "
+    "not \"stunning\", not \"sought-after\".\n"
+    "- Omit the line entirely if they stated no amenities. Never guess, "
+    "never infer from the neighbourhood, never carry features over from a "
+    "different property.\n"
+    "- These go straight to real buyers asking questions, so an invented "
+    "feature becomes a false claim about someone's home.\n\n"
     "For a STATUS CHANGE on an existing listing (listing-status-update), "
-    "same 7-line format in the same position, but Status is Active (price "
+    "same format in the same position, but Status is Active (price "
     "drop) or Under Contract instead - and Area/Rooms/Size must still be "
     "restated in the footer, not assumed from earlier in the "
     "conversation.\n\n"
-    "For a COMPLETED SALE (just-sold), same 7-line format in the same "
+    "For a COMPLETED SALE (just-sold), same format in the same "
     "position, but Status is Sold - just-sold is the only skill that ever "
     "sets Status: Sold.\n\n"
     "EXCEPTION - status change or sale with no stated identity: if the "

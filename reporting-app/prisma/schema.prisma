@@ -196,6 +196,16 @@ model Listing {
   // fabricated 0.
   price           Int?
   status          ListingStatus @default(ACTIVE)
+  // Free-text amenities the agent actually stated ("elevator, balcony,
+  // parking"), parsed from the Listing Record footer's last line. Nullable and
+  // free text for the same reason as transactionType: it comes from a skill's
+  // free-text output and an unexpected value must never hard-fail ingest.
+  //
+  // Null for every listing created before 2026-07-28, and for any footer that
+  // omits the line - normal, not malformed. NOT part of the ingest match key
+  // (customerId, area, rooms, sqm): editing a feature must update the listing,
+  // never create a second one.
+  features        String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   runs            Run[]

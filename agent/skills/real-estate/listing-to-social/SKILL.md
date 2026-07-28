@@ -1,7 +1,7 @@
 ---
 name: listing-to-social
 description: Use when a real estate agent provides new listing details (facts about a property, and optionally photo descriptions or attached photos) and wants ready-to-post content. Turns raw listing facts into platform-formatted Hebrew and English captions for Instagram, a Facebook group, and Yad2.
-version: 0.4.0
+version: 0.5.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -150,9 +150,29 @@ Size: <number> sqm
 Floor: <number, or N/A>
 Price: <₪ amount, or N/A>
 Status: Active
+Features: <comma-separated amenities, or omit this line>
 ```
 
-Always exactly these 7 labeled lines, this order. `Status` is always
+The first 7 labeled lines are required, in this order.
+
+`Features` is optional and must be **last**, after `Status`. It is the only
+free-text field, and the parser stops at the first line it doesn't recognise —
+so a `Features` value that wraps onto a second line above `Status` would cost
+the listing its tracking entirely. Last means a wrap costs only the features.
+
+Put in it **only concrete amenities the agent actually stated**: elevator,
+parking, balcony, air conditioning, renovated kitchen, sea view, distance to the
+beach. One line, comma-separated. **Never marketing language you wrote for the
+caption** — if the caption says "stunning renovated kitchen in a sought-after
+building", `Features` is `renovated kitchen`, not "stunning" or "sought-after".
+Omit the line entirely if no amenities were stated; never guess, never infer
+from the neighbourhood, never carry them over from another property.
+
+This field is what the buyer-facing bot answers amenity questions from, so an
+invented feature becomes a false claim about someone's home, made directly to a
+prospective buyer.
+
+`Status` is always
 `Active` for this skill (a new listing is always going on the market, never
 sold/under contract — that's `listing-status-update`'s job). Use `N/A` for
 `Floor`/`Price` only if genuinely not being stated — normally both are
@@ -191,7 +211,7 @@ following that listing's own Yad2 section.
    properties appearing in the same piece of content, not multiple
    listings appearing in the same reply.
 8. **Missing or malformed Listing Record footer.** Every complete response
-   needs its own footer, in the exact 7-line format, immediately after that
+   needs its own footer, in the exact format above, immediately after that
    listing's Yad2 section, with nothing after it. This isn't just cosmetic —
    a malformed footer can leak its own raw labels into the visible Yad2
    caption, and a missing one means this listing silently never enters the
@@ -216,6 +236,6 @@ following that listing's own Yad2 section.
       the same message got its own separate, clearly-labeled response
 - [ ] If a photo was attached, only visibly-true details were used — no
       invented condition/availability claims from the image
-- [ ] Every complete response ends with its own exact 7-line Listing Record
+- [ ] Every complete response ends with its own Listing Record
       footer (`Status: Active`), immediately after that listing's Yad2
       section, nothing after it

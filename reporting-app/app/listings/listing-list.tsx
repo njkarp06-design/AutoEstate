@@ -118,6 +118,14 @@ export function ListingList({ listings }: { listings: Listing[] }) {
                     {" · Updated "}
                     {formatRelativeDateTime(listing.updatedAt)}
                   </p>
+                  {listing.features ? (
+                    <p className="mt-1.5 truncate text-sm text-status-muted">
+                      <span className="font-mono text-xs uppercase tracking-wide">
+                        Features ·{" "}
+                      </span>
+                      {listing.features}
+                    </p>
+                  ) : null}
                 </div>
                 <span
                   className={

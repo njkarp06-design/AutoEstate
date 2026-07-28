@@ -10,6 +10,12 @@ export type ParsedListingRecord = {
   floor: number | null;
   price: number | null;
   status: ListingStatusKey;
+  // Free-text amenities the agent actually stated ("elevator, balcony, parking").
+  // Null for every footer written before 2026-07-28 and for any reply that omits
+  // the line - which is normal, not malformed, so it is NOT part of the required
+  // set below. Deliberately the LAST field in the footer format; see
+  // FEATURES_MAX_CHARS and the plugin's format block for why.
+  features: string | null;
 };
 
 const FIELD_RE: Record<string, RegExp> = {
@@ -20,7 +26,35 @@ const FIELD_RE: Record<string, RegExp> = {
   floor: /^floor:\s*(.+)$/i,
   price: /^price:\s*(.+)$/i,
   status: /^status:\s*(.+)$/i,
+  features: /^features:\s*(.+)$/i,
 };
+
+const FEATURES_MAX_CHARS = 500;
+
+/**
+ * Free text, so it needs a bound - this string is injected into the buyer
+ * instance's context on EVERY turn, and an agent who writes a paragraph would
+ * pay for it on every future buyer message.
+ *
+ * Cut at a comma boundary, never mid-string. A raw slice can turn "parking"
+ * into "park" - a feature the agent never stated, which is precisely the
+ * invention this whole design exists to prevent. If there is no comma to cut
+ * at, drop the value entirely rather than store a truncated half-fact.
+ */
+function normalizeFeatures(value: string | undefined): string | null {
+  // Strip a trailing comma: a wrapped value ("…kitchen," + continuation line)
+  // loses its continuation by design, and would otherwise be stored dangling.
+  const tidy = (s: string) => s.trim().replace(/[,;]+$/, "").trim();
+
+  const trimmed = tidy(value ?? "");
+  if (!trimmed) return null;
+  if (/^(none|n\/a|-)$/i.test(trimmed)) return null;
+  if (trimmed.length <= FEATURES_MAX_CHARS) return trimmed;
+
+  const lastComma = trimmed.lastIndexOf(",", FEATURES_MAX_CHARS);
+  if (lastComma <= 0) return null;
+  return tidy(trimmed.slice(0, lastComma));
+}
 
 function parseNumber(value: string): number | null {
   const match = value.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
@@ -125,6 +159,7 @@ export function parseListingRecords(raw: string): ParsedListingRecord[] {
       floor: parseIntegerField(fields.floor),
       price: parseIntegerField(fields.price),
       status,
+      features: normalizeFeatures(fields.features),
     });
   });
 

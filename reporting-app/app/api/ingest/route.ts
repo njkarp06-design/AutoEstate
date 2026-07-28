@@ -188,6 +188,9 @@ export async function POST(request: NextRequest) {
                 transactionType: record.transactionType || existing.transactionType,
                 floor: record.floor ?? existing.floor,
                 price: record.price ?? existing.price,
+                // ?? not =, same as floor/price: a just-sold or status-change
+                // footer need not restate features, and must never wipe them.
+                features: record.features ?? existing.features,
               },
             });
           }
@@ -202,6 +205,7 @@ export async function POST(request: NextRequest) {
               floor: record.floor,
               price: record.price,
               status: record.status,
+              features: record.features,
             },
           });
         },

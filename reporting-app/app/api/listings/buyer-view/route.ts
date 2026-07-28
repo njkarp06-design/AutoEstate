@@ -36,6 +36,11 @@ export async function GET(request: NextRequest) {
       floor: l.floor,
       price: l.price,
       status: l.status,
+      // Amenities the agent stated. Exposed HERE and not on /api/listings/active:
+      // this is what lets the buyer bot answer "is there parking?" instead of
+      // deferring. Not exhaustive - see the buyer-inquiry skill's rule that an
+      // absent feature is unknown, never absent.
+      features: l.features,
     })),
   });
 }

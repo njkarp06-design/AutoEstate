@@ -125,11 +125,22 @@ def inject_buyer_listings_context(session_id, turn_id, user_message, platform, *
     # sat OUTSIDE the try, so a single missing key would have propagated a
     # KeyError out of pre_llm_call on a PUBLIC instance, on every turn.
     try:
-        lines = [
+        header = [
             "Available listings (from the reporting system — answer ONLY from these; "
             "never call a SOLD or under-contract listing available; if a detail isn't "
-            "here, do not invent it — defer to the agent):"
+            "here, do not invent it — defer to the agent).",
+            # This rule lives HERE, not only in the skill file, because a
+            # long-lived buyer session never reloads SKILL.md (the documented
+            # tool-call compliance gap) - the injected text is the only channel
+            # that reaches a conversation already in progress.
+            "FEATURES ARE NOT EXHAUSTIVE: a feature not listed is UNKNOWN, never "
+            "absent. If someone asks about something that isn't in a listing's "
+            "features (parking, pets, storage, anything), you do NOT know the "
+            "answer — say so and defer to the agent. Never answer \"no\" about a "
+            "feature just because it isn't listed, and never infer one from the "
+            "area, the price or the other features.",
         ]
+        lines = list(header)
         for listing in listings:
             if not isinstance(listing, dict) or any(
                 listing.get(f) is None for f in REQUIRED_FIELDS
@@ -141,18 +152,30 @@ def inject_buyer_listings_context(session_id, turn_id, user_message, platform, *
                 continue
             price = f"₪{listing['price']}" if listing.get("price") is not None else "price N/A"
             floor = f"floor {listing['floor']}" if listing.get("floor") is not None else "floor N/A"
+            # Deliberately NOT in REQUIRED_FIELDS: every listing recorded before
+            # 2026-07-28 has features=None, and treating that as malformed would
+            # drop the entire existing portfolio from the buyer's context.
+            raw_features = listing.get("features")
+            features = (
+                f" — FEATURES: {raw_features}"
+                if isinstance(raw_features, str) and raw_features.strip()
+                else ""
+            )
             lines.append(
                 f"- {listing['area']}, {listing['rooms']} rooms, {listing['sqm']} sqm, "
                 f"{floor}, {price} ({listing['transactionType']}) "
-                f"— STATUS: {listing['status']}"
+                f"— STATUS: {listing['status']}{features}"
             )
     except Exception as e:
         logger.warning("buyer-listings-context: could not format listings, no context injected: %s", e)
         return None
 
     # Every row was malformed - same situation as an empty list, and the skill
-    # must be told so explicitly rather than handed a bare header.
-    if len(lines) == 1:
+    # must be told so explicitly rather than handed a bare header. Keyed to the
+    # header's own length, not a literal: the header grew from one entry to two
+    # when the features rule was added, and a hardcoded 1 would have silently
+    # stopped detecting the all-malformed case.
+    if len(lines) == len(header):
         return NO_LISTINGS_CONTEXT
 
     return "\n".join(lines)
