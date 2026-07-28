@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
   });
 
   // Best-effort Listing tracking, parsed from the "Listing Record" footer
-  // both listing-to-social and listing-status-update append. Wrapped so a
+  // listing-to-social, listing-status-update and just-sold append. Wrapped so a
   // parse/match failure can never fail the request or lose the Run/messages
   // already recorded above - this is purely additive bookkeeping.
   try {

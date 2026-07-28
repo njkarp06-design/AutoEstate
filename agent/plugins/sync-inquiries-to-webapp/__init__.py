@@ -7,8 +7,14 @@ background-threaded httpx.post so a slow request never delays the buyer's
 reply, same platform gate excluding CLI. The differences:
 
   - Posts to /api/inquiries (derived from AUTOESTATE_INGESTION_URL), not
-    /api/ingest. No new env var - reuses the same ingestion secret, which
-    resolves to the same Customer.
+    /api/ingest. Same env var NAMES as sync-to-webapp, but NOT the same
+    secret VALUE: since the credential split, a buyer instance holds its own
+    per-customer secret, valid only on /api/inquiries and
+    /api/listings/buyer-view and rejected with 401 by /api/ingest. Never
+    copy the operator instance's secret here to save a provisioning step -
+    that rebuilds exactly the exposure the split removed (this box is
+    public, and the operator secret can flip a property to SOLD). See
+    reporting-app/lib/ingest-auth.ts and the profile's .env.example.
   - Resolves and attaches the buyer's identity best-effort (see
     _resolve_lead below): a `sender` handle and a human-reachable
     `buyerContact`. Capturing a reachable lead is the #1 value of this

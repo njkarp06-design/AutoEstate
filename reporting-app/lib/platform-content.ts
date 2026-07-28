@@ -22,8 +22,9 @@ const HEADER_KEYWORDS: Record<PlatformKey, RegExp> = {
   yad2: /yad ?2/i,
 };
 
-// Both listing-to-social and listing-status-update append a "Listing Record"
-// footer after the Yad2 section (see lib/listing-record.ts). Without capping
+// listing-to-social, listing-status-update and just-sold all append a "Listing
+// Record" footer after the Yad2 section (see lib/listing-record.ts; just-sold
+// is the only one that ever writes Status: Sold). Without capping
 // the Yad2 slice at this header, the footer's raw labels would leak into the
 // customer-facing Yad2 caption shown/edited/posted in the app.
 export const LISTING_RECORD_HEADER_RE = /^\*\*listing record:?\*\*:?\s*$/i;

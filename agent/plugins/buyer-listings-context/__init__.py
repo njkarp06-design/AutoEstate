@@ -40,10 +40,13 @@ import httpx
 
 logger = logging.getLogger("plugins.buyer-listings-context")
 
-# Reused from sync-to-webapp's own env vars — no separate secret/URL to
-# provision. BUYER_VIEW_URL is derived from INGESTION_URL (same pattern as
-# active-listings-context), so enabling this plugin needs nothing new rolled
-# out to a buyer instance beyond the env it already has.
+# Same env var NAMES as sync-to-webapp, and BUYER_VIEW_URL is derived from
+# INGESTION_URL (same pattern as active-listings-context), so there is no extra
+# URL to roll out. The SECRET is a different matter: a buyer instance holds its
+# own per-customer credential, valid only on this endpoint and /api/inquiries,
+# and rejected with 401 by /api/ingest. Never reuse the operator instance's
+# secret here — this box is public, and that credential can mutate the
+# customer's Listing rows. See reporting-app/lib/ingest-auth.ts.
 INGESTION_URL = os.getenv("AUTOESTATE_INGESTION_URL")  # e.g. https://.../api/ingest
 INGESTION_SECRET = os.getenv("AUTOESTATE_INGESTION_SECRET")
 BUYER_VIEW_URL = (
