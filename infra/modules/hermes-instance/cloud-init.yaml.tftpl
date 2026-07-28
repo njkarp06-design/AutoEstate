@@ -23,11 +23,22 @@ write_files:
       # chat-id format only matters once cron delivery is actually used, so
       # re-check it then rather than assuming - see TODO item 3.
       WHATSAPP_HOME_CHANNEL=${whatsapp_allowed_users}
-      # ANTHROPIC_API_KEY and AUTOESTATE_INGESTION_SECRET are deliberately
-      # not written here - the null_resource.inject_secrets provisioner in
-      # main.tf injects both post-boot over SSH instead, so either can be
-      # rotated without changing user_data (which would force this whole
-      # server to be recreated, losing the paired WhatsApp session).
+      # Agent-facing Telegram, alongside WhatsApp (TODO 12a). Telegram needs no
+      # phone number, so it is the route to one-number-per-customer; WhatsApp
+      # stays until it's known whether agents will actually work in Telegram.
+      # Both vars are written unconditionally and are inert without a token -
+      # TELEGRAM_BOT_TOKEN is injected post-boot and empty by default, and no
+      # adapter starts without it, so a WhatsApp-only customer needs no
+      # conditional template logic.
+      TELEGRAM_ALLOWED_USERS=${telegram_allowed_users}
+      # Same "no home channel set" prompt suppression as WhatsApp above.
+      TELEGRAM_HOME_CHANNEL=${telegram_allowed_users}
+      # ANTHROPIC_API_KEY, AUTOESTATE_INGESTION_SECRET and TELEGRAM_BOT_TOKEN
+      # are deliberately not written here - the null_resource.inject_secrets
+      # provisioner in main.tf injects all three post-boot over SSH instead, so
+      # any of them can be rotated without changing user_data (which would
+      # force this whole server to be recreated, losing the paired WhatsApp
+      # session).
       # WHATSAPP_ENABLED and WHATSAPP_MODE are intentionally left unset -
       # the interactive `hermes whatsapp` pairing wizard sets these itself.
       # A gateway that starts with WHATSAPP_ENABLED=true but no paired
@@ -77,6 +88,23 @@ write_files:
             long_running_notifications: generic
             # Telegram-only in practice: the Baileys WhatsApp adapter has no
             # delete_message, so this no-ops there (verified 2026-07-28).
+            cleanup_progress: true
+            status_phrases:
+              mode: replace
+              status:
+                - "Working on that now — one moment."
+                - "Still on it — nearly there."
+          # Same presentation for the agent-facing Telegram bot. Not a copy for
+          # symmetry's sake: without its own block Telegram falls back to
+          # Hermes's defaults, which surface tool breadcrumbs ("📚 Reading skill
+          # listing-to-social") mid-answer - the exact thing the WhatsApp block
+          # above exists to suppress. cleanup_progress genuinely works here,
+          # since the Telegram adapter does implement delete_message.
+          telegram:
+            tool_progress: off
+            interim_assistant_messages: false
+            busy_ack_detail: false
+            long_running_notifications: generic
             cleanup_progress: true
             status_phrases:
               mode: replace

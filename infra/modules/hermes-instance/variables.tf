@@ -24,6 +24,32 @@ variable "whatsapp_allowed_users" {
   type        = string
 }
 
+// --- Operator channel -------------------------------------------------------
+// A customer's agent-facing bot runs on WhatsApp and/or Telegram. Both are
+// wired here deliberately (decided 2026-07-28, TODO 12a): Telegram needs no
+// phone number at all, so it is the route to one-number-per-customer, but
+// WhatsApp stays available while it's still unknown whether Tel Aviv agents
+// will actually work in Telegram.
+//
+// TO DROP WHATSAPP LATER, once that question is answered: remove
+// whatsapp_allowed_users above, its two lines in cloud-init.yaml.tftpl's .env
+// block, and the display.platforms.whatsapp block. Nothing else references it.
+// Kept as an explicit note because "which parts are the WhatsApp half" is
+// exactly the archaeology that makes a cheap deletion expensive later.
+
+variable "telegram_bot_token" {
+  description = "BotFather token for this customer's agent-facing Telegram bot. Empty disables Telegram entirely (no adapter starts), which is the correct value for a WhatsApp-only customer. Injected post-boot like the other secrets, so rotating it never rebuilds the server."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "telegram_allowed_users" {
+  description = "The customer's own numeric Telegram user id - the only sender their agent-facing bot will respond to. Ignored when telegram_bot_token is empty."
+  type        = string
+  default     = ""
+}
+
 variable "operator_ssh_key_name" {
   description = "Name of the operator's SSH key as already uploaded to the Hetzner project (Security -> SSH Keys). Looked up, not created: Hetzner rejects a duplicate public key within a project regardless of the resource name, so creating one per customer from the same operator key breaks every apply after the first. Upload it once, reference it by name for every customer."
   type        = string
