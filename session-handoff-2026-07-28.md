@@ -56,7 +56,7 @@ Two account-level steps remain the real gate for a pilot — both need the owner
 
 ### Open questions for the owner
 
-**One, and it is cosmetic.** The operator bot's *display name* is now "AutoEstate", but its **username is still `@autoestate_test_bot`** — that is what appears in any link. Changing it is BotFather `/setusername`, and it changes the link. Asked 2026-07-28, no answer as of that date; not blocking anything.
+**None.** The operator bot's *display name* is now "AutoEstate", though its **username is still `@autoestate_test_bot`** — and that is settled rather than open: **a Telegram bot's username is permanent.** There is no `/setusername`; BotFather changes the name, about text, picture, commands and privacy, not the username. Changing it means `/newbot`, which mints a **new token** that would then have to be written into the profile `.env` and the Terraform variable. Deliberately left alone: only the owner messages that bot, the display name already reads correctly, and a real customer gets their own bot created fresh — at which point the username is chosen once, permanently.
 
 Everything else is closed. The buyer bot has a fresh token and a paired WhatsApp number, both verified live; group-joining is now disabled on both bots (`can_join_groups: False`, confirmed via `getMe`). **Anthropic auto-reload billing: the owner reported it enabled, but on 2026-07-28 the shared key was found genuinely out of credit and the owner topped up manually — so whatever the setting says, it did not prevent an exhaustion that day.** All three `.env` files hold the *same* key, so this is one balance for the whole project. The only things still outside the repo's control are **Hetzner and Vercel**; neither account exists.
 
