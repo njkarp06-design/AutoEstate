@@ -76,6 +76,11 @@ it is locked down by construction rather than by prompt:
   scopes each credential to its own routes, so the buyer instance can read listing
   data and record inquiries but cannot write to the ingestion endpoint — extracting
   its secret does not grant the ability to alter a customer's listings.
+- **Outbound file delivery is restricted to a small allowlist of directories.**
+  The agent can attach a file by naming a path in its own reply text — a channel
+  no tool restriction covers, since it is not a tool. Left at the default it
+  would deliver almost any file on the host, so it is pinned to the instance's
+  own media cache.
 
 Secrets never live in this repo. Per-customer credentials are generated at
 provisioning time and stored only as hashes.
