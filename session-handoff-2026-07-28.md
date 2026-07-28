@@ -52,6 +52,8 @@ Two account-level steps remain the real gate for a pilot — both need the owner
 
 **Non-blocking:** create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts push. The dashboard records leads either way.
 
+**Listing photos/videos (TODO item 13) — scoped 2026-07-29, not started.** Two of three legs already exist in Hermes: inbound media is cached per-profile (video included), and outbound delivery needs **no new tool** (`MEDIA:<path>` in reply text). The blob store is **decided — Cloudflare R2**, chosen on zero egress and on S3 compatibility serving both the Next.js and Python runtimes; **no Cloudflare account, bucket or credential exists yet**, which is the first step and is the owner's. Scoping it also found and closed a live security gap — see the outbound-file-delivery gotcha below.
+
 **Channel consolidation (TODO item 12) — decided, built and live-tested 2026-07-28.** Both unblocked halves are done:
 
 - **12a — agent-facing Telegram. Decision: both channels, drop WhatsApp later.** The dev profile already ran Telegram on a **live** token (verified via `getMe`, now renamed to "AutoEstate"); the real gap was that the **Terraform template shipped no Telegram at all**, so every customer would have been WhatsApp-only. Now wired alongside WhatsApp — an empty token starts no adapter, and `variables.tf` names exactly what to delete when WhatsApp goes. Rendered in `terraform console`, `fmt`/`validate` clean, **never applied**. `listing-to-social` is proven end-to-end over Telegram (`REF-QTPT4`, Shenkin — the first real listing that channel ever carried), with the footer-reminder plugin confirmed firing there via `api_content`. **The other four skills remain unverified on Telegram.**
