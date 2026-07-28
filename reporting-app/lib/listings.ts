@@ -22,6 +22,10 @@ export type Listing = {
   floor: number | null;
   price: number | null;
   status: ListingStatus;
+  // Amenities the agent stated. Surfaced on the Listings page so the customer
+  // can see exactly what their buyer-facing bot answers questions from - there
+  // is no listing-edit UI, so this view is the only audit surface for it.
+  features: string | null;
   updatedAt: number; // epoch seconds - same convention as lib/db.ts's Run
   // The Run whose generated posts (Instagram/Facebook/Yad2) this listing
   // came from, most-recent first - lets the UI link out to /runs/[id].
@@ -62,6 +66,7 @@ export async function getListings(customer: Customer): Promise<Listing[]> {
     floor: l.floor,
     price: l.price,
     status: toListingStatus(l.status),
+    features: l.features,
     updatedAt: Math.floor(l.updatedAt.getTime() / 1000),
     latestRunId: l.runs[0]?.id ?? null,
   }));

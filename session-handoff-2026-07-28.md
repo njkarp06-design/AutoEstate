@@ -16,6 +16,8 @@ Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history;
 - **The buyer instance is running.** Its Telegram token was replaced (verified live as `@autoestate_buyer_bot`) and a dedicated WhatsApp number is paired. **It is public while running** — stop it when not testing.
 - **Nothing is half-deployed.** PR #52's five plugins and the buyer `config.yaml` are deployed and verified (parity 5/5, buyer config clean, live-profile resolution confirms the WhatsApp lockdown), and the owner restarted the operator gateway onto the new code at 15:53 on 2026-07-28. Re-run CLAUDE.md §5's parity recipe rather than trusting this line — the next plugin change invalidates it.
 
+- **Buyer bot can now answer amenity questions** (2026-07-28). An optional `Features:` line on the Listing Record footer carries parking/elevator/balcony/etc. through to the buyer instance. Verified live both ways: it answers a listed feature and **defers** on an unlisted one rather than inferring absence. **Not deployed** — see the deployment note in TODO; the migration must precede the plugin copy.
+
 ### Live systems
 
 Gateway, bridge and config rows verified **2026-07-28** by listing processes and resolving config through Hermes's own resolvers. Route/database/toolchain rows were last exercised the same day via the live buyer test. PIDs are a dated observation — re-derive rather than trust them.

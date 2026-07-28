@@ -1,7 +1,7 @@
 ---
 name: listing-status-update
 description: Use when a real estate agent wants to announce a change to a listing they already advertised — a price drop, or going under contract/rented — and wants ready-to-post content. Not for a completed sale — see just-sold. The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the status change plus the listing's core facts into platform-formatted Hebrew and English posts for Instagram, a Facebook group, and Yad2.
-version: 0.4.0
+version: 0.5.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -192,7 +192,19 @@ Size: <number> sqm
 Floor: <number, or N/A>
 Price: <₪ amount, or N/A>
 Status: <Active | Under Contract>
+Features: <optional, see below>
 ```
+`Features` may be appended as an optional **last** line (after `Status`) when
+the agent restates amenities in this message — `Features: elevator, balcony`.
+Only concrete amenities they actually stated, one comma-separated line, never
+marketing language from the caption. It must be last: the parser stops at the
+first unrecognised line, so a wrapped `Features` value above `Status` would
+cost the listing its tracking.
+
+Omitting it is safe and normal — the reporting system **keeps** the features
+already on record when this line is absent, so a status update never wipes
+them. Only include it when the agent has genuinely restated or changed them.
+
 
 `Status` reflects this update: `Active` for a price drop (still on the
 market, just at a new price — use the new price in `Price`), `Under
