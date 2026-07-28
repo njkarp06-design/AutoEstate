@@ -159,6 +159,13 @@ Currently on the **Baileys/QR bridge** (unofficial, carries a ban risk, mitigate
 The reporting app has a per-platform Instagram post-action preference, but the auto-post options are inert ("coming soon"). Facebook Group and Yad2 stay permanently manual (Meta retired third-party Group posting in 2024; Yad2 has no posting API).
 - [ ] Requires Meta Business Verification (an account-level commitment not yet made) before this can be built.
 
+### 14. In-chat contract signing (replace the agent's DocuSign subscription) — IDEA ONLY
+Discussed 2026-07-28. Nothing built, no schema change, no decision. The buyer bot delivers the realtor fee agreement (הזמנת שירותי תיווך) and the lead signs it without DocuSign. Full write-up, including the two gates that decide feasibility (Brokers Law §9 validity, and who holds the audit trail), is in [docs/ideas/contract-signing.md](docs/ideas/contract-signing.md) — written to be pasted into a fresh session as-is.
+- [ ] Ask 2-3 real Tel Aviv agents what they use today for the fee agreement.
+- [ ] One lawyer hour on §9 + electronic signature validity — the only thing that can kill this outright.
+- [ ] Then decide self-hosted audit trail vs a pay-per-envelope e-sign API behind the same UX.
+- Sequencing: this moves the product from marketing automation into contract execution, so not before the Hetzner apply (item 3) and the Vercel deploy (item 4) are live.
+
 ---
 
 ## 🔑 Credentials — both resolved (2026-07-28)
