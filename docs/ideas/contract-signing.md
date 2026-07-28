@@ -68,21 +68,28 @@ party, no email round trip.
       action this repo has documented three times as unreliable to control by
       instruction. Making a legally binding contract's delivery contingent on the
       model choosing to emit a tag is the wrong mechanism.
-    - It is **being deliberately locked down on this exact instance**. A parallel
-      branch (`feat/buyer-strict-media-delivery`, uncommitted as of 2026-07-29)
-      sets `gateway.strict` + `trust_recent_files: false` on the buyer profile,
-      because under Hermes's default a prompt-injected buyer can get the model to
-      emit a path and exfiltrate the operator's `.env` or either profile's
-      `state.db`. Under that lockdown only files beneath the profile's cache roots
-      are deliverable.
+    - It is **now locked down on this exact instance** — this was pending when the
+      paragraph was first written and has since shipped. PR #67 (merged
+      2026-07-29) sets `gateway.strict: true` **and** `trust_recent_files: false`
+      on the buyer profile, because under Hermes's defaults a prompt-injected
+      buyer could get the model to emit a path and exfiltrate the operator's
+      `.env` or either profile's `state.db` — all three were measured as
+      deliverable before the fix. Both keys are load-bearing: strict alone keeps a
+      600s recency fallback, and `state.db` is rewritten every turn, so it stayed
+      deliverable under strict until the second key was added. **Under that
+      lockdown only files beneath the profile's cache roots are deliverable**,
+      which is the constraint any contract-PDF delivery must design around.
     - So a contract PDF would have to be **written into the buyer profile's cache
       root by something other than the agent** — the instance has 3 tools and no
       file/terminal/code toolset, so it cannot produce one itself.
 
     Net: attachment delivery is available and is a genuine UX upgrade over a bare
     link (an agent expects to see the document), but it is a *delivery* option to
-    evaluate later, not the mechanism the design should rest on. Re-read that
-    branch's config comments before designing around it.
+    evaluate later, not the mechanism the design should rest on. Read the
+    commented lockdown block in `agent/profiles/autoestate-buyer/config.yaml`
+    (and the "fourth isolation layer" section of that profile's README) before
+    designing around it — the live config is machine-rewritten and comment-free,
+    so the repo copy is the only place the reasoning survives.
 
 (b) **The signing still cannot happen in chat, and this is the load-bearing
     blocker.** A signature captured as chat text ("reply YES to sign") is
