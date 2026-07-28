@@ -1,4 +1,4 @@
-## Session Handoff — 2026-07-27
+## Session Handoff — 2026-07-28
 
 ### What this project is
 
@@ -9,12 +9,14 @@ Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history;
 ### Where things stand
 
 - **All planned features are built, live-tested and merged.** The last, buyer-inquiry, shipped in PR #34 on 2026-07-26. **Nothing is blocked on more building** — everything remaining is productionization.
-- **Whether anything is in flight is deliberately not stated here** — it changes the moment anything merges, including the PR that would update this line, which is how this sentence has already gone stale once. Run `gh pr list`. Beyond `main` and whatever is genuinely in flight, exactly one other branch exists: `chore/doc-consistency-checker`, **intentionally unmerged**, holding the only copy of the closed PR #33 doc-checker script (`.claude/doc-consistency-check.sh`). Do not delete it as stale — its commits exist nowhere else — and never merge it: it sits far behind `main` by design. Cherry-pick the script if you want it.
+- **Whether anything is in flight is deliberately not stated here** — it changes the moment anything merges, including the PR that would update this line, which is how this sentence has already gone stale once. Run `gh pr list`. Beyond `main` and whatever is genuinely in flight there are **no other branches** — the long-lived `chore/doc-consistency-checker` was retired on 2026-07-28 after its one real run produced nothing actionable, and its commits live on as the tag `archive/doc-consistency-checker`. Nothing needs cherry-picking or protecting from deletion any more.
 - **Nothing is deployed.** The reporting app runs only via `npm run dev` (port 4127). The Terraform module is written and `validate`-clean but has **never been applied** — there is no Hetzner account.
 - **The buyer instance cannot currently be started.** Its Telegram token was revoked by the owner after testing (correct — it was a public bot). Verified, not assumed: `getMe` with the token still in its `.env` returns 401. The profile, its lockdown and both plugins are intact and version-controlled; only the credential is gone. TODO item 10.
 - **Nothing is half-deployed.** Repo↔live plugin parity is 5/5 and the running operator gateway demonstrably loaded the current code. Re-run CLAUDE.md §5's parity recipe rather than trusting this line — the next plugin change invalidates it.
 
-### Live systems — verified 2026-07-27 by listing processes, hashing files and calling the routes
+### Live systems
+
+Verified 2026-07-27 by listing processes, hashing files and calling the routes. The gateway rows and plugin parity were **re-confirmed 2026-07-28** after a merge; the route, database and toolchain rows still stand from the 27th and have not been re-run since.
 
 | | State |
 |---|---|
@@ -67,4 +69,4 @@ PIDs are a dated observation, not a standing fact — re-derive rather than trus
 
 ### How to resume
 
-> Read session-handoff-2026-07-27.md and continue. Everything is built and merged; verify with `git log origin/main..` and `gh pr list --state all` rather than trusting any branch/PR claim in these docs, and re-run CLAUDE.md §5's parity recipe rather than trusting the plugin-parity line. What's left is productionization, starting with whichever account-level step I authorize — Hetzner + `terraform apply` (TODO item 3) or the Vercel deploy (item 4). **Don't start either without me:** both cost money and neither account exists. Two things to know before you plan: the buyer-channel transport decision now carries a security gate, because the buyer profile's lockdowns are Telegram-only; and the buyer instance can't be started at all until a fresh BotFather token exists, since the old one is revoked (verified — `getMe` returns 401). If a dev server is running from an older checkout, restart it — the Prisma client loads at start, so it will 500 on every machine route until you do.
+> Read session-handoff-2026-07-28.md and continue. Everything is built and merged; verify with `git log origin/main..` and `gh pr list --state all` rather than trusting any branch/PR claim in these docs, and re-run CLAUDE.md §5's parity recipe rather than trusting the plugin-parity line. What's left is productionization, starting with whichever account-level step I authorize — Hetzner + `terraform apply` (TODO item 3) or the Vercel deploy (item 4). **Don't start either without me:** both cost money and neither account exists. Two things to know before you plan: the buyer-channel transport decision now carries a security gate, because the buyer profile's lockdowns are Telegram-only; and the buyer instance can't be started at all until a fresh BotFather token exists, since the old one is revoked (verified — `getMe` returns 401). If a dev server is running from an older checkout, restart it — the Prisma client loads at start, so it will 500 on every machine route until you do.
