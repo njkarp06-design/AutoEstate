@@ -189,6 +189,46 @@ access to the customer's `Listing` data. Never paste the operator instance's
 secret into this profile's `.env` to save a provisioning step — see
 `reporting-app/lib/ingest-auth.ts` and `.env.example`.
 
+## The fourth isolation layer: outbound file delivery
+
+Added 2026-07-29. It is a *fourth* layer because neither the skill lockdown, the
+tool lockdown nor the credential scoping touches it, and it took a feature
+question about listing photos to notice it was open.
+
+**Outbound media is not a tool.** The model emits `MEDIA:<absolute path>` in its
+reply **text**; the gateway strips the tag and delivers the file
+(`gateway/run.py` → `adapter.extract_media` → `send_video` /
+`send_multiple_images`). So this instance's 3-tool allowlist constrains it not at
+all, and `agent.disabled_toolsets` has nothing to say about it. A prompt-injected
+buyer who gets the model to emit one path gets that file — delivered to
+themselves.
+
+Hermes ships `gateway.strict: false` by default, which accepts **any** existing
+file not on a credential denylist, and that denylist is scoped to the *active*
+profile plus the shared root — so it does not cover a sibling profile. Measured
+here by running `validate_media_delivery_path` with `HERMES_HOME` set to this
+profile, not by reading it:
+
+| path | default | now |
+|---|---|---|
+| `autoestate-buyer/.env`, `hermes/auth.json` | blocked | blocked |
+| `autoestate-buyer/state.db` (every buyer's messages + captured phone numbers) | **delivered** | blocked |
+| `autoestate/.env` (operator's API key, bot token, ingestion secret) | **delivered** | blocked |
+| `autoestate/state.db` (operator's whole history) | **delivered** | blocked |
+| `cache/images/<file>` (legitimate delivery) | delivered | delivered |
+
+**`strict: true` alone does not close it — `trust_recent_files: false` is
+load-bearing.** Strict mode keeps a recency fallback that delivers anything
+modified within 600s (on by default). Its rationale is that injection targets
+"have mtimes measured in days or months" — true of `/etc/passwd`, false of the
+file that matters most here: this profile's `state.db` is rewritten on *every
+turn*, so while the gateway runs it is permanently inside the window. With
+strict alone, a freshly-touched `state.db` came back **delivered**.
+
+Legitimate delivery is unaffected: the cache roots are honoured *before* the
+denylist, so `cache/{images,audio,videos,documents}` stay deliverable — which is
+where any future listing-media feature must write.
+
 ## Known production gates (not fixed here)
 
 - **No OS-level isolation** (`terminal.backend: local`). The tool lockdown means
