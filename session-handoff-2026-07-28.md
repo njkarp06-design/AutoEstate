@@ -45,6 +45,7 @@ Two account-level steps remain the real gate for a pilot — both need the owner
 
 3. **Harden the public buyer instance** (items 5–6): OS-level isolation, and re-running `hermes security audit` once anything is exposed. *(The "global `.env` puts a Gmail credential on that box" item was **disproved 2026-07-28** by running Hermes's own env loader — profiles do not inherit it, and the buyer profile resolves no `email` platform and no `EMAIL_PASSWORD`. Nothing to do; see TODO.)*
 4. **Add `WHATSAPP_ALLOW_ALL_USERS=true`** to any buyer instance Terraform provisions — with `dm_policy: open` Hermes refuses to boot without it. It blocked the dev instance and will block the first real one identically.
+
 **Non-blocking:** create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts push. The dashboard records leads either way.
 
 **Channel consolidation (TODO item 12) — decided, built and live-tested 2026-07-28.** Both unblocked halves are done:
