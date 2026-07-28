@@ -99,8 +99,9 @@ agent:
   # reply that lands in 10-20s means it would NEVER show - the buyer just
   # watches "typing…" and wonders. 10s puts one short human line in front of
   # them while the answer is being prepared. It edits a single bubble rather
-  # than sending a new one each interval, and cleanup_progress removes it once
-  # the real answer arrives.
+  # than sending a new one each interval. On Telegram cleanup_progress then
+  # removes it; on WhatsApp it cannot (no delete_message), so the line stays
+  # above the answer - which reads fine, but know that it persists there.
   gateway_notify_interval: 10
   disabled_toolsets:
     - terminal
@@ -259,8 +260,12 @@ display:
       # "generic" = a short human holding phrase (from status_phrases below)
       # instead of "⏳ Working — N min", which reads as machinery.
       long_running_notifications: generic
-      # Remove the holding bubble once the real answer lands, so the thread
-      # reads as a clean conversation rather than a progress log.
+      # Remove the holding bubble once the real answer lands.
+      # ⚠ TELEGRAM ONLY, verified live 2026-07-28: the Baileys WhatsApp
+      # adapter implements edit_message but NOT delete_message, so this
+      # silently no-ops there and the holding line stays above the answer.
+      # Left enabled because it is correct for Telegram and harmless on
+      # WhatsApp - but do not read it as "the bubble disappears everywhere".
       cleanup_progress: true
       status_phrases:
         # replace, not append: the built-in catalog ("on it", "one sec") is

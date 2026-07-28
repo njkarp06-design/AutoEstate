@@ -75,6 +75,8 @@ write_files:
             interim_assistant_messages: false
             busy_ack_detail: false
             long_running_notifications: generic
+            # Telegram-only in practice: the Baileys WhatsApp adapter has no
+            # delete_message, so this no-ops there (verified 2026-07-28).
             cleanup_progress: true
             status_phrases:
               mode: replace
