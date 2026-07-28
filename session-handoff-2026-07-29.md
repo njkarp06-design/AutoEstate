@@ -22,9 +22,9 @@ Verified **2026-07-29** by listing processes, hashing files, calling the routes,
 | | State |
 |---|---|
 | `default` Hermes gateway | running, PID 1976 (unrelated personal profile) |
-| `autoestate` gateway (operator) | running **detached** (`pythonw`, PID 43308) via the `Hermes_Gateway_autoestate.vbs` startup item. Use `gateway start` (service), **not** `gateway run` (foreground) |
+| `autoestate` gateway (operator) | **STOPPED deliberately at ~01:35 on 2026-07-29** — see the open incident below. Telegram is down with it. Normally runs detached (`pythonw`) via the `Hermes_Gateway_autoestate.vbs` startup item; use `gateway start` (service), **not** `gateway run` (foreground) |
 | `autoestate-buyer` gateway | **stopped**, deliberately — it is public whenever it runs. Both channels credentialled: Telegram `@Auto_Estate_Buyer_bot` + a paired dedicated WhatsApp number |
-| WhatsApp bridges | port **3000** = operator (PID 2996, unchanged since 07-24 — **never kill this**); port **3001** = buyer (PID 34008, survives its gateway stopping, which keeps the linked device alive) |
+| WhatsApp bridges | port **3000** = operator — **currently FREE, bridge deliberately killed** during the open incident below. Port **3001** = buyer (PID 34008, untouched; survives its gateway stopping, which keeps the linked device alive). The standing "never kill 3000" rule protects a *working* operator bridge and is suspended while that bridge is a failing loop |
 | Reporting app, 127.0.0.1:4127 | running. All four machine routes healthy — `401` on the two GETs, `405` on the two POST-only ones |
 | Repo↔live plugin parity | **5/5**. Operator: `sync-to-webapp` / `listing-footer-reminder` / `active-listings-context`. Buyer: `buyer-listings-context` (1.2) / `sync-inquiries-to-webapp` |
 | Repo↔live buyer `config.yaml` | **0 drift** (parsed YAML, `MACHINE-SPECIFIC` keys excluded) — including the two new `gateway.*` keys |
@@ -62,6 +62,27 @@ Three account-level steps, all needing the owner, none of which I can do:
 - **Cloud API migration sequenced into the ordered path (PR #66)**, where it had been missing entirely despite carrying a full checklist inside item 12b.
 - **Contract-signing idea (TODO 14) corrected (PR #70)** — it described the media lockdown as an uncommitted branch; it had merged. Items 13 and 14 are now cross-linked, since both rest on `MEDIA:` delivery and the same cache-root constraint.
 
+### OPEN INCIDENT — operator WhatsApp is down (2026-07-29, unresolved at handoff)
+
+**State when this was written: the `autoestate` gateway is STOPPED and port 3000 is FREE, deliberately.** Telegram is down with it. The buyer bridge on 3001 (PID 34008) was never touched. No data is affected — this is a delivery channel, not a data path.
+
+**What happened, in order.** The operator bridge (PID 2996, up since 07-24) began throwing `503` stream errors at ~00:54. At 01:22 a gateway restart — run to pick up the new Telegram token — found the bridge unhealthy and therefore **killed and replaced it** (see the gotcha above; the previous docs claimed a restart always reuses it, which is what made this restart look free). The replacement bridge could not connect: a `405` loop, retrying every 3 seconds, with the gateway independently retrying every 60. `405` count reached **152** before it was stopped at ~01:35.
+
+**What is ruled out, by checking rather than reasoning:** not a logged-out session — the phone still lists both linked devices, and `creds.json` plus 1,376 session files are intact on disk. Not a stale Baileys version — the bridge calls `fetchLatestBaileysVersion()` at connect. Not caused *by* the restart alone — the `503`s predate it by ~25 minutes.
+
+**Leading hypothesis: a WhatsApp-side rate limit or block**, which the 3-second retry loop was actively deepening. That is the risk this project knowingly accepted by running Baileys on an eSIM.
+
+**Next step, and do not skip the wait.** After ≥30 minutes idle, start once and watch a *single* attempt:
+
+```
+hermes -p autoestate gateway start
+Get-Content "$env:LOCALAPPDATA\hermes\profiles\autoestate\whatsapp\bridge.log" -Tail 20 -Wait
+```
+
+`✅ WhatsApp connected!` means it was temporary and it is over. Another `405` within a few attempts means **stop immediately** (`gateway stop`, then kill the node process on port 3000 — it survives the gateway and keeps its own loop) and treat it as a durable block on that number. That is a materially worse situation and changes the Cloud-API argument in item 12b from "the right long-term home" to "the fix".
+
+**Killing port 3000 is correct in this state**, despite the standing never-kill-3000 rule — that rule protects a *working* bridge, and this one is a failing loop. It does not unpair anything.
+
 ### Open questions for the owner
 
 **None blocking.** One cosmetic observation, recorded rather than acted on: the two Telegram bots' display names are inconsistent — operator reads "AutoEstate", buyer reads "autoestate Buyer" (lowercase). Both are changeable in BotFather without touching a token. Not worth a session on its own.
@@ -80,6 +101,7 @@ Everything else is closed. **Anthropic credit exhaustion remains a live failure 
 - **Outbound file delivery is triggered by reply TEXT, not a tool.** `MEDIA:<abs path>` makes the gateway deliver that file, so no tool lockdown constrains it. The buyer profile now sets `gateway.strict: true` **and** `gateway.trust_recent_files: false`; media must be written into the profile cache roots to stay deliverable. The operator profile is deliberately still on the default.
 - **`sender_id` *is* available to plugin hooks** (`pre_llm_call` and `post_llm_call` both). It does **not** let you gate by role — a plugin can only inject text, and text doesn't reliably stop the model acting. Sender identity still never reaches a *skill*, which is what forces role-by-channel isolation.
 - **A skill edit never reaches a conversation already in progress.** A running session answers from the copy it loaded at session start. Use `/new` to pick a change up, or test with a fresh sender.
+- **A gateway restart replaces the WhatsApp bridge whenever that bridge is unhealthy or stale.** Reuse requires `/health` = `connected` **and** a `scriptHash` matching the on-disk `bridge.js`; otherwise the adapter kills it and spawns a new one. So restarting a gateway whose WhatsApp is already struggling throws away the connection that might have recovered — see the 2026-07-29 incident below. Pairing survives regardless (session on disk, device still linked); the *connection* does not.
 - **Never let the buyer gateway run with the default WhatsApp `bridge_port`.** The adapter defaults to 3000 and kills whatever holds that port on start — 3000 is the **live operator bridge**. The buyer config pins `3001`; do not "tidy" it. Pairing is unaffected (`--pair-only` starts no HTTP server).
 - **`gateway run` is foreground, `gateway start` is the detached service.**
 - Use **`127.0.0.1`**, never `localhost` (IPv6 collision). A page-route 500 on 4127 is usually a transient Turbopack recompile; an API route returning 401 proves the agent-facing path is fine.
