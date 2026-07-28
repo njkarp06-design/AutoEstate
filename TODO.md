@@ -8,7 +8,7 @@ Last updated: 2026-07-28 (channel-consolidation decision — item 12).
 
 **Blocked on the owner (account-level, cannot be done for you):** creating a Hetzner account so `terraform apply` can run (item 3), and setting up Vercel Pro to deploy the reporting app (item 4). These two gate a real pilot customer.
 
-**Must happen before a real customer:** hardening the public buyer instance (items 5–6) — not blocked. The buyer-channel transport decision is **settled** (2026-07-28: both Telegram and WhatsApp), and both channels are **paired and live-tested**. One nuance remains on the open-channel question: the WhatsApp buyer path was exercised end to end, but by the **owner's own number**, not a genuine third party. The allowlist is `*` so no sender is privileged for messaging, and a real stranger did test the Telegram side on 2026-07-26 — but a third-party sender on WhatsApp specifically is still untested.
+**Must happen before a real customer:** hardening the public buyer instance (items 5–6) — not blocked. The buyer-channel transport decision is **settled** (2026-07-28: both Telegram and WhatsApp), both channels are **paired and live-tested**, and the open-channel question is now **fully closed on both**: a genuine third party (not the owner, not the flatmate) messaged the WhatsApp buyer number on 2026-07-28 and the whole path held — see item 10.
 
 **Both long-standing open questions are now closed (2026-07-28):**
 - **The buyer bot is fully credentialled as of 2026-07-28.** Its Telegram token was revoked on 07-27 (old one verified dead via `getMe` -> 401, not assumed) and replaced 07-28, verified live -> `@autoestate_buyer_bot`. A dedicated WhatsApp number is now paired too. **Nothing about the buyer instance is blocked on credentials any more** — see item 10.
@@ -40,7 +40,7 @@ Buyer-inquiry shipped on 2026-07-26 (PR #34), which was the last item on the mar
 2. Deploy the reporting app to Vercel Pro (item 4) — also account-level.
 3. The public buyer instance's remaining production security gates (items 5 and 6): container isolation, and re-running `hermes security audit` once anything is publicly exposed. **The scoped second ingestion secret is done** (2026-07-27) — the buyer box no longer holds a credential that can write to `/api/ingest`.
 4. ~~Settle the buyer-channel transport.~~ **Done 2026-07-28** — both Telegram and WhatsApp, with the gating landed in the same change as the transport. The equivalent gate is now open only for `whatsapp_cloud`. **Superseded in direction the same day by the channel-consolidation decision (item 12): operator → Telegram, buyer → Cloud API, one number per customer.** Today's arrangement stays as-is and keeps working; 12 is the target state, not a rollback.
-5. Re-confirm open-channel behaviour on **WhatsApp with a genuine third party**. No longer blocked — both channels are paired and the WhatsApp path ran end to end on 2026-07-28, but from the **owner's own number**. The allowlist is `*`, so no sender is privileged for messaging, and a real stranger did test Telegram on 07-26; a third-party sender on WhatsApp is the one untested combination. Cheap to close: have someone else message the buyer number.
+5. ~~Re-confirm open-channel behaviour on **WhatsApp with a genuine third party**.~~ **DONE 2026-07-28** — a real stranger tapped a real ad link and the whole path held, including the `buyerContact` capture that had never been proven by a third party. Details in item 10.
 
 Also outstanding and non-blocking: create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts actually push (the dashboard records leads either way).
 
@@ -173,7 +173,12 @@ Both channels are credentialled and paired; nothing here blocks anything. Histor
   - Registering it does **not** require logging the operator bot out; it requires a free *slot* (a spare handset, or multi-account support in WhatsApp / WhatsApp Business).
   - **Keepalive:** a linked device is logged out after **14 days** of its primary phone account not opening WhatsApp. If that happens the bridge drops silently and the buyer bot goes dark.
   - Pairing is safe to do at any time and will **not** disturb the live operator bridge — `--pair-only` starts no HTTP server (verified 2026-07-28).
-- [ ] Still untested: a **genuine third-party sender on WhatsApp** (the live test used the owner's own number). Not blocked — it just needs someone else to message the buyer number.
+- [x] **Genuine third-party sender on WhatsApp — DONE 2026-07-28, and it closed the last unproven thing in the buyer pipeline.** A real stranger (not the owner, not the flatmate; LID `237606314995936`, distinct from the owner's `107186009169928`) tapped a real ad link. Session `20260728_230803_5bc25170`, its own `Inquiry` row, no bleed into the owner's thread.
+  - `REF-V42TS` resolved to Rothschild on **a stranger's very first message**, no disambiguation — the PR #60 linker fix proving itself on precisely the lead type that used to fail to link.
+  - "Is there parking?" → deferred rather than inventing a negative, and used defer **variant ①** ("what's the best number") because no contact existed yet; once he gave one it switched to **variant ②** ("I've passed your details along"). That live switch is the 2026-07-28 self-contradiction fix holding under a real stranger.
+  - **`buyerContact` captured: a real number from a real third party.** This is the single most important field in the feature and the one thing that had never been proven this way. Note it was a **bare 9-digit local number** — the low bound of `_extract_phone`'s 9–15 digit guard, so the guard's floor is now exercised by real data rather than only by fixtures.
+  - Slash lockdown re-resolved **against his real LID**: stranger gets `help`/`whoami` only; `profile`, `model`, `yolo`, `restart`, `update` all denied. Owner gets all of them.
+  - **Operational fact learned the awkward way:** the gateway was stopped between his two messages (stopped eagerly on "they did it"), and his next message was **still delivered on reconnect** — the Baileys bridge stayed up on 3001 and WhatsApp queued it. Useful to know, but don't rely on it: `sync-to-webapp` has no durable spool, so a turn *completed* while the reporting app is down is still lost.
 
 ---
 
