@@ -23,14 +23,14 @@ Verified **2026-07-29** by listing processes, hashing files, calling the routes,
 |---|---|
 | `default` Hermes gateway | running, PID 1976 (unrelated personal profile) |
 | `autoestate` gateway (operator) | running **detached** (`pythonw`, PID 43308) via the `Hermes_Gateway_autoestate.vbs` startup item. Use `gateway start` (service), **not** `gateway run` (foreground) |
-| `autoestate-buyer` gateway | **stopped**, deliberately — it is public whenever it runs. Both channels credentialled: Telegram `@autoestate_buyer_bot` + a paired dedicated WhatsApp number |
+| `autoestate-buyer` gateway | **stopped**, deliberately — it is public whenever it runs. Both channels credentialled: Telegram `@Auto_Estate_Buyer_bot` + a paired dedicated WhatsApp number |
 | WhatsApp bridges | port **3000** = operator (PID 2996, unchanged since 07-24 — **never kill this**); port **3001** = buyer (PID 34008, survives its gateway stopping, which keeps the linked device alive) |
 | Reporting app, 127.0.0.1:4127 | running. All four machine routes healthy — `401` on the two GETs, `405` on the two POST-only ones |
 | Repo↔live plugin parity | **5/5**. Operator: `sync-to-webapp` / `listing-footer-reminder` / `active-listings-context`. Buyer: `buyer-listings-context` (1.2) / `sync-inquiries-to-webapp` |
 | Repo↔live buyer `config.yaml` | **0 drift** (parsed YAML, `MACHINE-SPECIFIC` keys excluded) — including the two new `gateway.*` keys |
 | Terraform template ↔ dev operator profile | **0 drift** on the widened key set (platform *set* compared first, then keys within each) |
 | Anthropic API key | **live, has credit** — asked of the provider (HTTP 200 on a one-token request), not read off the console. All three profiles share this one key |
-| Telegram bots | both tokens **live** via `getMe`; both `can_join_groups: False`. Operator `@autoestate_test_bot` ("AutoEstate"), buyer `@autoestate_buyer_bot` ("autoestate Buyer") |
+| Telegram bots | **replaced 2026-07-29** — operator `@Auto_Estate_Operator_bot` (id 8902059217), buyer `@Auto_Estate_Buyer_bot` (id 8838769580), both named "AutoEstate". Both tokens verified live via `getMe`, both `can_join_groups: False`, privacy on. New tokens written to each profile's `.env`; **the operator gateway has not been restarted, so it is still running the old, deleted token** |
 | Skill / plugin versions | read off disk, all matching the docs — skills `listing-to-social` 0.5.0, `listing-status-update` 0.5.0, `just-sold` 0.3.0, `listing-reengagement` 0.2.0, `weekly-digest` 0.1.0, `buyer-inquiry` 0.4.0; plugins `listing-footer-reminder` 1.5, `buyer-listings-context` 1.2, others 1.0 |
 | `tsc` / `eslint` / `terraform fmt` / `validate` | clean. **`npm run build` was NOT run** — the dev server was up and they share `.next/` |
 
@@ -51,7 +51,9 @@ Three account-level steps, all needing the owner, none of which I can do:
 
 6. **Migrate the buyer channel to the official WhatsApp Cloud API** — TODO item 12b, step 4 of TODO's ordered path. Blocked *only* on the public HTTPS webhook the module's firewall forbids, so step 1 unlocks it. **Close the `whatsapp_cloud` lockdown gate in the same change, never after** — it is a distinct platform name, so neither `platform_toolsets` nor slash gating covers it, and an ungated block puts every stranger back at admin tier on ~68 commands.
 
-**Unblocked work, if you want something that needs no account:** the **four skills never tested over Telegram** (only `listing-to-social` has been). **Non-blocking:** create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts push — the dashboard records leads either way.
+**Do this first — it is small and the operator bot is dark until it happens.** Both Telegram bots were replaced on 2026-07-29 and the new tokens are in the profile `.env` files, but **the operator gateway was not restarted**, so it is still running the old, now-deleted token. Restart it **from your own PowerShell, not an agent session** (that has caused a full outage before). The buyer gateway is stopped and picks its new token up on next start. Then **`/start` both new bots from your Telegram account** — a fresh bot cannot open a DM with someone who has never messaged it, and both profiles set `TELEGRAM_HOME_CHANNEL` to your own user id, so anything the agent pushes rather than replies to will fail silently until you do.
+
+**Unblocked work, if you want something that needs no account:** the **four skills never tested over Telegram** (only `listing-to-social` has been) — and the bot replacement means the first message to the new operator bot re-tests that path anyway. **Non-blocking:** create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts push — the dashboard records leads either way.
 
 ### What changed on 2026-07-29
 
