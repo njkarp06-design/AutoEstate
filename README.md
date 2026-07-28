@@ -32,6 +32,12 @@ anything human (a viewing, an offer, a fact it wasn't given) to the agent, and
 captures the buyer's contact details as a lead. It runs on WhatsApp and Telegram
 together, because buyers reply on whichever platform the ad reached them on.
 
+Every listing carries a short reference code, and the dashboard gives the agent
+a ready-to-paste link for their Yad2 or Instagram ad. A buyer who taps it opens
+a message with that code already filled in, so the assistant knows exactly which
+property they mean from the very first message — no "which one did you mean?",
+and the lead is attached to the right listing automatically.
+
 **The dashboard.** A Next.js app where the agent reviews generated content
 per platform, edits it, marks it posted, sees their live listings, and works
 through buyer leads.
