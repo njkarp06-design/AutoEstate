@@ -82,7 +82,26 @@ if INGESTION_URL and not LISTINGS_URL:
 # plugins/ dir), so a missing entry would silently no-op this plugin on a Cloud
 # instance rather than fail visibly.
 SYNCED_PLATFORMS = {"whatsapp", "whatsapp_cloud", "telegram"}
-TIMEOUT_SECONDS = 3
+
+# Was 3, which was measurably too tight and cost a real turn on 2026-07-29.
+# The reporting app's /api/listings/active answers in ~0.5-0.7s warm but
+# 3.0-3.2s cold (first request after an idle period: dev-server recompile plus
+# a cold Neon connection), so a 3s budget was a coin flip rather than a margin.
+# It had silently fired three times (2026-07-24, 07-25, 07-29) before anyone
+# noticed, because the only visible symptom is the agent asking the operator to
+# restate facts it should already have had - which reads as ordinary skill
+# behaviour, not a failure.
+#
+# This gets WORSE in production, not better: on Vercel the endpoint becomes a
+# serverless function with its own cold start in front of the same cold Neon
+# connection.
+#
+# The cost of a longer budget is bounded and small. This is a blocking call on
+# the reply path, but a dead app fails fast (connection refused, not a timeout),
+# so this only extends the slow-but-alive case - and real turns already take
+# 27-100s end to end, so several extra seconds is immaterial next to
+# weekly-digest reporting "no active listings" while five exist.
+TIMEOUT_SECONDS = 10
 
 # The fields a row must carry to be describable. A row missing any of them is
 # skipped rather than rendered with a hole in it - weekly-digest reproduces

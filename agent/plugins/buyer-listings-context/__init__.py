@@ -79,7 +79,24 @@ if INGESTION_URL and not BUYER_VIEW_URL:
 # plugins/ dir), so a missing entry would silently no-op this plugin on a Cloud
 # instance rather than fail visibly.
 BUYER_PLATFORMS = {"whatsapp", "whatsapp_cloud", "telegram"}
-TIMEOUT_SECONDS = 3
+
+# Was 3. Raised in the same change as active-listings-context's, which is where
+# the measurement lives - the two plugins fetch sibling endpoints off the same
+# app, so a timeout that is too tight for one is too tight for the other. It was
+# fixed here at the same time deliberately: correcting one of two consumers and
+# leaving the other is a failure this repo has recorded more than once, and the
+# consequence is WORSE on this side. There, a missed fetch makes the operator
+# retype facts; here it strips the receptionist of every listing it knows, so a
+# real buyer - a stranger who just tapped an ad - gets "let me check with the
+# agent" to a question the bot could have answered. That is the single moment
+# this whole feature exists for.
+#
+# Unmeasured on this endpoint specifically: /api/listings/buyer-view has never
+# been timed cold, and no buyer-side occurrence is in the logs. The change is
+# made on the strength of the shared-cause argument above, not on an observation
+# here - worth timing for real once the buyer instance runs against a deployed
+# app rather than a laptop dev server.
+TIMEOUT_SECONDS = 10
 
 # The fields a row must carry to be describable at all. A row missing any of
 # them is skipped rather than rendered with a hole in it - a half-described
