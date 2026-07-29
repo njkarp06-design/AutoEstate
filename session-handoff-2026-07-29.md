@@ -23,8 +23,8 @@ Verified **2026-07-29 evening** by listing processes, checking ports, calling th
 |---|---|
 | `autoestate` gateway (operator) | **running, PID 31076** (was 1032; restarted late that night to load the timeout fix), `Gateway running with 2 platform(s)` — Telegram + WhatsApp both connected |
 | `autoestate-buyer` gateway | **stopped**, deliberately — it is public whenever it runs. Both its channels are credentialled and paired |
-| WhatsApp bridges | operator bridge **up on port 3000** (PID 31116), zero `405`s since recovery. Port **3001** free (buyer gateway stopped) |
-| `default` Hermes gateway | **not running** (unrelated personal profile; it was running this morning) |
+| WhatsApp bridges | operator bridge **up on port 3000, PID 31116** — *unchanged across the late-night gateway restart*, which is the documented "reuse the bridge if it is healthy AND its `scriptHash` matches" branch actually firing rather than the kill-and-replace path. Zero `405`s since recovery. Port **3001** free (buyer gateway stopped) |
+| `default` Hermes gateway | **running, PID 5020** (unrelated personal profile). It was down mid-evening and back up by the late session — it comes and goes, so treat any claim here as a dated observation and re-derive it |
 | Reporting app, 127.0.0.1:4127 | **running** (PID 29720 — it died at some point that night and was restarted twice; do not assume it is up, check). All four machine routes healthy. **It must be running before the gateway** — there is no sync spool |
 | Anthropic API key | **live with credit** — proven by four real completed turns across both channels, which beats a probe. All three profiles share this one key |
 | Telegram bots | operator `@Auto_Estate_Operator_bot` (id 8902059217), buyer `@Auto_Estate_Buyer_bot` (id 8838769580). **Both `/start`ed from the owner's account this evening**, so home-channel pushes now work |
