@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { authenticateMachineRequest } from "@/lib/ingest-auth";
 import { parseListingRecords } from "@/lib/listing-record";
 import { generateRefCode } from "@/lib/ref-code";
+import { isBackgroundReviewTurn } from "@/lib/hermes-harness";
 
 /**
  * A ref code that no listing currently holds.
@@ -92,6 +93,17 @@ export async function POST(request: NextRequest) {
     );
   }
   const body = parsed.data;
+
+  // Hermes's own background-review housekeeping turn, not customer activity -
+  // see lib/hermes-harness.ts for what it is and why it reaches us at all.
+  // Acknowledged with a 200 rather than rejected: the sync plugin logs a
+  // warning on any >=400 (and correctly does not retry it), and this is not an
+  // error - it is the route working as intended. Checked before any write, so
+  // neither event ever creates a row.
+  if (isBackgroundReviewTurn(body.userMessage)) {
+    return NextResponse.json({ ok: true, skipped: "background_review" });
+  }
+
   const startedAt = new Date(body.occurredAt);
 
   // Grouping key is the turn, not the session: Hermes doesn't reset a

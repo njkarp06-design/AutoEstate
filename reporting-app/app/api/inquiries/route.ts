@@ -5,6 +5,7 @@ import { authenticateMachineRequest } from "@/lib/ingest-auth";
 import { replyDefersToOperator } from "@/lib/inquiries";
 import { extractRefCodes } from "@/lib/ref-code";
 import { notifyOperatorOfLead } from "@/lib/notify-operator";
+import { isBackgroundReviewTurn } from "@/lib/hermes-harness";
 
 // Inbound counterpart to /api/ingest. Same server-to-server bearer auth
 // (authenticateMachineRequest resolves the Customer, scoped to the BUYER
@@ -82,6 +83,19 @@ export async function POST(request: NextRequest) {
     );
   }
   const body = parsed.data;
+
+  // Same guard as /api/ingest - see lib/hermes-harness.ts. Not currently
+  // reachable here (the buyer profile sets memory_enabled: false, and 0 of 60
+  // real InquiryMessages match), so this is the cheaper half of a pair rather
+  // than a fix for something observed. It is here because the predicate is
+  // shared and the alternative is the failure this repo has already had twice:
+  // correcting one of two consumers and leaving the other. A harness turn
+  // landing here would append Hermes's internal prompt and the agent's own
+  // skill-library notes into a real buyer's lead thread.
+  if (isBackgroundReviewTurn(body.userMessage)) {
+    return NextResponse.json({ ok: true, skipped: "background_review" });
+  }
+
   const startedAt = new Date(body.occurredAt);
 
   if (body.event === "turn_started") {
