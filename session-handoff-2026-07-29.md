@@ -1,4 +1,4 @@
-## Session Handoff — 2026-07-29
+## Session Handoff — 2026-07-29 (evening; supersedes the morning version of this file)
 
 ### What this project is
 
@@ -8,31 +8,30 @@ Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history;
 
 ### Where things stand
 
-- **Every roadmap feature is built, live-tested and merged.** So is the channel-consolidation work (item 12). **Everything remaining is productionization**, and every step that gates a pilot is account-level and belongs to the owner.
-- **Nothing is hosted.** The reporting app runs only via `npm run dev` (port 4127). The Terraform module is `validate`-clean but has **never been applied** — there is no Hetzner account, no Vercel project and no Cloudflare account.
-- **The buyer bot runs on both Telegram and WhatsApp**, answers amenity questions from the footer's `Features:` line, and resolves a **ref code** from a tapped ad link so it knows the exact property from message one. All live-tested, including by a genuine third party.
-- **New 2026-07-29 — outbound file delivery is locked down on the buyer instance.** This was a *live* gap, not a hypothetical: the operator profile's `.env` and both profiles' `state.db` were deliverable to a prompt-injected buyer. Details below; it is the most important thing this session changed.
-- **New 2026-07-29 — listing photos/videos (TODO 13) is scoped and its blob store decided (Cloudflare R2).** Nothing built, no Cloudflare account.
-- **Whether a PR is open is deliberately not stated here** — it changes the moment anything merges, which is how this sentence has already gone stale once. Run `gh pr list`. Merged branches are deleted on merge, so `git branch -a` corroborates it.
+- **Every roadmap feature is built, live-tested and merged.** **Everything remaining is productionization**, and every step that gates a pilot is account-level and belongs to the owner.
+- **The WhatsApp outage is over.** Both channels are live again and both were re-verified end to end with real messages this evening. **The cause was never determined and is now unreproducible** — recorded as unexplained rather than closed with an invented cause. See the incident record in TODO.md.
+- **Nothing is hosted.** The reporting app runs only via `npm run dev` (port 4127, and the port is not optional — see below). The Terraform module is `validate`-clean but has **never been applied**: no Hetzner account, no Vercel project, no Cloudflare account.
+- **Both bots verified end to end this evening**, at three layers each (gateway log, `state.db`, dev database) — not just the phone screen. Telegram: **REF-RZJ5D** (Frishman). WhatsApp: **REF-H5DHA** (Bugrashov). Database now holds 7 listings / 29 runs, 7 distinct ref codes.
+- **One new defect, not yet fixed:** Hermes memory-consolidation turns are ingested as customer-visible `Run` rows. Details in TODO's known-issues list.
+- **Whether a PR is open is deliberately not stated here** — run `gh pr list`. Merged branches are deleted on merge, so `git branch -a` corroborates it.
 
 ### Live systems
 
-Verified **2026-07-29** by listing processes, hashing files, calling the routes, and asking each provider directly. PIDs are a dated observation — re-derive rather than trust them.
+Verified **2026-07-29 evening** by listing processes, checking ports, calling the routes, and querying the database. PIDs are a dated observation — re-derive rather than trust them.
 
 | | State |
 |---|---|
-| `default` Hermes gateway | running, PID 1976 (unrelated personal profile) |
-| `autoestate` gateway (operator) | **STOPPED deliberately at ~01:35 on 2026-07-29** — see the open incident below. Telegram is down with it. Normally runs detached (`pythonw`) via the `Hermes_Gateway_autoestate.vbs` startup item; use `gateway start` (service), **not** `gateway run` (foreground) |
-| `autoestate-buyer` gateway | **stopped**, deliberately — it is public whenever it runs. Telegram `@Auto_Estate_Buyer_bot` is credentialled and fine; its **WhatsApp session logged itself out during the 405 incident** and needs re-pairing before that channel works again |
-| WhatsApp bridges | **both down** — see the incident below. Port **3000** free (operator bridge killed, and WhatsApp now commented out of that profile's `.env`); port **3001** free (the buyer bridge logged itself out and its process exited on its own). The standing "never kill 3000" rule protects a *working* operator bridge and is suspended while that bridge is a failing loop |
-| Reporting app, 127.0.0.1:4127 | running. All four machine routes healthy — `401` on the two GETs, `405` on the two POST-only ones |
-| Repo↔live plugin parity | **5/5**. Operator: `sync-to-webapp` / `listing-footer-reminder` / `active-listings-context`. Buyer: `buyer-listings-context` (1.2) / `sync-inquiries-to-webapp` |
-| Repo↔live buyer `config.yaml` | **0 drift** (parsed YAML, `MACHINE-SPECIFIC` keys excluded) — including the two new `gateway.*` keys |
-| Terraform template ↔ dev operator profile | **0 drift** on the widened key set (platform *set* compared first, then keys within each) |
-| Anthropic API key | **live, has credit** — asked of the provider (HTTP 200 on a one-token request), not read off the console. All three profiles share this one key |
-| Telegram bots | **replaced 2026-07-29** — operator `@Auto_Estate_Operator_bot` (id 8902059217), buyer `@Auto_Estate_Buyer_bot` (id 8838769580), both named "AutoEstate". Both tokens verified live via `getMe`, both `can_join_groups: False`, privacy on. New tokens written to each profile's `.env`; **the operator gateway has not been restarted, so it is still running the old, deleted token** |
-| Skill / plugin versions | read off disk, all matching the docs — skills `listing-to-social` 0.5.0, `listing-status-update` 0.5.0, `just-sold` 0.3.0, `listing-reengagement` 0.2.0, `weekly-digest` 0.1.0, `buyer-inquiry` 0.4.0; plugins `listing-footer-reminder` 1.5, `buyer-listings-context` 1.2, others 1.0 |
-| `tsc` / `eslint` / `terraform fmt` / `validate` | clean. **`npm run build` was NOT run** — the dev server was up and they share `.next/` |
+| `autoestate` gateway (operator) | **running, PID 1032, `Gateway running with 2 platform(s)`** — Telegram + WhatsApp both connected |
+| `autoestate-buyer` gateway | **stopped**, deliberately — it is public whenever it runs. Both its channels are credentialled and paired |
+| WhatsApp bridges | operator bridge **up on port 3000** (PID 31116), zero `405`s since recovery. Port **3001** free (buyer gateway stopped) |
+| `default` Hermes gateway | **not running** (unrelated personal profile; it was running this morning) |
+| Reporting app, 127.0.0.1:4127 | **running** (PID 23668). All four machine routes healthy — `401` on the two GETs, `405` on the two POST-only ones |
+| Anthropic API key | **live with credit** — proven by four real completed turns across both channels, which beats a probe. All three profiles share this one key |
+| Telegram bots | operator `@Auto_Estate_Operator_bot` (id 8902059217), buyer `@Auto_Estate_Buyer_bot` (id 8838769580). **Both `/start`ed from the owner's account this evening**, so home-channel pushes now work |
+| WhatsApp numbers | operator **+972 55-988-5104** ("Auto-Estate-Bot"), buyer **+972 55-519-4380** ("Autoestate"). Read from each profile's `creds.json` |
+| Repo↔live plugin parity | **5/5** |
+| Repo↔live buyer `config.yaml` | **0 drift** (41 keys compared, 3 `MACHINE-SPECIFIC` markers honoured) |
+| Skill / plugin versions | read off disk, all matching the docs |
 
 ### What to do next
 
@@ -40,81 +39,63 @@ Three account-level steps, all needing the owner, none of which I can do:
 
 1. **Create a Hetzner account, then `terraform apply`** (TODO item 3). Three things there have **never run**: the operator SSH key must be uploaded to the project once beforehand (Hetzner rejects a duplicate public key, so the module looks it up); skills and plugins arrive via post-boot SSH upload rather than cloud-init, so confirm they landed; and operator slash-command access is ungated by default on that box.
 2. **Deploy the reporting app to Vercel Pro** (item 4). **Land the partial unique index on `Listing` first** — the current `Serializable` transaction removes the ingest dedupe race on that code path, but the durable guarantee needs `UNIQUE (customerId, lower(area), rooms, sqm) WHERE status <> 'SOLD'`, and the obvious plain `@@unique` is wrong because it would block a legitimate relist of a sold property.
-3. **Create the Cloudflare account + R2 bucket** (item 13). Smaller than the other two and independent of them: it unblocks all of listing media. Expected cost at pilot scale is zero, but re-check R2's pricing at signup rather than inheriting the projection in TODO.
+3. **Create the Cloudflare account + R2 bucket** (item 13). Smallest of the three and independent of them: it unblocks all of listing media. Expected cost at pilot scale is zero, but re-check R2's pricing at signup.
 
-**Then, before any real customer:**
+**Then, before any real customer:** harden the public buyer instance (items 5–6: OS-level isolation, re-run `hermes security audit`), and add `WHATSAPP_ALLOW_ALL_USERS=true` to any buyer instance Terraform provisions — with `dm_policy: open` Hermes refuses to boot without it.
 
-4. **Harden the public buyer instance** (items 5–6): OS-level isolation, and re-running `hermes security audit` once anything is exposed.
-5. **Add `WHATSAPP_ALLOW_ALL_USERS=true`** to any buyer instance Terraform provisions — with `dm_policy: open` Hermes refuses to boot without it. It blocked the dev instance and will block the first real one identically.
+**Then the target state, not a pilot blocker:** migrate the buyer channel to the official WhatsApp Cloud API (item 12b). **Close the `whatsapp_cloud` lockdown gate in the same change, never after.**
 
-**Then the target state, not a pilot blocker:**
+**Unblocked work needing no account** — the honest gap: the **four skills never tested over Telegram** (status-update, just-sold, re-engagement, digest). `listing-to-social` has now been proven there twice. Also non-blocking: create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts push, and fix the memory-consolidation-turn ingest defect (count affected rows first).
 
-6. **Migrate the buyer channel to the official WhatsApp Cloud API** — TODO item 12b, step 4 of TODO's ordered path. Blocked *only* on the public HTTPS webhook the module's firewall forbids, so step 1 unlocks it. **Close the `whatsapp_cloud` lockdown gate in the same change, never after** — it is a distinct platform name, so neither `platform_toolsets` nor slash gating covers it, and an ungated block puts every stranger back at admin tier on ~68 commands.
-
-**Do this first.** Start the operator gateway — it is stopped, and with WhatsApp commented out it comes up clean on Telegram only: `hermes -p autoestate gateway start`, expect `Gateway running with 1 platform(s)`. Then **`/start` both new bots from your Telegram account** — a fresh bot cannot open a DM with someone who has never messaged it, and both profiles set `TELEGRAM_HOME_CHANNEL` to your own user id, so anything the agent pushes rather than replies to fails silently until you do. **Then the WhatsApp incident below**, whose first step is a hotspot retry.
-
-**Unblocked work, if you want something that needs no account:** the **four skills never tested over Telegram** (only `listing-to-social` has been) — and the bot replacement means the first message to the new operator bot re-tests that path anyway. **Non-blocking:** create the Telegram notifier bot and set `OPERATOR_TELEGRAM_BOT_TOKEN` so operator lead alerts push — the dashboard records leads either way.
+**Nothing needs doing to the live systems.** They are in a good state and the buyer gateway is correctly stopped.
 
 ### What changed on 2026-07-29
 
-- **Outbound file delivery locked down on the buyer instance (PR #67).** Outbound media is triggered by the model emitting `MEDIA:<abs path>` in its reply **text** — not a tool, so the 3-tool lockdown and `agent.disabled_toolsets` never touched it. Measured before the fix: the operator profile's `.env` (API key, bot token, ingestion secret), the operator's `state.db`, and the buyer's own `state.db` (every buyer's messages and captured phone numbers) were all **deliverable**. Fixed with `gateway.strict: true` **and** `gateway.trust_recent_files: false`; the second is load-bearing, because strict alone keeps a 600s recency fallback and `state.db` is rewritten every turn. **Deliberately not changed on the operator instance** — single-tenant, different threat model; settle it at first `terraform apply` alongside slash-command gating.
-- **Item 13 (listing photos/videos) scoped, and its store decided: Cloudflare R2 (PR #69).** Two of three legs already exist in Hermes — inbound media is cached per-profile including video, and outbound needs no new tool. R2 chosen on zero egress (every file crosses machines at least twice) and on S3 compatibility serving both runtimes. Rejected: Vercel Blob, S3, Backblaze B2, with reasons recorded in TODO and CLAUDE.md.
-- **Cloud API migration sequenced into the ordered path (PR #66)**, where it had been missing entirely despite carrying a full checklist inside item 12b.
-- **Contract-signing idea (TODO 14) corrected (PR #70)** — it described the media lockdown as an uncommitted branch; it had merged. Items 13 and 14 are now cross-linked, since both rest on `MEDIA:` delivery and the same cache-root constraint.
+**Morning (merged, PRs #66–#71):** outbound file delivery locked down on the buyer instance (`gateway.strict: true` **and** `gateway.trust_recent_files: false` — the second is load-bearing); item 13 scoped with Cloudflare R2 chosen as the blob store; the Cloud API migration sequenced into the ordered path; the contract-signing idea cross-linked.
 
-### OPEN INCIDENT — BOTH WhatsApp channels are down (2026-07-29, unresolved; cause is external)
+**Evening (this session — live operations, no repo artefact deployed):**
 
-**State: WhatsApp is disabled on the operator profile and both bridges are down. Telegram works on both bots and is unaffected. No data is affected** — this is a delivery channel, not a data path. Every ingested run, listing and lead is intact.
-
-**What happened.** Both bridges began failing in the *same window* — the buyer bridge's last activity clusters 00:53–01:05, the operator's `503`s land at 00:54 and 01:00. At 01:22 an operator gateway restart (run to pick up a new Telegram token) found its bridge unhealthy and therefore **killed and replaced it**; the replacement went into a `405` loop retrying every 3s, reaching 170 before being stopped. The buyer bridge, which nobody touched at all, logged **630** `405`s over the same period and then logged itself out and exited.
-
-**Four things are ruled out by evidence, not by argument:**
-
-- **Not a ban on either number.** The `405` occurs *pre-authentication* — at QR stage WhatsApp does not yet know which account is connecting — and it hit two independent numbers simultaneously.
-- **Not a corrupt session.** Pairing was attempted with a **completely empty** session directory (the old one moved aside to `whatsapp/session.bak.20260729-405`) and failed identically, never reaching a QR.
-- **Not a stale client.** Installed Baileys is `7.0.0-rc13`, which **is** the latest published version. There is no upgrade to apply.
-- **Not caused by the restart.** Both bridges were already failing ~25 minutes before it. The restart is why the *operator* bridge was replaced, but not why WhatsApp refuses the connection.
-
-**What is left is external and common to both:** a WhatsApp-side change or incident affecting Baileys connections generally, or an **IP-level block** on this machine/network. Telegram being unaffected is consistent with either.
-
-**The one decisive test not yet run:** retry pairing from a **different network** (phone hotspot). That splits "WhatsApp-side" from "this IP" in about two minutes, and it is the first thing to do when picking this up.
-
-**Current mitigation, applied 2026-07-29.** The four `WHATSAPP_*` vars in the operator profile's `.env` are **commented out** (not set to `false` — `false` does not stop Hermes attempting a connection), so `gateway start` brings up a clean Telegram-only operator bot with no bridge and no retry loop. Backup at `.env.bak.20260729-wa-off`; reversing it is uncommenting four lines.
-
-**State to carry forward:** the **buyer's** WhatsApp session logged itself out, so its device link is gone — whenever this clears, *both* numbers need re-pairing, not just the operator's. The operator's old session is preserved at `whatsapp/session.bak.20260729-405`, though a logged-out link makes it unlikely to be useful.
-
-**Do not retry in a loop while diagnosing.** Repeated handshakes are what took the operator from 24 to 170 rejections. If a test fails, stop the gateway *and* kill the node process on port 3000 — the bridge survives `gateway stop` and keeps its own 3-second loop. **Killing port 3000 is correct in this state**, despite the standing never-kill-3000 rule: that rule protects a *working* bridge.
-
-**If this turns out to be durable**, it strengthens item 12b — the official Cloud API has none of this failure mode — but 12b is gated on Hetzner, so it is not an escape hatch available tonight.
+- **Recovered the operator's WhatsApp with no re-pairing** by restoring its preserved session. Its device link had never been logged out; the incident only moved the files aside, so the gateway saw no `creds.json` and reported "enabled but not paired" — which looks identical to a dead link. The morning handoff had written that backup off as "unlikely to be useful"; that was a judgement, never tested, and wrong.
+- **Re-paired the buyer number**, which genuinely had logged itself out.
+- **Caught and reverted an allowlist overwrite.** `hermes whatsapp` re-runs *first-time setup* when it cannot see existing `WHATSAPP_*` values, and wrote `WHATSAPP_ALLOWED_USERS=*` onto the **operator** profile. Never live — the running gateway had WhatsApp disconnected and was not restarted before the fix. Restored from `.env.bak.20260729-wa-off`; a further backup sits at `.env.bak.20260729-allowlist-fix`.
+- **Measured that neither commenting out `WHATSAPP_*` nor `WHATSAPP_ENABLED=false` disables WhatsApp** — corrected in five places, including two code comments that implied commenting out was a kill switch.
+- **Lost a real turn to the reconnect race**, and recovered it by re-sending.
+- **Fixed two stale satellite-doc claims** no docs-vs-docs check could have caught: the buyer profile's "transport is undecided" (settled a day earlier) and `reporting-app/README.md`'s claim that port 3000 is permanently occupied and Next auto-falls-back to 4127 (both false — that is what sent the dev server to 3000 tonight).
 
 ### Open questions for the owner
 
-**None blocking.** One cosmetic observation, recorded rather than acted on: the two Telegram bots' display names are inconsistent — operator reads "AutoEstate", buyer reads "autoestate Buyer" (lowercase). Both are changeable in BotFather without touching a token. Not worth a session on its own.
+**None blocking.** Two recorded rather than acted on:
 
-Everything else is closed. **Anthropic credit exhaustion remains a live failure mode, not a solved one** — auto-reload was reported enabled, yet the key was found dry on 2026-07-28 and needed a manual top-up. It is live with credit as of 2026-07-29, verified by asking the provider. All three profiles share **one** key, so one empty balance takes everything down.
+- **The `405` cause is unexplained.** If it recurs, the diagnostic that was never completed is comparing a failing home-network attempt against a hotspot one *in the same window*; this evening both eventually worked, so the discriminator was lost.
+- Cosmetic: the two Telegram bots' display names differ in casing. Changeable in BotFather without touching a token.
+
+**Anthropic credit exhaustion remains a live failure mode** — auto-reload was reported enabled, yet the key was found dry on 2026-07-28. It is live with credit as of this evening, proven by four completed turns. All three profiles share **one** key, so one empty balance takes everything down.
 
 ### Working conventions
 
 - **Git:** `main` → feature branch → PR. Never commit to `main`. **Never merge without asking** — the owner asks explicitly each time.
 - **No hooks exist in this repo.** Doc-sync is a convention: record real changes as part of finishing a task. Do not reintroduce automation.
-- **Verify by running something.** CLAUDE.md §5 carries the exact recipes — a profile's real tool list, its visible skills, slash-command policy, **what files it would hand out**, repo↔live parity, Terraform-template↔dev-profile parity, what the model was actually sent on a turn, and whether a "revoked" credential is really dead. Every one has caught something real.
+- **Verify by running something.** CLAUDE.md §5 carries the exact recipes, now including *whether a platform is really enabled*, *which number a profile is paired to*, and *where its session actually lives*. Every one has caught something real.
 - **Merging deploys nothing.** Plugins are physical copies inside each profile. A plugin PR is not finished until the parity recipe passes and the gateway has been restarted — by the **owner, from their own shell**. Restarting from an agent session has caused a full outage before.
 
 ### Environment gotchas
 
-- **Outbound file delivery is triggered by reply TEXT, not a tool.** `MEDIA:<abs path>` makes the gateway deliver that file, so no tool lockdown constrains it. The buyer profile now sets `gateway.strict: true` **and** `gateway.trust_recent_files: false`; media must be written into the profile cache roots to stay deliverable. The operator profile is deliberately still on the default.
-- **`sender_id` *is* available to plugin hooks** (`pre_llm_call` and `post_llm_call` both). It does **not** let you gate by role — a plugin can only inject text, and text doesn't reliably stop the model acting. Sender identity still never reaches a *skill*, which is what forces role-by-channel isolation.
-- **A skill edit never reaches a conversation already in progress.** A running session answers from the copy it loaded at session start. Use `/new` to pick a change up, or test with a fresh sender.
-- **A gateway restart replaces the WhatsApp bridge whenever that bridge is unhealthy or stale.** Reuse requires `/health` = `connected` **and** a `scriptHash` matching the on-disk `bridge.js`; otherwise the adapter kills it and spawns a new one. So restarting a gateway whose WhatsApp is already struggling throws away the connection that might have recovered — see the 2026-07-29 incident below. Pairing survives regardless (session on disk, device still linked); the *connection* does not.
-- **Never let the buyer gateway run with the default WhatsApp `bridge_port`.** The adapter defaults to 3000 and kills whatever holds that port on start — 3000 is the **live operator bridge**. The buyer config pins `3001`; do not "tidy" it. Pairing is unaffected (`--pair-only` starts no HTTP server).
+- **Start the reporting app BEFORE the gateway.** WhatsApp delivers queued messages within seconds of a bridge reconnecting (6s, measured this evening), and `sync-to-webapp` has no spool — a turn completed while the app is down is lost permanently, with a perfect-looking reply and a silently missing dashboard entry.
+- **`npm run dev -- -p 4127` — the flag is not optional.** The script is a bare `next dev`, so without it Next takes **3000**, which is the WhatsApp bridge's port. Both profiles hardcode the ingestion URL to 4127, so an app on any other port is up but unreachable.
+- **Neither commenting out `WHATSAPP_*` nor `WHATSAPP_ENABLED=false` disables WhatsApp.** Only the absence of a pairing (`creds.json`) keeps the adapter off the network. Mechanism unconfirmed; do not assert one.
+- **Re-pairing rewrites `.env`.** If the wizard asks the *open* "who should be allowed to message the bot?" question rather than "keep what you have?", it has lost your allowlist — retype the real value, never `*`. `*` is correct only on the buyer profile.
+- **An empty `whatsapp/session/` makes the adapter report the *other* session path** in its "not paired" warning (`get_hermes_dir` prefers the legacy path only if it has content). Looks like a path bug; isn't.
+- **A gateway restart replaces the WhatsApp bridge whenever that bridge is unhealthy or stale.** Reuse requires `/health` = `connected` **and** a `scriptHash` matching the on-disk `bridge.js`. Pairing survives regardless; the *connection* does not.
+- **Never let the buyer gateway run with the default WhatsApp `bridge_port`.** The adapter defaults to 3000 and kills whatever holds that port on start — 3000 is the live operator bridge. The buyer config pins `3001`; do not "tidy" it. Pairing is unaffected (`--pair-only` starts no HTTP server).
+- **`/start` is a no-op by design** — Hermes acknowledges the platform ping without replying. Silence there is correct, not a fault. But a fresh bot cannot DM someone who has never messaged it, so `/start` is still required before home-channel pushes work.
 - **`gateway run` is foreground, `gateway start` is the detached service.**
-- Use **`127.0.0.1`**, never `localhost` (IPv6 collision). A page-route 500 on 4127 is usually a transient Turbopack recompile; an API route returning 401 proves the agent-facing path is fine.
-- **Never edit a profile's `config.yaml` while its gateway is running** — the gateway rewrites the file, strips comments, and clobbers concurrent edits. The commented copies under `agent/profiles/` are the source of truth; compare as parsed YAML, not text.
+- Use **`127.0.0.1`**, never `localhost` (IPv6 collision). Check health on an **API** route (401 = healthy), not a page route.
+- **Never edit a profile's `config.yaml` while its gateway is running** — the gateway rewrites the file and strips comments. Compare as parsed YAML, not text.
 - Per-profile logs: `%LOCALAPPDATA%\hermes\profiles\<profile>\logs\gateway.log` — not the shared path, which has misled a session.
-- **After ANY schema change, restart the `next dev` server on 4127.** The Prisma client loads at server *start*. Symptom: machine routes 500 where they used to 401 — and while it lasts, the live gateway's sync POSTs fail, so a real turn is lost.
-- **Don't run `npm run build` while the dev server is up** — shared `.next/`. Use `lint` + `tsc`, but remember `next build` catches `"use server"` export errors neither does.
+- **After ANY schema change, restart the `next dev` server on 4127.** The Prisma client loads at server *start*.
+- **Don't run `npm run build` while the dev server is up** — shared `.next/`. But remember `next build` catches `"use server"` export errors that `tsc` and `eslint` both miss.
 - **When resolving anything profile-scoped, set `HERMES_HOME` explicitly.** Measuring the wrong profile is this environment's most repeated mistake.
 
 ### How to resume
 
-> Read session-handoff-2026-07-29.md and continue. Everything is built, merged and live-tested. Verify with `git log origin/main..` and `gh pr list --state all` rather than trusting any branch/PR claim here, and re-run CLAUDE.md §5's parity recipes rather than trusting the parity lines. **What's left is productionization**, and all three next steps are account-level: Hetzner + `terraform apply` (TODO 3), the Vercel deploy (TODO 4, and land the partial unique index on `Listing` first), and the Cloudflare + R2 bucket (TODO 13, the smallest and independent of the other two). **Don't start any of them without me** — they cost money and none of the accounts exist. If you want unblocked work instead, the honest gap is the **four skills never tested over Telegram**. Four things to know before planning. **The buyer bot is paired on both channels but its gateway is stopped** — it is public whenever it runs, so start it only to test and stop it after; its WhatsApp `bridge_port` must stay **3001**, because the adapter kills whatever holds its port on startup and its default is 3000, the live operator bridge. **A skill edit does not reach a conversation already in progress** — use `/new` or a fresh sender. **Credit exhaustion is a live failure mode** — all three profiles share one Anthropic key, so ask the provider before any live test rather than trusting the console balance. And **outbound file delivery is text-triggered, not tool-gated** — the buyer profile is now locked to its cache roots, which any listing-media work must write into. If a dev server is running from an older checkout, restart it: the Prisma client loads at start.
+> Read session-handoff-2026-07-29.md and continue. Everything is built, merged and live-tested, and the WhatsApp outage that was open this morning is **resolved** — both channels are live and were re-verified end to end. Verify with `git log origin/main..` and `gh pr list --state all` rather than trusting any branch/PR claim here, and re-run CLAUDE.md §5's parity recipes rather than trusting the parity lines. **What's left is productionization**, and all three next steps are account-level: Hetzner + `terraform apply` (TODO 3), the Vercel deploy (TODO 4, land the partial unique index on `Listing` first), and the Cloudflare + R2 bucket (TODO 13, smallest and independent). **Don't start any of them without me** — they cost money and none of the accounts exist. For unblocked work there are two honest options: the **four skills never tested over Telegram**, and the **memory-consolidation-turn ingest defect** (count the affected rows before writing the filter). Four things to know before touching anything. **Start the reporting app before the gateway** — WhatsApp delivers queued messages seconds after a bridge reconnects and there is no sync spool, which cost a real turn on 2026-07-29. **`npm run dev -- -p 4127`** — without the flag Next takes port 3000, the WhatsApp bridge's port, and every sync silently fails. **The buyer gateway is stopped and should stay stopped** unless you are testing — it is public whenever it runs, and its `bridge_port` must stay 3001. **Credit exhaustion is a live failure mode** — all three profiles share one Anthropic key. If a dev server is running from an older checkout, restart it: the Prisma client loads at start.
