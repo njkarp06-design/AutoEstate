@@ -6,9 +6,19 @@ a property of the configuration, not of the model's good behaviour.
 
 `config.yaml` and `SOUL.md` are the real, deployed files (copied verbatim from
 the running dev profile). `.env.example` is the same `.env` with every secret
-value stripped. They live in the repo so the lockdown is reviewable and
-reproducible — a security posture that exists only on one laptop is not a
+value stripped, and with the three `WHATSAPP_*` pairing vars commented out until
+a number is actually paired. They live in the repo so the lockdown is reviewable
+and reproducible — a security posture that exists only on one laptop is not a
 deliverable, and Terraform's future per-customer buyer instance ships from here.
+
+**That "same file, secrets stripped" claim is only true if you keep it true.**
+`.env.example` was missing `WHATSAPP_ALLOW_ALL_USERS` entirely — not commented,
+absent — while the live `.env` had it, and it is a *hard startup requirement* of
+`config.yaml`'s `dm_policy: open`: without it the gateway refuses to boot at all.
+So a buyer instance stood up from this template, exactly as the steps below say
+to, would never have started, with the reason only in the log. Fixed; the lesson
+is that a key-name diff of the live `.env` against this template is cheap and
+catches what reading either one alone cannot.
 
 ## The machine-specific keys — change them on deploy
 
@@ -119,6 +129,18 @@ in `plugins.enabled`.
 `TELEGRAM_ALLOWED_USERS` must be an explicit `*`. An empty value passes the
 adapter's intake prefilter but then routes unknown DMs into a pairing flow that
 a stranger would never complete.
+
+**`WHATSAPP_ALLOW_ALL_USERS=true` is required for the gateway to start at all**,
+and it is not the same thing as an allowlist of `*`. `config.yaml` sets
+`whatsapp.extra.dm_policy: open`, and Hermes requires a second explicit opt-in on
+top of the allowlist for any open policy
+(`gateway/run.py::_own_policy_open_startup_violation`) — without it the process
+aborts with *"Refusing to start: whatsapp has dm_policy/group_policy set to
+'open' but neither GATEWAY_ALLOW_ALL_USERS nor WHATSAPP_ALLOW_ALL_USERS is
+enabled."* It applies even before a WhatsApp number is paired, because WhatsApp
+resolves `enabled: True` regardless of the commented-out `WHATSAPP_*` vars. Use
+the **platform-scoped** variable, never `GATEWAY_ALLOW_ALL_USERS`, which would
+open every platform at once.
 
 ## ⚠ Both lockdowns are per-platform — now Telegram **and** WhatsApp
 

@@ -54,10 +54,21 @@ const USAGE =
 
 async function main() {
   const args = process.argv.slice(2);
-  const email = args.find((a) => !a.startsWith("--"));
 
   const roleIndex = args.indexOf("--role");
   const role = roleIndex === -1 ? "operator" : args[roleIndex + 1];
+
+  // The email is the first token that is neither a flag nor a FLAG'S VALUE.
+  // A plain `args.find(a => !a.startsWith("--"))` picked up the value of
+  // --role when the flag came first, so `--role operator alice@example.com`
+  // provisioned a customer whose email was literally "operator" - and
+  // succeeded, printing a confident "Customer provisioned:" line.
+  //
+  // -1 rather than roleIndex + 1 when the flag is absent: 0 is a real argument
+  // index (the email, in the documented `<email>` invocation), so excluding it
+  // would break the common path while fixing the rare one.
+  const roleValueIndex = roleIndex === -1 ? -1 : roleIndex + 1;
+  const email = args.find((a, i) => !a.startsWith("--") && i !== roleValueIndex);
   if (role !== "operator" && role !== "buyer") {
     console.error(`Unknown role ${JSON.stringify(role)}. Expected "operator" or "buyer".`);
     console.error(USAGE);
