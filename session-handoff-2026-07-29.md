@@ -29,7 +29,7 @@ Verified **2026-07-29 evening** by listing processes, checking ports, calling th
 | `autoestate-buyer` gateway | **stopped**, deliberately — it is public whenever it runs. Both its channels are credentialled and paired |
 | WhatsApp bridges | operator bridge **up on port 3000, PID 31116** — *unchanged across the late-night gateway restart*, which is the documented "reuse the bridge if it is healthy AND its `scriptHash` matches" branch actually firing rather than the kill-and-replace path. Zero `405`s since recovery. Port **3001** free (buyer gateway stopped) |
 | `default` Hermes gateway | **running, PID 5020** (unrelated personal profile). It was down mid-evening and back up by the late session — it comes and goes, so treat any claim here as a dated observation and re-derive it |
-| Reporting app, 127.0.0.1:4127 | **running** (PID 29720 — it died at some point that night and was restarted twice; do not assume it is up, check). All four machine routes healthy. **It must be running before the gateway** — there is no sync spool |
+| Reporting app, 127.0.0.1:4127 | **running, PID 12192** as of 2026-07-30 (it was 29720; deliberately stopped and restarted that day to run `next build`, which shares `.next/`). It has died and been restarted several times across these sessions — **do not assume it is up, check.** All four machine routes verified healthy after the restart (`401`/`401`/`405`/`405`). **It must be running before the gateway** — there is no sync spool, and see the login gotcha below, which makes the wrong order the default |
 | Anthropic API key | **live with credit** — proven by four real completed turns across both channels, which beats a probe. All three profiles share this one key |
 | Telegram bots | operator `@Auto_Estate_Operator_bot` (id 8902059217), buyer `@Auto_Estate_Buyer_bot` (id 8838769580). **Both `/start`ed from the owner's account this evening**, so home-channel pushes now work |
 | WhatsApp numbers | operator **+972 55-988-5104** ("Auto-Estate-Bot"), buyer **+972 55-519-4380** ("Autoestate"). Read from each profile's `creds.json` |
@@ -110,9 +110,28 @@ All 104 in-scope tracked files re-read. **8 findings: 1 critical, 2 major, 5 min
 
 **Anthropic credit exhaustion remains a live failure mode** — auto-reload was reported enabled, yet the key was found dry on 2026-07-28. It is live with credit as of this evening, proven by four completed turns. All three profiles share **one** key, so one empty balance takes everything down.
 
+### Shutting down for the day, and picking it back up
+
+Asked and answered 2026-07-30, and written here rather than said once, because the answer is non-obvious in both directions.
+
+**Nothing needs shutting down.** The only surface with a real safety argument is the **public buyer gateway, and it is already stopped** — and it has **no Startup-folder entry**, so it stays stopped across reboots without anyone remembering to check. Everything else is preference:
+
+| Running | Leave or stop? |
+|---|---|
+| `autoestate` gateway + its WhatsApp bridge on **:3000** | Either. An idle gateway makes no LLM calls, so it costs nothing to leave. **Never kill port 3000** to free a port — it is the live bridge, and the adapter also kills whatever holds its own bridge port on start, so the collision goes both ways. |
+| `default` gateway | Unrelated personal profile. |
+| Reporting app **:4127** | Harmless either way. |
+
+**Powering the machine off overnight does not risk the WhatsApp pairing.** The 14-day linked-device logout is driven by the **phone account** not opening WhatsApp, not by the bridge being down — so a PC shutdown is free, while a phone left untouched for two weeks is not.
+
+**Stopping the gateway the night before does not help anything**, because login restarts it (see the gotcha below). The only thing that actually matters is the *first* action after logging back in:
+
+> **Start `npm run dev -- -p 4127` BEFORE messaging the bot.** Login brings the gateway up and leaves the ingestion endpoint down. Nothing is lost while nobody messages it — but the first message sent before the app is up has its sync dropped permanently, with a flawless reply and a silently missing dashboard entry.
+
 ### Working conventions
 
 - **Git:** `main` → feature branch → PR. Never commit to `main`. **Never merge without asking** — the owner asks explicitly each time.
+- **If something is worth telling the owner, it is worth writing down.** Established 2026-07-30, by getting it wrong: the overnight-shutdown answer and the login-ordering trap above were both delivered as chat and would have evaporated with the session. Anything that matters for tomorrow, or in general, goes into these three files as part of the same turn — not into a reply.
 - **No hooks exist in this repo.** Doc-sync is a convention: record real changes as part of finishing a task. Do not reintroduce automation.
 - **Verify by running something.** CLAUDE.md §5 carries the exact recipes, now including *whether a platform is really enabled*, *which number a profile is paired to*, and *where its session actually lives*. Every one has caught something real.
 - **Merging deploys nothing.** Plugins are physical copies inside each profile. A plugin PR is not finished until the parity recipe passes and the gateway has been restarted — by the **owner, from their own shell**. Restarting from an agent session has caused a full outage before.
@@ -120,6 +139,7 @@ All 104 in-scope tracked files re-read. **8 findings: 1 critical, 2 major, 5 min
 ### Environment gotchas
 
 - **Start the reporting app BEFORE the gateway.** WhatsApp delivers queued messages within seconds of a bridge reconnecting (6s, measured this evening), and `sync-to-webapp` has no spool — a turn completed while the app is down is lost permanently, with a perfect-looking reply and a silently missing dashboard entry.
+- **⚠ AND THE MACHINE VIOLATES THAT RULE FOR YOU ON EVERY LOGIN.** Verified 2026-07-30 by listing the Startup folder: `Hermes_Gateway.vbs` and `Hermes_Gateway_autoestate.vbs` both auto-start on login, and **the reporting app does not**. So after any reboot or logout the operator gateway is up and the ingestion endpoint is dead, which is exactly the ordering the rule above forbids — arrived at by default rather than by mistake. Nothing is lost while nobody messages the bot, so the practical rule is: **first thing after a login, start the app (`npm run dev -- -p 4127`) before sending the bot anything.** Stopping the gateway the night before does *not* help — it comes back on the next login regardless. (The **buyer** profile deliberately has no Startup entry, which is why the public bot stays stopped across reboots; keep it that way.)
 - **`npm run dev -- -p 4127` — the flag is not optional.** The script is a bare `next dev`, so without it Next takes **3000**, which is the WhatsApp bridge's port. Both profiles hardcode the ingestion URL to 4127, so an app on any other port is up but unreachable.
 - **Neither commenting out `WHATSAPP_*` nor `WHATSAPP_ENABLED=false` disables WhatsApp.** Only the absence of a pairing (`creds.json`) keeps the adapter off the network. Mechanism unconfirmed; do not assert one.
 - **Re-pairing rewrites `.env`.** If the wizard asks the *open* "who should be allowed to message the bot?" question rather than "keep what you have?", it has lost your allowlist — retype the real value, never `*`. `*` is correct only on the buyer profile.
