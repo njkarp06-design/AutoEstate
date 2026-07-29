@@ -168,8 +168,27 @@ Two things about that port are worth knowing before touching this config:
    out to do this; you need a free *slot* (a spare handset, or the multi-account
    support in WhatsApp/WhatsApp Business).
 3. `hermes -p autoestate-buyer whatsapp` → choose **separate bot number** mode →
-   scan the QR from Settings → Linked Devices.
+   scan the QR from Settings → Linked Devices. Scan **promptly**: the QR expires
+   in roughly 20 seconds. A `stream:error code 515` followed by an automatic
+   reconnect is normal WhatsApp Web restart behaviour, not a fault — wait for
+   `✅ WhatsApp connected!`.
 4. Uncomment the three `WHATSAPP_*` vars in `.env`.
+
+**⚠ The wizard rewrites `.env`, and on a profile whose `WHATSAPP_*` values it
+cannot see it re-runs *first-time setup* rather than the "keep what you have?"
+path.** It then asks who may message the bot and writes the answer straight in.
+`*` is the right answer **here** and the wrong one on the operator profile, and
+the wizard asks identically either way — on 2026-07-29 that put
+`WHATSAPP_ALLOWED_USERS=*` onto the operator instance, which loads all five
+outbound `Listing`-mutating skills and has slash gating off. Caught before any
+restart. **Back the `.env` up before re-pairing, and re-read it afterwards.**
+
+**Do not rely on commenting `WHATSAPP_*` out to disable this channel.** Measured
+2026-07-29 by resolving `load_gateway_config()` on both profiles: WhatsApp comes
+out `enabled: True` with `WHATSAPP_ENABLED` absent, `=false`, **and** `=true`.
+The vars ship commented here for tidiness and to avoid a half-configured channel,
+not because commenting them out is a kill switch. To actually stop the adapter
+connecting, remove the pairing (`creds.json`), not the environment variables.
 
 **Keepalive:** a linked device is logged out if its primary phone account goes
 **14 days** without opening WhatsApp. If that happens the bridge silently drops
@@ -235,6 +254,11 @@ where any future listing-media feature must write.
   there is no code-execution tool to abuse, but Hermes's own `SECURITY.md` is
   clear that OS isolation is the only real boundary. Containerize on the real
   deployment target.
-- **The buyer channel transport is undecided** (2nd WhatsApp eSIM vs. official
-  Cloud API vs. staying on Telegram). This profile is transport-agnostic; only
-  `.env` changes.
+- **`whatsapp_cloud` is still ungated** — see the section above. That is the one
+  genuinely open transport question, and it is a deploy gate, not a preference.
+
+The transport question itself is **settled** (2026-07-28): this profile runs
+**both** Telegram and WhatsApp, because buyers reply on whichever platform the ad
+reached them on. Baileys for the pilot, the official Cloud API once Hetzner
+exists (TODO 12b). This paragraph previously read "the buyer channel transport is
+undecided", which had been false for a day.

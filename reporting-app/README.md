@@ -20,10 +20,16 @@ Requires `DATABASE_URL` (Postgres) and Clerk keys in `.env.local` — see `prism
 ```bash
 npm install
 npx prisma generate
-npm run dev
+npm run dev -- -p 4127
 ```
 
-Next prints the actual port it started on — **on this machine port 3000 is permanently occupied by the live Hermes WhatsApp bridge process** (`hermes-agent/scripts/whatsapp-bridge/bridge.js`), never kill it looking for a free port; Next auto-falls-back to another port (4127, last time). Once `allowedDevOrigins` is set in `next.config.ts` (already is, for `127.0.0.1` and `localhost`), either hostname works for whatever port it lands on. Before that fix was in place, the wrong hostname produced a silently blank page with dead buttons (client JS blocked as cross-origin), not an error pointing at the cause.
+**The port is not optional, and `-- -p 4127` is not decoration.** The `dev` script is a bare `next dev`, so without it Next takes **3000** — which is the live Hermes WhatsApp bridge's port. Both Hermes profiles hardcode `AUTOESTATE_INGESTION_URL=http://127.0.0.1:4127/api/ingest`, so an app listening anywhere else is up but unreachable: every sync POST is connection-refused, retries 3× and is **dropped for good** (there is no spool). The bot's replies stay perfect and only the dashboard is quietly missing listings.
+
+This paragraph previously claimed 3000 was "permanently occupied" by the bridge and that Next "auto-falls-back to another port (4127, last time)". Both were wrong and were caught on 2026-07-29 by running it: the bridge was **down** at the time, so 3000 was free and Next bound straight to it — 4127 had only ever been reached by passing the flag by hand. Corollary that still holds: **when the bridge *is* up, never kill port 3000 looking for a free port.** Note the adapter also kills whatever holds its own bridge port on gateway start, so an app squatting on 3000 gets killed from the other direction too.
+
+Check health on an **API** route rather than a page: `curl http://127.0.0.1:4127/api/listings/active` should return **401** (up, auth working). A page-route 500 is usually a transient Turbopack recompile and recovers. Once `allowedDevOrigins` is set in `next.config.ts` (already is, for `127.0.0.1` and `localhost`), either hostname works. Before that fix was in place, the wrong hostname produced a silently blank page with dead buttons (client JS blocked as cross-origin), not an error pointing at the cause.
+
+**Start this app *before* the Hermes gateway.** WhatsApp delivers messages queued during an outage within seconds of the bridge reconnecting (6s, measured 2026-07-29), so a gateway that comes up first can complete a real turn into a dead ingestion endpoint and lose it.
 
 To register a new customer after provisioning their Hermes instance (see `infra/modules/hermes-instance/README.md`), use `scripts/provision-customer.ts`.
 

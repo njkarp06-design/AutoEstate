@@ -364,6 +364,16 @@ plugins:
 # What still holds from it: `WHATSAPP_ENABLED=false` does NOT stop Hermes
 # attempting a connection, so the WHATSAPP_* vars ship COMMENTED OUT in
 # .env.example and are uncommented only once a number is actually paired.
+#
+# CORRECTED 2026-07-29: commenting them out does not stop it either. Measured by
+# resolving load_gateway_config() on BOTH profiles, with the value supplied in
+# the real process environment - WhatsApp comes out enabled:True with
+# WHATSAPP_ENABLED absent, =false, AND =true. So the vars ship commented for
+# tidiness (a half-configured channel is messier than an absent one), NOT as a
+# kill switch. The only thing that actually keeps the adapter off the network is
+# the absence of a pairing (creds.json). Mechanism unconfirmed and deliberately
+# not asserted: gateway/config.py:1773-1784 reads as though an explicit `false`
+# is honoured when a YAML block exists, and measurement contradicts it.
 
 # --- First-contact onboarding note OFF ---------------------------------------
 # Hermes injects a note into the very first message ever for a profile telling
