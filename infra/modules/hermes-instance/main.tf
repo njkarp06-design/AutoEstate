@@ -131,9 +131,31 @@ resource "null_resource" "deploy_agent_content" {
   # Wait for cloud-init's write_files stage before touching /root/.hermes, and
   # clear out anything previously shipped so a renamed or retired skill/plugin
   # doesn't linger on an already-provisioned server.
+  #
+  # `set -e` FIRST, and it is load-bearing rather than boilerplate. Terraform's
+  # remote-exec provisioner concatenates `inline` into ONE script joined by
+  # newlines, with no shebang and no errexit (generateScripts, internal/builtin/
+  # provisioners/remote-exec), and reports the script's exit status - i.e. the
+  # LAST command's. So without this, a failed check does not stop the commands
+  # after it and the whole provisioner still reports success. Every guard in
+  # this file assumes otherwise.
+  #
+  # `|| true` on the wait is deliberate and is not the silent-failure pattern:
+  # `cloud-init status --wait` blocks until cloud-init finishes either way, but
+  # exits non-zero on a DEGRADED boot (a non-fatal module warning), which under
+  # `set -e` would abort an otherwise-fine apply. Its job here is to wait, not to
+  # assert - so the assertion is explicit instead.
+  #
+  # /root/docker-compose.yml is the sentinel because it is a write_files output
+  # and nothing else on the box creates it, so its absence means write_files did
+  # not run. That is the one state in which the `rm -rf` below must NOT proceed:
+  # clearing /root/.hermes on a box that was never provisioned would destroy
+  # whatever is there instead of refreshing shipped content.
   provisioner "remote-exec" {
     inline = [
-      "cloud-init status --wait",
+      "set -e",
+      "cloud-init status --wait || true",
+      "test -f /root/docker-compose.yml",
       "rm -rf /root/.hermes/skills/real-estate /root/.hermes/plugins",
       "mkdir -p /root/.hermes/skills/real-estate /root/.hermes/plugins",
     ]
@@ -155,6 +177,7 @@ resource "null_resource" "deploy_agent_content" {
   # the file provisioner swept up, since it cannot filter its source.
   provisioner "remote-exec" {
     inline = concat(
+      ["set -e"], # see the first remote-exec above for why this is required
       [for p in local.buyer_only_plugins : "rm -rf /root/.hermes/plugins/${p}"],
       ["find /root/.hermes/plugins -type d -name __pycache__ -exec rm -rf {} +"],
     )
@@ -170,11 +193,22 @@ resource "null_resource" "deploy_agent_content" {
 # starts no Telegram adapter, which is the correct WhatsApp-only behaviour.
 #
 # `cloud-init status --wait` blocks until cloud-init's write_files stage has
-# actually finished, so this never races the file into existence. The grep
-# step (no longer `|| true`) fails loudly instead of silently producing an
-# empty .env.tmp, and the sentinel check before `mv` confirms the rest of
-# the file's content survived before the live .env is overwritten - a
-# corrupted/empty .env would otherwise wipe ANTHROPIC_API_KEY and friends.
+# actually finished, so this never races the file into existence. The grep step
+# fails loudly instead of silently producing an empty .env.tmp, and the sentinel
+# check before `mv` confirms the rest of the file's content survived before the
+# live .env is overwritten - a corrupted/empty .env would otherwise wipe
+# ANTHROPIC_API_KEY and friends.
+#
+# BOTH OF THOSE GUARANTEES DEPEND ENTIRELY ON `set -e`, which is why it is the
+# first inline command of each remote-exec block below. Terraform joins `inline`
+# into ONE newline-separated script with no shebang and no errexit, and reports
+# the LAST command's exit status - so before it was added, the sentinel `grep -q`
+# failing did not stop the `mv` on the next line, and the provisioner still
+# reported success because `docker compose restart` succeeded. Measured, not
+# assumed: replaying this exact sequence under plain `sh` overwrote a live .env
+# holding AUTOESTATE_CUSTOMER_ID with the three secrets alone and exited 0. The
+# comment above described the intent; the shell did something else. Do not
+# remove `set -e` as noise - it is the only thing making any of this true.
 #
 # The secret VALUES are written via a file provisioner (SCP) rather than
 # interpolated into `inline` commands: an inline `echo 'SECRET' >> file` puts
@@ -213,7 +247,11 @@ resource "null_resource" "inject_secrets" {
 
   provisioner "remote-exec" {
     inline = [
-      "cloud-init status --wait",
+      "set -e",
+      # Waits either way; `|| true` only tolerates a DEGRADED exit status. The
+      # `test -f` is the real assertion. See deploy_agent_content's first
+      # remote-exec for the full reasoning.
+      "cloud-init status --wait || true",
       "test -f /root/.hermes/.env",
     ]
   }
@@ -229,6 +267,9 @@ resource "null_resource" "inject_secrets" {
 
   provisioner "remote-exec" {
     inline = [
+      # Without this, the `grep -q` sentinel below cannot stop the `mv` that
+      # follows it - see this resource's header comment.
+      "set -e",
       "chmod 600 /root/.hermes/.env.secrets",
       "grep -v -e '^AUTOESTATE_INGESTION_SECRET=' -e '^ANTHROPIC_API_KEY=' -e '^TELEGRAM_BOT_TOKEN=' /root/.hermes/.env > /root/.hermes/.env.tmp",
       "cat /root/.hermes/.env.secrets >> /root/.hermes/.env.tmp",

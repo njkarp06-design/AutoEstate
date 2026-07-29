@@ -38,6 +38,23 @@ variable "whatsapp_allowed_users" {
   type = string
 }
 
+# The agent-facing channel can be Telegram, WhatsApp or both (TODO 12a).
+# These MUST be declared here as well as in the module: this wrapper is what
+# `terraform.tfvars` is read against, and Terraform treats a value for an
+# undeclared root variable as a WARNING, not an error - so before these existed,
+# setting telegram_bot_token per the module README's step 4 applied cleanly and
+# silently provisioned a WhatsApp-only instance.
+variable "telegram_bot_token" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "telegram_allowed_users" {
+  type    = string
+  default = ""
+}
+
 variable "operator_ssh_key_name" {
   type    = string
   default = "autoestate-operator"
@@ -60,6 +77,8 @@ module "hermes" {
   anthropic_api_key             = var.anthropic_api_key
   ingestion_api_url             = var.ingestion_api_url
   whatsapp_allowed_users        = var.whatsapp_allowed_users
+  telegram_bot_token            = var.telegram_bot_token
+  telegram_allowed_users        = var.telegram_allowed_users
   operator_ssh_key_name         = var.operator_ssh_key_name
   operator_ssh_private_key_path = var.operator_ssh_private_key_path
   operator_ssh_cidrs            = var.operator_ssh_cidrs

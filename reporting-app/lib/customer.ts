@@ -10,6 +10,25 @@ import type { Customer } from "@/prisma/generated/prisma/client";
  * pair WhatsApp per customer, so there's no self-serve signup story here).
  * On first login, the Clerk user gets linked to that pre-provisioned row by
  * verified email.
+ *
+ * "Verified" is now ENFORCED here rather than only claimed. Email is the entire
+ * tenancy boundary on first login: whoever presents a matching address gets
+ * permanently bound to that Customer row (`clerkUserId` is unique, so the FIRST
+ * claimant wins) and with it the customer's runs, listings and buyer leads. This
+ * function previously read the address and bound the row without ever looking at
+ * `verification.status`, which left that boundary resting entirely on a Clerk
+ * dashboard setting that nothing in this repo pins, asserts or documents - and
+ * the operator's emails are not secrets, they go in terraform.tfvars.
+ *
+ * Anything other than `verified` fails closed: the caller gets null and the
+ * pages render their existing "your account isn't linked yet" state, which is
+ * the honest message - they genuinely are not linked.
+ *
+ * The check gates the LINK, not every request: an already-linked user returns
+ * from the clerkUserId lookup above without reaching it. That is deliberate, not
+ * an oversight - the binding is what needs a verified address, and re-checking
+ * per request would lock a real customer out if they later changed their primary
+ * email to one pending verification.
  */
 export async function getCurrentCustomer(): Promise<Customer | null> {
   const { userId } = await auth();
@@ -21,8 +40,20 @@ export async function getCurrentCustomer(): Promise<Customer | null> {
   if (existing) return existing;
 
   const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress;
+  const primaryEmail = user?.primaryEmailAddress;
+  const email = primaryEmail?.emailAddress;
   if (!email) return null;
+
+  // Checked BEFORE the lookup, so an unverified address never even probes which
+  // emails are provisioned.
+  if (primaryEmail?.verification?.status !== "verified") {
+    console.warn(
+      "customer: refusing to link Clerk user %s - primary email is not verified (status: %s)",
+      userId,
+      primaryEmail?.verification?.status ?? "none",
+    );
+    return null;
+  }
 
   const customer = await prisma.customer.findUnique({ where: { email } });
   if (!customer) return null; // signed in, but not provisioned by the operator yet

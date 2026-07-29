@@ -31,7 +31,16 @@ export function InquiryList({ inquiries }: { inquiries: Inquiry[] }) {
   const needsYouCount = inquiries.filter(
     (i) => i.disposition === "needs_you" && i.status !== "handled",
   ).length;
-  const autoAnsweredCount = inquiries.length - needsYouCount;
+  // Counted from the disposition, NOT as `inquiries.length - needsYouCount`.
+  // By subtraction, a lead that deferred to a human and was then marked handled
+  // fell out of "need you" and straight into "auto-answered" - claiming the bot
+  // dealt with it alone, on the one page whose whole job is being trustworthy
+  // about that. A handled-but-deferred lead now appears in NEITHER tile, which
+  // is correct: it was neither auto-answered nor still waiting on you. The tiles
+  // therefore don't always sum to Total, which is fine - the fourth is channels.
+  const autoAnsweredCount = inquiries.filter(
+    (i) => i.disposition === "auto_answered",
+  ).length;
   const whatsappCount = inquiries.filter((i) => isWhatsAppSource(i.source)).length;
   const telegramCount = inquiries.filter((i) => i.source === "telegram").length;
 

@@ -5,6 +5,7 @@ import { authenticateMachineRequest } from "@/lib/ingest-auth";
 import { parseListingRecords } from "@/lib/listing-record";
 import { generateRefCode } from "@/lib/ref-code";
 import { isBackgroundReviewTurn } from "@/lib/hermes-harness";
+import { withSerializationRetry } from "@/lib/serialization-retry";
 
 /**
  * A ref code that no listing currently holds.
@@ -206,7 +207,12 @@ export async function POST(request: NextRequest) {
       // (UNIQUE (customerId, lower(area), rooms, sqm) WHERE status <> 'SOLD')
       // matches those semantics; it needs a migration and is tracked in
       // TODO.md as the durable fix before the Vercel deploy.
-      const listing = await prisma.$transaction(
+      //
+      // Wrapped in withSerializationRetry because Prisma does not retry an
+      // interactive transaction, and Postgres aborts one side of a real
+      // conflict with P2034. Unretried, the Serializable level TRADED duplicate
+      // rows for a silently-lost listing - see lib/serialization-retry.ts.
+      const listing = await withSerializationRetry(() => prisma.$transaction(
         async (tx) => {
           const existing = await tx.listing.findFirst({
             where: {
@@ -254,7 +260,7 @@ export async function POST(request: NextRequest) {
           });
         },
         { isolationLevel: "Serializable" },
-      );
+      ));
 
       listingIds.push(listing.id);
     }
