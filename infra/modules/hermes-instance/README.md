@@ -1,27 +1,51 @@
 # hermes-instance module
 
-Provisions one dedicated Hetzner Cloud server for one AutoEstate customer:
-Docker, the official `nousresearch/hermes-agent` image, all five operator
-real-estate skills, and the three operator plugins - everything up to the
-point where WhatsApp pairing (a manual, interactive step) is the only thing
-left.
+Provisions one dedicated Hetzner Cloud server for **one role of** one AutoEstate
+customer: Docker, the official `nousresearch/hermes-agent` image, that role's
+skills and plugins - everything up to the point where WhatsApp pairing (a
+manual, interactive step) is the only thing left.
 
-Shipped to the instance:
+## Two roles, two servers, `instance_role`
 
-- **Skills** (`/root/.hermes/skills/real-estate/`) - `listing-to-social`,
-  `listing-status-update`, `just-sold`, `listing-reengagement`,
-  `weekly-digest`. Everything under `agent/skills/real-estate/` is uploaded,
-  so a new skill directory needs no change here.
-- **Plugins** (`/root/.hermes/plugins/`, and named in `config.yaml`'s
-  `plugins.enabled`) - `sync-to-webapp`, `listing-footer-reminder`,
-  `active-listings-context`. The buyer-instance plugins are removed after
-  upload; this module provisions the **operator** role only.
+A fully-provisioned customer has **two** instances, and they cannot share one.
+That is forced rather than preferred: the Hermes sender allowlist is a hard
+adapter gate and sender identity never reaches a skill, so a buyer messaging the
+operator's channel could trigger the outbound, `Listing`-mutating skills.
+
+| | `instance_role = "operator"` (default) | `instance_role = "buyer"` |
+|---|---|---|
+| Who messages it | the customer only (allowlisted number/id) | **anyone** - it is public |
+| Skills | 5, from `agent/skills/real-estate/` | **1**, from `agent/skills-buyer/real-estate/` |
+| Plugins | `sync-to-webapp`, `listing-footer-reminder`, `active-listings-context` | `buyer-listings-context`, `sync-inquiries-to-webapp` |
+| Tools the model gets | Hermes defaults | **3** (`skills_list`, `skill_view`, `skill_manage`) |
+| Slash gating | off - see the config comment | **on, and required** |
+| Secret role | `operator` | `buyer` |
+
+The other role's plugins are deleted after upload: the whole `plugins/` directory
+is uploaded in one go, and a public buyer box has no business carrying the
+operator's `Listing`-mutating sync code.
+
+**Buyer instances require `buyer_telegram_admin_ids` and
+`buyer_whatsapp_admin_lids`, and the module refuses to plan without them.** An
+empty admin list does not mean "no admins" - `gateway/slash_access.py` computes
+`enabled = bool(admin_ids)`, so empty switches gating **off** and every allowed
+caller (i.e. every stranger, since the buyer allowlist is `*`) holds admin tier
+on ~68 commands including `/profile`. These are the **operator's own** ids.
+
+**`skills.external_dirs` is deliberately absent from the generated buyer
+config.** The dev profile pins an absolute Windows path, which on Linux resolves
+to nothing and would leave the instance with **zero** skills - a public
+receptionist with no receptionist, failing silently and totally. Hermes discovers
+`/root/.hermes/skills` natively and only that role's tree is uploaded there.
 
 **How they get there matters.** Skills and plugins are *not* embedded in
-cloud-init `user_data` - Hetzner caps that at 32KB and the five skills alone
-are ~63KB of Markdown. They are uploaded over SSH after boot by
-`null_resource.deploy_agent_content`, which re-uploads whenever any of those
-files change, then `null_resource.inject_secrets` restarts the gateway.
+cloud-init `user_data` - Hetzner caps that at 32KB and the five operator skills
+alone are ~63KB of Markdown. (Measured after this change: the rendered
+`user_data` is ~9.5KB for the operator role and ~13KB for the buyer role, both
+well inside the cap.) They are uploaded over SSH after boot.
+
+`null_resource.deploy_agent_content` re-uploads whenever any of those files
+change, then `null_resource.inject_secrets` restarts the gateway.
 
 **Status: written and unapplied.** `terraform validate`/`fmt` only, per Phase
 C's scope - no real server has been provisioned against this module yet, so
@@ -75,9 +99,17 @@ terraform apply
 ### 3. Register the customer in the reporting webapp's database
 
 ```bash
-terraform output -raw operator_ingestion_secret | \
-  npx tsx ../../../reporting-app/scripts/provision-customer.ts <customer-email>
+# --role MUST match instance_role. Registering under the wrong role produces an
+# instance that authenticates nowhere - 401 on every sync, which on a buyer box
+# silently drops every lead. provision-customer.ts also rejects the same secret
+# being registered for both roles, which would rebuild the shared credential
+# the split removed.
+terraform output -raw ingestion_secret | \
+  npx tsx ../../../reporting-app/scripts/provision-customer.ts <customer-email> --role operator
 ```
+
+For a **buyer** stack, everything is the same but `--role buyer`. The customer
+must already exist, so register their operator credential first.
 
 ### 4. Pick the customer's agent-facing channel(s)
 
@@ -136,8 +168,8 @@ Tainting `random_password.ingestion_secret` and re-applying regenerates the
 ```bash
 terraform taint 'module.hermes.random_password.ingestion_secret'
 terraform apply
-terraform output -raw operator_ingestion_secret | \
-  npx tsx ../../../reporting-app/scripts/provision-customer.ts <customer-email>
+terraform output -raw ingestion_secret | \
+  npx tsx ../../../reporting-app/scripts/provision-customer.ts <customer-email> --role operator
 ```
 
 ## What's deliberately not automated
@@ -152,15 +184,16 @@ terraform output -raw operator_ingestion_secret | \
 
 ## The buyer instance's secret is separate
 
-This module provisions the **operator** role only. A customer's buyer instance
-authenticates with its own credential, scoped by the reporting app to
-`/api/inquiries` and `/api/listings/buyer-view` — presenting it to `/api/ingest`
-returns 401. That is deliberate: the buyer box is the one public surface, and a
-shared secret there meant write access to the customer's `Listing` data.
+Each stack generates **one** secret, for its own role. A buyer instance's
+credential is scoped by the reporting app to `/api/inquiries` and
+`/api/listings/buyer-view` — presenting it to `/api/ingest` returns 401. That is
+deliberate: the buyer box is the one public surface, and a shared secret there
+meant write access to the customer's `Listing` data.
 
-It is minted at provisioning time rather than generated here, because there is no
-buyer Terraform module yet (`instance_role`, see TODO.md) and generating it in the
-operator module would force a future buyer module to read the operator's state:
+Since 2026-07-31 the buyer secret is generated by this module too (run a second
+stack with `instance_role = "buyer"`), so the hand-minting step below is no
+longer needed. It is kept only for a buyer instance you are running **outside**
+Terraform — e.g. the dev laptop profile:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"

@@ -1,18 +1,34 @@
 locals {
   agent_root  = "${path.module}/../../../agent"
-  skills_dir  = "${local.agent_root}/skills/real-estate"
+  is_buyer    = var.instance_role == "buyer"
   plugins_dir = "${local.agent_root}/plugins"
 
-  # Plugins that belong to the BUYER instance (agent/skills-buyer), not this
-  # one. The whole plugins/ directory is uploaded in one go and these two are
-  # deleted remotely afterwards - simpler and more self-maintaining than
-  # enumerating the operator plugins in provisioners, which can't be looped
-  # over with a dynamic block. When a buyer-role instance is added
-  # (instance_role, see TODO.md), this becomes the conditional.
-  buyer_only_plugins = [
+  # The skill directory split is the whole isolation mechanism, not a filing
+  # convention: the buyer tree holds exactly ONE skill (buyer-inquiry) and the
+  # operator tree holds the five outbound, Listing-mutating ones. A buyer
+  # instance pointed at the operator tree would hand strangers the ability to
+  # mark a customer's property SOLD. Verified on the dev profiles by resolving
+  # what each one actually discovers: buyer 1 skill, operator 5, neither
+  # sees the other's.
+  skills_dir = local.is_buyer ? "${local.agent_root}/skills-buyer/real-estate" : "${local.agent_root}/skills/real-estate"
+
+  # Plugins split by role. The whole plugins/ directory is uploaded in one go
+  # and the OTHER role's are deleted remotely afterwards - simpler and more
+  # self-maintaining than enumerating them in provisioners, which can't be
+  # looped over with a dynamic block.
+  operator_plugins = [
+    "sync-to-webapp",
+    "listing-footer-reminder",
+    "active-listings-context",
+  ]
+  buyer_plugins = [
     "buyer-listings-context",
     "sync-inquiries-to-webapp",
   ]
+  # Deleted remotely AND excluded from agent_content_hash below: they are never
+  # enabled on this role, so letting them into the hash means editing the other
+  # role's plugin forces a pointless re-upload and gateway restart here.
+  foreign_plugins = local.is_buyer ? local.operator_plugins : local.buyer_plugins
 
   # Re-upload whenever any shipped skill or plugin file changes, so an edited
   # SKILL.md actually reaches an already-provisioned server.
@@ -26,18 +42,18 @@ locals {
     for f in tolist(fileset(local.skills_dir, "**")) : f
     if !strcontains(f, "__pycache__")
   ])
-  # Buyer-only plugins are excluded from the hash as well as deleted remotely
-  # (see deploy_agent_content): they are never enabled on an operator box, so
-  # letting them into agent_content_hash meant editing a buyer plugin forced a
-  # pointless re-upload and gateway restart on every operator instance.
   plugin_files = sort([
     for f in tolist(fileset(local.plugins_dir, "**")) : f
     if !strcontains(f, "__pycache__")
-    && !anytrue([for p in local.buyer_only_plugins : startswith(f, "${p}/")])
+    && !anytrue([for p in local.foreign_plugins : startswith(f, "${p}/")])
   ])
+  # The buyer instance also ships a SOUL.md (its receptionist persona). Folded
+  # into the hash so editing it actually redeploys, same as a SKILL.md.
+  buyer_soul_path = "${local.agent_root}/profiles/autoestate-buyer/SOUL.md"
   agent_content_hash = sha256(join("", concat(
     [for f in local.skill_files : filesha256("${local.skills_dir}/${f}")],
     [for f in local.plugin_files : filesha256("${local.plugins_dir}/${f}")],
+    local.is_buyer ? [filesha256(local.buyer_soul_path)] : [],
   )))
 }
 
@@ -85,17 +101,46 @@ resource "hcloud_server" "hermes" {
   # rather than at write time. They are uploaded post-boot instead - see
   # null_resource.deploy_agent_content below.
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    customer_id            = var.customer_id
-    ingestion_api_url      = var.ingestion_api_url
-    whatsapp_allowed_users = var.whatsapp_allowed_users
-    telegram_allowed_users = var.telegram_allowed_users
-    hermes_model           = var.hermes_model
-    hermes_image_tag       = var.hermes_image_tag
+    instance_role             = var.instance_role
+    customer_id               = var.customer_id
+    ingestion_api_url         = var.ingestion_api_url
+    whatsapp_allowed_users    = var.whatsapp_allowed_users
+    telegram_allowed_users    = var.telegram_allowed_users
+    buyer_telegram_admin_ids  = var.buyer_telegram_admin_ids
+    buyer_whatsapp_admin_lids = var.buyer_whatsapp_admin_lids
+    hermes_model              = var.hermes_model
+    hermes_image_tag          = var.hermes_image_tag
   })
 
   labels = {
     customer = var.customer_id
     project  = "autoestate"
+    role     = var.instance_role
+  }
+
+  # Enforced here rather than in a `validation` block because this module is
+  # pinned to Terraform >= 1.5 and cross-variable validation needs 1.9+.
+  #
+  # An empty admin list does not mean "no admins" - gateway/slash_access.py
+  # computes `enabled = bool(admin_ids)`, so empty switches gating OFF and every
+  # ALLOWED caller gets admin tier on ~68 commands. On a buyer box the allowlist
+  # is `*`, so that is every stranger, holding /profile - which reaches the
+  # operator profile's outbound Listing-mutating skills. Failing the plan is the
+  # correct outcome: this is the one misconfiguration that silently produces a
+  # working-looking public bot with no isolation at all.
+  lifecycle {
+    precondition {
+      condition     = !local.is_buyer || length(var.buyer_telegram_admin_ids) > 0
+      error_message = "instance_role = \"buyer\" requires a non-empty buyer_telegram_admin_ids. An empty list disables slash-command gating entirely, which promotes every stranger on a public instance to admin tier (including /profile)."
+    }
+    precondition {
+      condition     = !local.is_buyer || length(var.buyer_whatsapp_admin_lids) > 0
+      error_message = "instance_role = \"buyer\" requires a non-empty buyer_whatsapp_admin_lids (WITH the @lid suffix). An empty list disables slash-command gating entirely - see buyer_telegram_admin_ids."
+    }
+    precondition {
+      condition     = local.is_buyer || var.whatsapp_allowed_users != ""
+      error_message = "instance_role = \"operator\" requires whatsapp_allowed_users (the customer's own number). Only the buyer role runs open to everyone."
+    }
   }
 }
 
@@ -171,16 +216,45 @@ resource "null_resource" "deploy_agent_content" {
     destination = "/root/.hermes/plugins"
   }
 
-  # Drop the buyer-instance plugins that came along with the directory upload
-  # (not in plugins.enabled, so inert either way - but an operator box has no
-  # business carrying the public instance's code), and any local __pycache__
-  # the file provisioner swept up, since it cannot filter its source.
+  # Drop the OTHER role's plugins that came along with the directory upload
+  # (not in plugins.enabled, so inert either way - but a public buyer box has
+  # no business carrying the operator's Listing-mutating sync code, and vice
+  # versa), and any local __pycache__ the file provisioner swept up, since it
+  # cannot filter its source.
   provisioner "remote-exec" {
     inline = concat(
       ["set -e"], # see the first remote-exec above for why this is required
-      [for p in local.buyer_only_plugins : "rm -rf /root/.hermes/plugins/${p}"],
+      [for p in local.foreign_plugins : "rm -rf /root/.hermes/plugins/${p}"],
       ["find /root/.hermes/plugins -type d -name __pycache__ -exec rm -rf {} +"],
     )
+  }
+}
+
+# The buyer instance's receptionist persona. A separate count-gated resource
+# rather than a conditional `provisioner` block inside the one above, because
+# provisioners cannot be made conditional - and the alternative (pointing an
+# unwanted upload at a throwaway destination) is the kind of cleverness that
+# reads as a bug to the next person. The operator role deliberately runs
+# Hermes's default persona and gets no SOUL.md at all.
+resource "null_resource" "deploy_buyer_soul" {
+  count      = local.is_buyer ? 1 : 0
+  depends_on = [null_resource.deploy_agent_content]
+
+  triggers = {
+    server_id = hcloud_server.hermes.id
+    soul_hash = filesha256(local.buyer_soul_path)
+  }
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = file(var.operator_ssh_private_key_path)
+  }
+
+  provisioner "file" {
+    source      = local.buyer_soul_path
+    destination = "/root/.hermes/SOUL.md"
   }
 }
 
@@ -217,7 +291,7 @@ resource "null_resource" "deploy_agent_content" {
 # single quote (anthropic_api_key is operator-supplied, so that is not
 # hypothetical). The temp file is 0600 and removed in the same run.
 resource "null_resource" "inject_secrets" {
-  depends_on = [null_resource.deploy_agent_content]
+  depends_on = [null_resource.deploy_agent_content, null_resource.deploy_buyer_soul]
 
   triggers = {
     secret_hash  = sha256(random_password.ingestion_secret.result)

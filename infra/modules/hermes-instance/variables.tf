@@ -1,3 +1,42 @@
+variable "instance_role" {
+  description = "Which half of the product this instance runs: \"operator\" (the customer's own agent-facing bot, with the five outbound Listing-mutating skills) or \"buyer\" (the PUBLIC receptionist strangers message, locked down to the single buyer-inquiry skill). A fully-provisioned customer has one of each - they cannot share an instance, because the Hermes sender allowlist is a hard adapter gate and sender identity never reaches a skill, so a buyer on the operator's channel could trigger the outbound skills."
+  type        = string
+  default     = "operator"
+
+  validation {
+    condition     = contains(["operator", "buyer"], var.instance_role)
+    error_message = "instance_role must be exactly \"operator\" or \"buyer\"."
+  }
+}
+
+// --- Buyer-role slash-command gating ----------------------------------------
+// REQUIRED when instance_role = "buyer", and enforced by a precondition in
+// main.tf rather than left to documentation. This is not a preference:
+// gateway/slash_access.py computes `enabled = bool(admin_ids)`, so an EMPTY
+// admin list does not mean "nobody is admin" - it means gating is OFF and every
+// ALLOWED caller holds admin tier on all ~68 commands. On a public instance
+// (allowlist `*`) that is every stranger on the internet, holding /profile -
+// which would let them switch to the operator profile and reach the outbound
+// Listing-mutating skills, defeating the entire role-by-channel isolation this
+// architecture rests on. Found live on the dev buyer instance 2026-07-26.
+//
+// These are the OPERATOR's own ids (the human running the business), not the
+// customer's and certainly not a buyer's. Nobody else should ever hold admin on
+// a public box. The dev profile hardcodes them; parameterising them here is what
+// closes that deploy gate.
+
+variable "buyer_telegram_admin_ids" {
+  description = "Numeric Telegram user ids allowed admin-tier slash commands on a BUYER instance. Must be non-empty when instance_role = \"buyer\" - an empty list switches gating OFF entirely and promotes every stranger to admin. Ignored for the operator role."
+  type        = list(string)
+  default     = []
+}
+
+variable "buyer_whatsapp_admin_lids" {
+  description = "WhatsApp LIDs allowed admin-tier slash commands on a BUYER instance, WITH the @lid suffix (e.g. \"107186009169928@lid\"). The bare number does NOT work - the slash layer does no normalising, unlike the bridge's own allowlist (verified against the real policy code 2026-07-28). Must be non-empty when instance_role = \"buyer\". Ignored for the operator role."
+  type        = list(string)
+  default     = []
+}
+
 variable "customer_id" {
   description = "Short, unique slug for this customer (e.g. \"acme-realty\"). Used to name cloud resources - keep it DNS/hostname-safe."
   type        = string
@@ -20,8 +59,9 @@ variable "ingestion_api_url" {
 }
 
 variable "whatsapp_allowed_users" {
-  description = "The customer's own WhatsApp number, international format, no + or spaces (e.g. 972501234567) - the only sender the bot will respond to."
+  description = "OPERATOR role only: the customer's own WhatsApp number, international format, no + or spaces (e.g. 972501234567) - the only sender the bot will respond to. Ignored for the buyer role, which sets `*` (allow-all) plus the separate WHATSAPP_ALLOW_ALL_USERS opt-in, because a public receptionist must answer strangers by definition."
   type        = string
+  default     = ""
 }
 
 // --- Operator channel -------------------------------------------------------

@@ -14,6 +14,31 @@ write_files:
     content: |
       AUTOESTATE_CUSTOMER_ID=${customer_id}
       AUTOESTATE_INGESTION_URL=${ingestion_api_url}
+%{ if instance_role == "buyer" ~}
+      # BUYER ROLE - a PUBLIC instance. Strangers message it by design, so the
+      # allowlist is `*` rather than one number.
+      #
+      # WHATSAPP_ALLOW_ALL_USERS IS A HARD STARTUP REQUIREMENT, not a nicety:
+      # with dm_policy: open, gateway/run.py::_own_policy_open_startup_violation
+      # REFUSES TO BOOT without it ("open policy without allow-all opt-in"). An
+      # allowlist of `*` is deliberately not sufficient - running open to the
+      # public takes a second, explicit opt-in. Good design, and it fails in the
+      # right direction, but it will stop a first buyer apply dead if omitted.
+      #
+      # Platform-scoped on purpose. GATEWAY_ALLOW_ALL_USERS would open EVERY
+      # platform at once, which is a wider grant than intended.
+      WHATSAPP_ALLOWED_USERS=*
+      WHATSAPP_ALLOW_ALL_USERS=true
+      TELEGRAM_ALLOWED_USERS=*
+      # Defaults to `self-chat` (adapter.py), which runs the agent on the
+      # operator's OWN number talking to itself - wrong for a receptionist, and
+      # the mode this project explicitly ruled out. Nothing warns you; it is a
+      # silent default, so it is set explicitly.
+      WHATSAPP_MODE=bot
+      # No *_HOME_CHANNEL: there is no operator on this box to push cron output
+      # to, and the "no home channel set" prompt only fires for an allowed
+      # sender, which here means a buyer - who must never see it.
+%{ else ~}
       WHATSAPP_ALLOWED_USERS=${whatsapp_allowed_users}
       # Suppresses the one-time "📬 No home channel is set … Type /sethome"
       # prompt, which fires on any session with no history - i.e. the
@@ -33,16 +58,37 @@ write_files:
       TELEGRAM_ALLOWED_USERS=${telegram_allowed_users}
       # Same "no home channel set" prompt suppression as WhatsApp above.
       TELEGRAM_HOME_CHANNEL=${telegram_allowed_users}
+%{ endif ~}
       # ANTHROPIC_API_KEY, AUTOESTATE_INGESTION_SECRET and TELEGRAM_BOT_TOKEN
       # are deliberately not written here - the null_resource.inject_secrets
       # provisioner in main.tf injects all three post-boot over SSH instead, so
       # any of them can be rotated without changing user_data (which would
       # force this whole server to be recreated, losing the paired WhatsApp
       # session).
-      # WHATSAPP_ENABLED and WHATSAPP_MODE are intentionally left unset -
-      # the interactive `hermes whatsapp` pairing wizard sets these itself.
-      # A gateway that starts with WHATSAPP_ENABLED=true but no paired
-      # session hard-fails startup entirely, not just the WhatsApp adapter.
+      # WHATSAPP_ENABLED is intentionally left unset on BOTH roles - the
+      # interactive `hermes whatsapp` pairing wizard sets it itself, and a
+      # gateway that starts with WHATSAPP_ENABLED=true but no paired session
+      # hard-fails startup entirely, not just the WhatsApp adapter.
+      #
+      # THE ENV VAR IS ONLY HALF THE STORY, and the two roles differ here.
+      # Measured 2026-07-30: a top-level `platforms.<name>` block in config.yaml
+      # REGISTERS that platform by itself, and an explicit WHATSAPP_ENABLED=false
+      # cannot override it. (`display.platforms.*` is a different key and enables
+      # nothing.) The OPERATOR config below writes no top-level `platforms:`
+      # block, so its WhatsApp genuinely stays unregistered until the wizard runs
+      # - which is what keeps a Telegram-only customer clear of that trap.
+      #
+      # The BUYER config does write one, unavoidably: the slash-command gating
+      # lives under `platforms.<name>.extra`, and shipping a public instance
+      # without gating is the one thing this role must never do. So a buyer box
+      # has WhatsApp REGISTERED from first boot, before any pairing. See the
+      # first-apply note in the buyer config block below - this is a known
+      # ordering consequence, not an oversight, and it is unverified against a
+      # real server because this module has never been applied.
+      #
+      # WHATSAPP_MODE is left unset for the operator role (same wizard) but set
+      # explicitly to `bot` for the buyer role above, because its default is
+      # `self-chat` and nothing warns you.
 
   - path: /root/.hermes/config.yaml
     permissions: '0644'
@@ -50,6 +96,150 @@ write_files:
       model:
         default: ${hermes_model}
         provider: anthropic
+%{ if instance_role == "buyer" ~}
+      # ======================= BUYER ROLE: PUBLIC BOX =======================
+      # Strangers reach this instance. The reasoning behind every key below is
+      # kept in full in agent/profiles/autoestate-buyer/config.yaml (the tracked,
+      # commented source of truth) and that profile's README - this is the
+      # deployable extract, kept short because Hetzner caps user_data at 32KB.
+      #
+      # ⚠ FIRST-APPLY ORDERING, UNVERIFIED AGAINST A REAL SERVER. The
+      # `platforms:` block below registers WhatsApp from first boot (see the
+      # .env comment above), so the gateway may refuse to start until the number
+      # is paired. Pairing does not need the gateway - `hermes whatsapp` runs
+      # `bridge.js --pair-only`, which starts no HTTP server - so the recovery is
+      # to SSH in and pair. Check this at the first buyer apply and record what
+      # actually happens.
+      #
+      # NO skills.external_dirs. The dev profile pins an absolute Windows path,
+      # which on Linux resolves to nothing and would leave this instance with
+      # ZERO skills - a public receptionist with no receptionist, failing
+      # silently and totally. Hermes discovers /root/.hermes/skills natively, and
+      # deploy_agent_content uploads ONLY agent/skills-buyer there, so the single
+      # buyer-inquiry skill is found and the five outbound Listing-mutating ones
+      # are not present at all.
+      skills:
+        # The `skills` toolset is all-or-nothing (skills_list + skill_view +
+        # skill_manage) and Hermes has no per-tool denylist, so a public box that
+        # needs skill_view necessarily exposes skill WRITES. Neutered rather than
+        # removed: every create/edit/delete is STAGED for review and never
+        # committed, and nobody approves anything on a buyer instance. A
+        # prompt-injected buyer rewriting the skill that answers every later
+        # buyer is the one genuinely durable compromise available here.
+        write_approval: true
+        guard_agent_created: true
+        inline_shell: false
+      curator:
+        # The background curator archives unused skills. This profile has
+        # exactly one - an archive would silently kill the instance.
+        enabled: false
+      # Layer 1 of the tool lockdown. NOT a complete allowlist on its own:
+      # _get_platform_tools re-adds non-configurable toolsets belonging to the
+      # platform composite, which is how `kanban` slipped past an explicit list.
+      platform_toolsets:
+        telegram: [skills]
+        whatsapp: [skills]
+        cli: [skills]
+      agent:
+        max_turns: 12
+        reasoning_effort: medium
+        gateway_notify_interval: 10
+        # Layer 2, and LOAD-BEARING rather than belt-and-braces: this is applied
+        # unconditionally as a final subtraction in model_tools.py, and is the
+        # only thing that actually removed `kanban`. After changing tool config,
+        # re-dump the resolved tool list - never assume the allowlist held.
+        # `vision` is off because a public instance processing attacker-supplied
+        # images is exactly what makes the deferred Pillow CVEs reachable.
+        disabled_toolsets: [terminal, file, code_execution, browser, web, computer_use,
+          delegation, cronjob, memory, image_gen, video_gen, video, vision, tts,
+          x_search, todo, session_search, context_engine, homeassistant, spotify,
+          discord, discord_admin, yuanbao, kanban]
+      memory:
+        # Durable memory is a cross-buyer poisoning vector.
+        memory_enabled: false
+        user_profile_enabled: false
+      onboarding:
+        # Hermes's first-contact note asks a stranger for their name and
+        # occupation and offers to build a profile of them. The gate is "first
+        # message ever for the profile", so it fires exactly once - on a freshly
+        # provisioned customer's very first real prospect, the worst possible
+        # audience.
+        profile_build: "off"
+      gateway:
+        # Outbound file delivery is triggered by the model emitting a path in
+        # reply TEXT, so no tool lockdown touches it. Under Hermes's default
+        # (strict: false) a prompt-injected buyer could exfiltrate a sibling
+        # profile's .env or either state.db - all measured deliverable before
+        # this was set. BOTH keys are required: strict alone keeps a 600s
+        # recency fallback, and state.db is rewritten every turn, so it stayed
+        # deliverable until trust_recent_files was disabled too.
+        strict: true
+        trust_recent_files: false
+      session_reset:
+        mode: none
+      # SLASH-COMMAND GATING. Non-negotiable on this role, and the module
+      # refuses to plan without the admin ids (see main.tf's preconditions):
+      # gating is switched ON by the PRESENCE of an admin list, so an empty one
+      # means every stranger holds admin tier on ~68 commands - /profile
+      # included, which would hand them the operator profile's outbound skills.
+      # The WhatsApp ids need the @lid suffix; the slash layer does no
+      # normalising, unlike the bridge's own allowlist.
+      platforms:
+        telegram:
+          extra:
+            allow_admin_from: [${join(", ", formatlist("\"%s\"", buyer_telegram_admin_ids))}]
+            group_allow_admin_from: [${join(", ", formatlist("\"%s\"", buyer_telegram_admin_ids))}]
+            # `start` is not an admin action - it is the button Telegram shows
+            # in every new bot chat. Omitting it made a real buyer's first tap a
+            # permissions refusal.
+            user_allowed_commands: [start]
+            group_user_allowed_commands: [start]
+        whatsapp:
+          extra:
+            # Load-bearing: the adapter defaults to 3000 and KILLS whatever holds
+            # its bridge port on start. Irrelevant on a dedicated box, kept
+            # identical to the dev profile so the two don't diverge.
+            bridge_port: 3001
+            dm_policy: open
+            # A public number gets added to groups by spammers and a
+            # receptionist has no business participating.
+            group_policy: disabled
+            allow_admin_from: [${join(", ", formatlist("\"%s\"", buyer_whatsapp_admin_lids))}]
+            group_allow_admin_from: [${join(", ", formatlist("\"%s\"", buyer_whatsapp_admin_lids))}]
+            # Unlike Telegram, the WhatsApp adapter registers NO commands, so
+            # strangers correctly get only the hardcoded /help + /whoami floor.
+            user_allowed_commands: []
+            group_user_allowed_commands: []
+      # The two buyer plugins. Plugins are NOT auto-discovered the way skills
+      # are - each must be physically present in /root/.hermes/plugins AND named
+      # here.
+      #   buyer-listings-context   - injects the customer's listings (every
+      #                              status, so the bot can be honest that a
+      #                              property is gone) into EVERY buyer turn.
+      #   sync-inquiries-to-webapp - syncs each lead to POST /api/inquiries.
+      plugins:
+        enabled:
+          - buyer-listings-context
+          - sync-inquiries-to-webapp
+      # Presentation, same reasoning as the operator role but with a
+      # receptionist's wording rather than a marketing assistant's: a buyer is
+      # a stranger waiting on an answer about a home, not someone watching an
+      # agent work. Matches the dev buyer profile verbatim.
+      display:
+        platforms:
+          whatsapp: &buyer_display
+            tool_progress: off
+            interim_assistant_messages: false
+            busy_ack_detail: false
+            long_running_notifications: generic
+            cleanup_progress: true
+            status_phrases:
+              mode: replace
+              status:
+                - "Just checking that now — one moment."
+                - "Still looking into that for you — won't be long."
+          telegram: *buyer_display
+%{ else ~}
       # All three operator plugins. Plugins are NOT auto-discovered the way
       # skills are - each must be physically present in /root/.hermes/plugins
       # (uploaded by null_resource.deploy_agent_content) AND named here.
@@ -125,6 +315,7 @@ write_files:
       # Deliberately not "fixed" blind: this module has never been applied, so
       # shipping untested gating into the first real provisioning run would be
       # the riskier move. Settle it at first apply - tracked on TODO item 3.
+%{ endif ~}
 
   - path: /root/docker-compose.yml
     permissions: '0644'
