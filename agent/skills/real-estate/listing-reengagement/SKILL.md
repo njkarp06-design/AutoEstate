@@ -1,7 +1,7 @@
 ---
 name: listing-reengagement
 description: Use when a real estate agent wants to re-promote or remind people about a listing they already advertised and that is still active — nothing about it has changed. Trigger phrases include "still available," "re-post this," "remind people," "hasn't sold yet," "it's been a few weeks." The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the listing's core facts into a fresh round of platform-formatted Hebrew and English posts, framed as a reminder rather than a first-time introduction.
-version: 0.2.0
+version: 0.2.1
 author: AutoEstate
 license: MIT
 metadata:
@@ -67,8 +67,11 @@ delivered in *this specific turn*):
   write — safe to default to the sole listing rather than asking. (Contrast
   `listing-status-update`/`just-sold`, which require a locator for this
   exact reason — see their own Required Input.)
-- **Zero matches** → say so plainly, then fall through to asking for facts
-  directly (below) — never guess.
+- **Zero matches** → do **not** tell the agent the listing isn't on record.
+  This lookup only covers listings still marked **Active**, so one that has
+  gone under contract *is* tracked but will not appear here. Say you
+  couldn't find a matching *active* listing, then fall through to asking for
+  facts directly (below) — never guess.
 - **Multiple matches** (locator matches more than one, or no locator given
   and more than one active listing exists) → ask one specific question
   naming the real candidates with distinguishing facts (rooms/sqm/price) —
