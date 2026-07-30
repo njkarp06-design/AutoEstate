@@ -126,9 +126,9 @@ Run against this file's own advice not to. **Four findings, none from reading.**
 
 ### Open questions for the owner
 
-**One genuinely open, asked 2026-07-30 and not yet answered:** whether anything changed outside what the repo and the live systems can be read for — an account created, a credential rotated, a decision taken, something someone told you. Everything checkable *was* checked this pass (see TODO's verification record); this covers only the part that cannot be. **If the answer is "nothing", say so and it gets recorded as asked-and-answered** — an unanswered question here is indistinguishable from an unasked one a week later.
+**None blocking.** The outside-world question was **asked and answered on 2026-07-30: nothing has changed** beyond what the repo and the live systems can be read for — no account created, no credential rotated, no decision taken elsewhere, nothing said off-system. Recorded rather than left silent, because "asked and the answer was nothing" and "never asked" look identical a week later, and only one of them means the docs are complete.
 
-Then two recorded rather than acted on, neither blocking:
+Two things are recorded rather than acted on, neither blocking:
 
 - **The `405` cause is unexplained.** If it recurs, the diagnostic that was never completed is comparing a failing home-network attempt against a hotspot one *in the same window*; this evening both eventually worked, so the discriminator was lost.
 - Cosmetic: the two Telegram bots' display names differ in casing. Changeable in BotFather without touching a token.
