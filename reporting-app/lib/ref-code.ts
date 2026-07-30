@@ -48,7 +48,12 @@ const PREFIX = "REF";
  */
 const REF_CODE_RE = new RegExp(`\\b${PREFIX}[\\s:_-]*([${ALPHABET}]{${CODE_LENGTH}})\\b`, "gi");
 
-/** Random code. Not checked for uniqueness here - see generateUniqueRefCode. */
+/**
+ * Random code. Uniqueness is NOT checked here, and the allocator does not live
+ * in this file: see `allocateRefCode` in `app/api/ingest/route.ts`, which
+ * retries on collision and returns null (never throws) on exhaustion, because
+ * aborting would lose the whole Listing row rather than just its ad link.
+ */
 export function generateRefCode(): string {
   let out = "";
   for (let i = 0; i < CODE_LENGTH; i++) out += ALPHABET[randomInt(ALPHABET.length)];

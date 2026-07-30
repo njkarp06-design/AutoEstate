@@ -10,9 +10,12 @@ export type InquiryStatus = "needs_operator" | "handled";
 // Two DIFFERENT axes, deliberately not merged:
 //  - `status` (stored, operator-controlled): has the operator dealt with this
 //    lead yet? NEEDS_OPERATOR -> HANDLED via the dashboard.
-//  - `disposition` (computed here, display-only, never stored): did the bot's
-//    latest reply hand off to a human, or fully answer it itself? Keyed off
-//    the buyer-inquiry skill's CANONICAL DEFER SENTENCE - see
+//  - `disposition` (computed here, display-only, never stored): has the bot
+//    handed off to a human at any point in this thread, or answered it all
+//    itself? ANY deferring reply marks it "needs you", not just the latest -
+//    see computeDisposition below, which explains the real buyer thread that
+//    proved keying on the latest reply hides exactly the lead you most need.
+//    Keyed off the buyer-inquiry skill's CANONICAL DEFER SENTENCE - see
 //    replyDefersToOperator below. This is the plan's "display-only heuristic",
 //    never a safety boundary.
 export type InquiryDisposition = "auto_answered" | "needs_you";
