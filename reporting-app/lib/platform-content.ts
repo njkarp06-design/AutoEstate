@@ -33,9 +33,56 @@ export const LISTING_RECORD_HEADER_RE = /^\*\*listing record:?\*\*:?\s*$/i;
 // *entirely* one bold span ("**...**"). Deliberately conservative: matching
 // any line that merely contains the word "Instagram" would false-positive on
 // body text (e.g. a contact-info line mentioning an Instagram handle).
+//
+// Used as-is by splitByLanguage. splitPlatformContent additionally accepts the
+// bare-label form below - see isPlatformHeaderLine for why the widening is
+// NOT applied here.
 function isHeaderLine(line: string): boolean {
   const t = line.trim();
   return /^#{1,6}\s+\S/.test(t) || /^\*\*[^*]+\*\*:?\s*$/.test(t);
+}
+
+// Strips a line down to its bare label: markdown (*, #), emoji and all other
+// punctuation, then any leading numbering ("1." / "2)"). "**2. INSTAGRAM:**"
+// and "📸 INSTAGRAM" both reduce to "INSTAGRAM".
+function labelCore(line: string): string {
+  return line
+    .replace(/[^\p{L}\p{N} ]+/gu, " ")
+    .trim()
+    .replace(/^\d+\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// The whole line must BE the platform's label - not merely contain it. That
+// whole-line equality is what makes this safe, not the casing: "Follow us on
+// Instagram" and "Instagram: @agent_handle" both survive as body text, which
+// is exactly what the conservative rule above exists to protect.
+const BARE_PLATFORM_LABEL: Record<PlatformKey, RegExp> = {
+  instagram: /^instagram( caption| post)?$/i,
+  facebook: /^facebook( group| post)?$/i,
+  yad2: /^yad ?2( listing| description| ad)?$/i,
+};
+
+// Real output usually carries bold-numbered headers, which isHeaderLine
+// already covers. This tolerates one further shape observed in a real reply:
+// an unadorned all-caps "INSTAGRAM" line (see CLAUDE.md's PR #19 entry).
+//
+// Measured 2026-07-31 before changing anything: that shape does NOT appear in
+// any ingested reply - all 22 real multi-platform messages in the dev database
+// already split, and all 66 of their sections already language-split. The one
+// observation came from a `hermes -z` CLI run, which never reaches ingest. So
+// this is tolerance for a drift shape that is real but unobserved in
+// production, not a fix for a live failure - and it was verified to leave
+// every one of those 22 messages' section boundaries byte-identical.
+//
+// Deliberately NOT applied to splitByLanguage: its Hebrew marker is "a header
+// line containing Hebrew characters", and Hebrew has no letter case, so any
+// bare-label widening there would promote the first Hebrew *body* line to a
+// header and silently truncate the Hebrew half.
+function isPlatformHeaderLine(line: string, key: PlatformKey): boolean {
+  if (isHeaderLine(line)) return HEADER_KEYWORDS[key].test(line);
+  return BARE_PLATFORM_LABEL[key].test(labelCore(line));
 }
 
 /**
@@ -62,9 +109,8 @@ export function splitPlatformContent(raw: string): ParsedPlatformContent {
   const matchCount: Record<PlatformKey, number> = { instagram: 0, facebook: 0, yad2: 0 };
 
   lines.forEach((line, i) => {
-    if (!isHeaderLine(line)) return;
     for (const key of PLATFORM_KEYS) {
-      if (HEADER_KEYWORDS[key].test(line)) {
+      if (isPlatformHeaderLine(line, key)) {
         at[key] = i; // keep overwriting - last match wins
         matchCount[key]++;
       }
