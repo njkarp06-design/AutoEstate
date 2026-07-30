@@ -15,11 +15,18 @@ reply, same platform gate excluding CLI. The differences:
     that rebuilds exactly the exposure the split removed (this box is
     public, and the operator secret can flip a property to SOLD). See
     reporting-app/lib/ingest-auth.ts and the profile's .env.example.
-  - Resolves and attaches the buyer's identity best-effort (see
-    _resolve_lead below): a `sender` handle and a human-reachable
-    `buyerContact`. Capturing a reachable lead is the #1 value of this
+  - Resolves and attaches a human-reachable `buyerContact` best-effort (see
+    _resolve_lead below). Capturing a reachable lead is the #1 value of this
     feature, so we try - but degrade cleanly to None (the endpoint keeps the
     thread on session id and the dashboard shows "contact not captured").
+
+    A `sender` handle (the platform's opaque `sender_id`) was sent alongside
+    it until 2026-07-31 and DROPPED: nothing ever stored or read it. The
+    Inquiry thread key is `hermesSessionId` by design, so the handle had no
+    consumer at either end - it was dead weight on the wire that read like a
+    persisted field. If a cross-session "returning buyer" feature is ever
+    wanted, this is where to reinstate it, but it needs an Inquiry column and
+    a real consumer decided first, not a field posted on the chance it helps.
 
 Sender resolution is now settled, not tentative. The Phase-0c live Telegram
 spike ran (2026-07-25) and the first real buyer conversation (2026-07-26)
@@ -152,10 +159,12 @@ def _extract_phone(text: str | None) -> str | None:
     return None
 
 
-def _resolve_lead(kwargs: dict, user_message: str | None = None) -> tuple[str | None, str | None]:
-    """(sender_handle, buyer_contact). sender_handle is a stable opaque id;
-    buyer_contact is a dialable number the buyer typed into their message.
-    Both default to None, never a guess.
+def _resolve_lead(kwargs: dict, user_message: str | None = None) -> str | None:
+    """The buyer's dialable contact, extracted from their own message text, or
+    None. Never a guess.
+
+    Returned alone since 2026-07-31; this used to also return the platform's
+    opaque `sender_id` handle, which was posted and then stored by nobody.
 
     The hooks pass exactly these kwargs, confirmed by logging them on a real
     buyer turn rather than assumed:
@@ -175,14 +184,10 @@ def _resolve_lead(kwargs: dict, user_message: str | None = None) -> tuple[str | 
         logger.info("sync-inquiries: hook kwargs keys = %s", sorted(kwargs.keys()))
         _logged_kwargs_once = True
 
-    sender = kwargs.get("sender_id")
-
     # The buyer's own message text is the ONLY place a dialable number ever
     # exists (Phase-0b: platform metadata carries a LID or a numeric user id on
     # both channels, never a phone), which is exactly why the skill asks.
-    contact = _extract_phone(user_message)
-
-    return (str(sender) if sender is not None else None, contact)
+    return _extract_phone(user_message)
 
 
 def _post(payload: dict) -> None:
@@ -233,14 +238,13 @@ def on_turn_started(session_id, turn_id, user_message, platform, **kwargs):
     # Return value is used by Hermes to inject context - always return None.
     if not (INQUIRIES_URL and INGESTION_SECRET) or platform not in SYNCED_PLATFORMS:
         return None
-    sender, buyer_contact = _resolve_lead(kwargs, user_message)
+    buyer_contact = _resolve_lead(kwargs, user_message)
     _post_in_background({
         "event": "turn_started",
         "sessionId": session_id,
         "turnId": turn_id,
         "platform": platform,
         "userMessage": user_message,
-        "sender": sender,
         "buyerContact": buyer_contact,
         "occurredAt": _now_iso(),
     })
@@ -251,7 +255,7 @@ def on_turn_completed(session_id, turn_id, user_message, assistant_response, pla
     # Explicit None, matching on_turn_started - see sync-to-webapp for why.
     if not (INQUIRIES_URL and INGESTION_SECRET) or platform not in SYNCED_PLATFORMS:
         return None
-    sender, buyer_contact = _resolve_lead(kwargs, user_message)
+    buyer_contact = _resolve_lead(kwargs, user_message)
     _post_in_background({
         "event": "turn_completed",
         "sessionId": session_id,
@@ -259,7 +263,6 @@ def on_turn_completed(session_id, turn_id, user_message, assistant_response, pla
         "platform": platform,
         "userMessage": user_message,
         "assistantResponse": assistant_response,
-        "sender": sender,
         "buyerContact": buyer_contact,
         "occurredAt": _now_iso(),
     })
