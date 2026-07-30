@@ -1,6 +1,6 @@
-"""Fetches the customer's currently-active listings from the reporting
-webapp (GET /api/listings/active) and injects them as LLM context. Used by
-four skills: weekly-digest (a roundup of everything active), and - as of
+"""Fetches the customer's non-sold listings from the reporting webapp
+(GET /api/listings/active) and injects them as LLM context. Used by four
+skills: weekly-digest (a roundup of everything on the market), and - as of
 the listing-lookup-by-locator feature - listing-reengagement,
 listing-status-update, and just-sold, so an agent can say "the Dizengoff
 place sold" instead of retyping every fact, with the skill matching the
@@ -8,6 +8,18 @@ named locator against this injected list rather than trusting the model's
 own conversation memory (a real, verified backend record is a categorically
 different trust level than recall - see each consuming skill's own
 Required Input section for exactly how it's used and disambiguated).
+
+TWO STATUSES ARRIVE HERE, NOT ONE (since 2026-07-31). The endpoint returns
+ACTIVE *and* UNDER_CONTRACT, because an under-contract listing being
+invisible meant the canonical "under contract, then sold" sequence told the
+agent its own listing was not on record. Every row is tagged (see
+_status_tag) and the injected header states the rule, because the two are
+NOT interchangeable: weekly-digest and listing-reengagement may use ACTIVE
+rows only - a roundup of what is available must not advertise a property
+that is spoken for, and you do not re-promote one either - while
+listing-status-update and just-sold may match either. Each SKILL.md carries
+its own half of that split; this plugin only reports the truth and labels
+it. SOLD is excluded upstream and never appears here.
 
 Uses a pre_llm_call hook, like sync-to-webapp - but unlike sync-to-webapp,
 which always returns None (its return value is never used), this hook's
@@ -107,9 +119,44 @@ TIMEOUT_SECONDS = 10
 # skipped rather than rendered with a hole in it - weekly-digest reproduces
 # this block verbatim, so a half-described listing becomes a half-described
 # post.
+#
+# `status` is deliberately NOT required: the endpoint only started sending it
+# on 2026-07-31, and a row without it must still be usable rather than dropped.
+# See _status_tag for why an absent status renders as UNDER CONTRACT-ish
+# (withheld from roundups) rather than as ACTIVE.
 REQUIRED_FIELDS = ("area", "rooms", "sqm", "transactionType")
 
 NO_LISTINGS_CONTEXT = "Active listings context: no currently active listings on record."
+
+# The endpoint returns every non-SOLD listing. The two statuses are NOT
+# interchangeable to the four consuming skills, so each row is tagged and the
+# header states the rule - the skills' own SKILL.md files carry the detail.
+#
+# MISSING and UNRECOGNISED are deliberately NOT the same case, and conflating
+# them is a real bug rather than a style choice:
+#
+#   key absent  -> the row came from the pre-2026-07-31 route, which returned
+#                  ACTIVE rows EXCLUSIVELY. So absent genuinely means ACTIVE,
+#                  and that is not a guess. This matters in one real window: a
+#                  profile that gets this plugin copied in before the reporting
+#                  app is redeployed. Tagging those rows unavailable would make
+#                  weekly-digest report "nothing on the market" while several
+#                  listings are - the asymmetric WRONG-ANSWER case this
+#                  plugin's docstring calls out, manufactured by the very
+#                  change meant to prevent a wrong answer.
+#
+#   present but not "ACTIVE" -> anything the route might add later. Renders as
+#                  unavailable, which is the harmless direction: under-
+#                  advertising is a missed post, over-advertising tells buyers
+#                  something untrue about a home that is already spoken for.
+_ACTIVE_TAG = "[ACTIVE]"
+_UNAVAILABLE_TAG = "[UNDER CONTRACT - not available]"
+
+
+def _status_tag(listing: dict) -> str:
+    if "status" not in listing:
+        return _ACTIVE_TAG
+    return _ACTIVE_TAG if listing["status"] == "ACTIVE" else _UNAVAILABLE_TAG
 
 # Deliberately broad across all four consuming skills' vocabulary - see
 # module docstring on the asymmetric cost of a false positive (free) vs.
@@ -164,7 +211,17 @@ def inject_active_listings_context(session_id, turn_id, user_message, platform, 
     # area/rooms/sqm/transactionType directly and sat outside any try, so one
     # missing key would have propagated a KeyError out of pre_llm_call.
     try:
-        lines = ["Active listings context (from reporting system - use ONLY these, never invent others):"]
+        # The header is TWO lines as of 2026-07-31. Nothing below may compare
+        # len(lines) against a literal - see the all-malformed check at the end,
+        # which is keyed to len(header) for exactly this reason.
+        header = [
+            "Active listings context (from reporting system - use ONLY these, never invent others):",
+            "Each row is tagged. [ACTIVE] = on the market. [UNDER CONTRACT - not available] = "
+            "spoken for: it can still be named for a status change or a completed sale, but it "
+            "must NEVER be included in a roundup of what is available, re-promoted, or offered "
+            "to anyone as still on the market.",
+        ]
+        lines = list(header)
         for listing in listings:
             if not isinstance(listing, dict) or any(
                 listing.get(f) is None for f in REQUIRED_FIELDS
@@ -178,7 +235,8 @@ def inject_active_listings_context(session_id, turn_id, user_message, platform, 
             floor = f"floor {listing['floor']}" if listing.get("floor") is not None else "floor N/A"
             lines.append(
                 f"- {listing['area']}, {listing['rooms']} rooms, {listing['sqm']} sqm, "
-                f"{floor}, {price} ({listing['transactionType']})"
+                f"{floor}, {price} ({listing['transactionType']}) "
+                f"{_status_tag(listing)}"
             )
     except Exception as e:
         logger.warning("active-listings-context: could not format listings, no context injected: %s", e)
@@ -186,7 +244,12 @@ def inject_active_listings_context(session_id, turn_id, user_message, platform, 
 
     # Every row was malformed - say so plainly rather than emit a bare header,
     # which weekly-digest would read as "here are the listings" and find none.
-    if len(lines) == 1:
+    # Keyed to len(header), NOT a literal: the header grew from one line to two
+    # on 2026-07-31, and the hardcoded `== 1` that used to be here would have
+    # silently stopped detecting this case. The sibling buyer-listings-context
+    # hit exactly this landmine on 2026-07-28 and was re-keyed then; this file
+    # still had the literal, so the same bug was sitting here waiting.
+    if len(lines) == len(header):
         return NO_LISTINGS_CONTEXT
 
     return "\n".join(lines)

@@ -1,3 +1,3 @@
 name: active-listings-context
-version: "1.1"
-description: Fetches the customer's currently-active listings from the AutoEstate reporting webapp and injects them as LLM context when a message looks like a digest/roundup, re-engagement, status-update, or just-sold request.
+version: "1.2"
+description: Fetches the customer's non-sold listings (ACTIVE and UNDER_CONTRACT, each tagged) from the AutoEstate reporting webapp and injects them as LLM context when a message looks like a digest/roundup, re-engagement, status-update, or just-sold request.

@@ -1,7 +1,7 @@
 ---
 name: listing-reengagement
 description: Use when a real estate agent wants to re-promote or remind people about a listing they already advertised and that is still active — nothing about it has changed. Trigger phrases include "still available," "re-post this," "remind people," "hasn't sold yet," "it's been a few weeks." The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the listing's core facts into a fresh round of platform-formatted Hebrew and English posts, framed as a reminder rather than a first-time introduction.
-version: 0.2.1
+version: 0.3.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -54,28 +54,41 @@ from earlier in this conversation never counts, only the literal block
 delivered in *this specific turn*):
 
 - Search that block for listings whose area reasonably matches the stated
-  locator.
-- **Exactly one match** → use that listing's facts (transaction type,
-  rooms, sqm, floor, price) as this post's identity facts, and open your
-  reply with a short confirmation line restating them (e.g. "Re-posting:
-  4-room apartment, Ben Gurion Blvd, 95 sqm, ₪4,800,000") so a wrong match
-  is visible before the agent does anything with the content.
-- **No locator given, but the context lists exactly one active listing** →
-  same as above, use it directly. This skill has no Listing Record footer
+  locator. **Only `[ACTIVE]` rows count as matches for this skill.** The
+  block also carries `[UNDER CONTRACT - not available]` rows; a property
+  that is spoken for must never be re-promoted as still available, so treat
+  those as non-matches for the purposes of every branch below — except the
+  one that names them explicitly.
+- **Exactly one `[ACTIVE]` match** → use that listing's facts (transaction
+  type, rooms, sqm, floor, price) as this post's identity facts, and open
+  your reply with a short confirmation line restating them (e.g.
+  "Re-posting: 4-room apartment, Ben Gurion Blvd, 95 sqm, ₪4,800,000") so a
+  wrong match is visible before the agent does anything with the content.
+- **The locator matches only an `[UNDER CONTRACT - not available]` row** →
+  do **not** produce re-promotion content, and do not silently treat it as
+  "not found". Say plainly that that listing is under contract, so
+  re-promoting it would advertise a property that is already spoken for,
+  and ask whether they meant a different one — or whether the sale has now
+  completed, in which case `just-sold` is the right skill. This is a real
+  answer, not a refusal: the agent asked to re-promote something they may
+  not remember is off the market.
+- **No locator given, but the context lists exactly one `[ACTIVE]` listing**
+  → same as the single-match case, use it directly. This skill has no Listing Record footer
   and makes no automatic change to any stored data (see Output Format), so
   a wrong guess here only costs a redo of draft copy, not a bad database
   write — safe to default to the sole listing rather than asking. (Contrast
   `listing-status-update`/`just-sold`, which require a locator for this
   exact reason — see their own Required Input.)
-- **Zero matches** → do **not** tell the agent the listing isn't on record.
-  This lookup only covers listings still marked **Active**, so one that has
-  gone under contract *is* tracked but will not appear here. Say you
-  couldn't find a matching *active* listing, then fall through to asking for
-  facts directly (below) — never guess.
-- **Multiple matches** (locator matches more than one, or no locator given
-  and more than one active listing exists) → ask one specific question
-  naming the real candidates with distinguishing facts (rooms/sqm/price) —
-  not a generic "please restate everything."
+- **Zero matches** (nothing matched, and not the under-contract case above)
+  → do **not** tell the agent the listing isn't on record. Say you couldn't
+  find a matching *active* listing — it may be recorded under a
+  differently-spelled area — then fall through to asking for facts directly
+  (below) — never guess.
+- **Multiple matches** (locator matches more than one `[ACTIVE]` row, or no
+  locator given and more than one `[ACTIVE]` listing exists) → ask one
+  specific question naming the real candidates with distinguishing facts
+  (rooms/sqm/price) — not a generic "please restate everything." Never
+  include an under-contract listing among the candidates you offer.
 - If no such block was injected this turn, or it says there are no active
   listings, skip straight to asking for facts directly (below).
 

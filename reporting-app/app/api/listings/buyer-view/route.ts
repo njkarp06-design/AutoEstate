@@ -5,11 +5,13 @@ import { authenticateMachineRequest } from "@/lib/ingest-auth";
 // Called by a customer's own buyer-facing Hermes instance
 // (agent/plugins/buyer-listings-context) so the buyer-inquiry skill can answer
 // a stranger's questions from real data. Deliberately the mirror image of
-// /api/listings/active: that one returns ACTIVE only (the operator's outbound
-// skills only act on live listings), whereas the buyer bot MUST know about
-// SOLD/UNDER_CONTRACT rows too so it can tell a buyer honestly that a listing
-// is already gone rather than call it available. So this returns every status
-// and includes the `status` field, which `active` omits.
+// /api/listings/active: that one returns every NON-SOLD listing (ACTIVE and
+// UNDER_CONTRACT - widened 2026-07-31, it was ACTIVE-only before), because the
+// operator's outbound skills only act on a listing still in play. The buyer
+// bot MUST additionally know about SOLD rows, so it can tell a buyer honestly
+// that a listing is already gone rather than quietly omit it. So this returns
+// every status. Both endpoints now carry a `status` field; the difference is
+// which rows they include, not what they describe.
 export async function GET(request: NextRequest) {
   // BUYER role only, and read-only - the public instance never needs more than
   // this from the listings table.
