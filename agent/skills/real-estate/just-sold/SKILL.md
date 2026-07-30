@@ -1,7 +1,7 @@
 ---
 name: just-sold
 description: Use when a real estate agent's listing just sold and they want a celebratory, shareable social-proof post about it — not a factual status note. The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the sale plus the listing's core facts into platform-formatted Hebrew and English posts for Instagram, a Facebook group, and Yad2.
-version: 0.3.0
+version: 0.3.1
 author: AutoEstate
 license: MIT
 metadata:
@@ -70,8 +70,13 @@ literal block delivered in *this specific turn*):
   message** — that confirmation is itself the "locator" for the purposes of
   this section, so from that point on this is a single-match locator case
   (above), not a no-locator case.
-- **Zero matches** → say so plainly, then fall through to asking for the
-  identity facts directly (below) — never guess.
+- **Zero matches** → do **not** tell the agent the listing isn't on record.
+  This lookup only covers listings still marked **Active**, so one that has
+  already gone under contract *is* tracked but will not appear here — and
+  "under contract, then sold" is the ordinary lifecycle, not an edge case.
+  Say you couldn't find a matching *active* listing, then fall through to
+  asking for the identity facts directly (below) — never guess. Restating
+  the facts still updates the right listing, so nothing is lost by asking.
 - **Multiple matches** → ask one specific question naming the real
   candidates with distinguishing facts (rooms/sqm/price) — not a generic
   "please restate everything."
@@ -173,6 +178,8 @@ Price: <₪ amount, or N/A>
 Status: Sold
 Features: <optional, see below>
 ```
+The first 7 labeled lines are required, in this order.
+
 `Features` may be appended as an optional **last** line (after `Status`) when
 the agent restates amenities in this message — `Features: elevator, balcony`.
 Only concrete amenities they actually stated, one comma-separated line, never
@@ -238,7 +245,8 @@ confirms in a later message.
    separate response — don't merge them, and don't drop one in favor of the
    other.
 12. **Missing or malformed Listing Record footer.** Every complete response
-   needs its own footer, in the exact 7-line format, immediately after that
+   needs its own footer, in the exact format above — the 7 required labeled
+   lines, plus the optional `Features` line last — immediately after that
    listing's Yad2 section, with `Status: Sold` — *except* the no-stated-
    locator case (Required Input), where the footer is deliberately withheld
    until confirmed. Outside that one case, a missing footer means the
@@ -272,7 +280,8 @@ confirms in a later message.
 - [ ] Each distinguishable property got its own complete, separate response
       if more than one appeared in the request
 - [ ] Numbers use sqm and ₪ (unless told otherwise)
-- [ ] Every complete response ends with its own exact 7-line Listing Record
-      footer, `Status: Sold`, immediately after that listing's Yad2 section —
+- [ ] Every complete response ends with its own Listing Record footer in the
+      format above (7 required lines, `Status: Sold`, with `Features` last
+      and optional), immediately after that listing's Yad2 section —
       **except** the no-stated-locator case above, where the footer is
       deliberately withheld until the agent confirms in a later message

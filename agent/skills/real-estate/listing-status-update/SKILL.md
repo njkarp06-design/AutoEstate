@@ -1,7 +1,7 @@
 ---
 name: listing-status-update
 description: Use when a real estate agent wants to announce a change to a listing they already advertised — a price drop, or going under contract/rented — and wants ready-to-post content. Not for a completed sale — see just-sold. The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the status change plus the listing's core facts into platform-formatted Hebrew and English posts for Instagram, a Facebook group, and Yad2.
-version: 0.5.0
+version: 0.5.1
 author: AutoEstate
 license: MIT
 metadata:
@@ -74,8 +74,14 @@ literal block delivered in *this specific turn*):
   confirmation is itself the "locator" for the purposes of this section, so
   from that point on this is a single-match locator case (above), not a
   no-locator case.
-- **Zero matches** → say so plainly, then fall through to asking for the
-  identity facts directly (below) — never guess.
+- **Zero matches** → do **not** tell the agent the listing isn't on record.
+  This lookup only covers listings still marked **Active**, so one that has
+  already gone under contract *is* tracked but will not appear here — which
+  matters especially for this skill, since it is what sets `Under Contract`
+  in the first place. Say you couldn't find a matching *active* listing,
+  then fall through to asking for the identity facts directly (below) —
+  never guess. Restating the facts still updates the right listing, so
+  nothing is lost by asking.
 - **Multiple matches** → ask one specific question naming the real
   candidates with distinguishing facts (rooms/sqm/price) — not a generic
   "please restate everything."
@@ -194,6 +200,8 @@ Price: <₪ amount, or N/A>
 Status: <Active | Under Contract>
 Features: <optional, see below>
 ```
+The first 7 labeled lines are required, in this order.
+
 `Features` may be appended as an optional **last** line (after `Status`) when
 the agent restates amenities in this message — `Features: elevator, balcony`.
 Only concrete amenities they actually stated, one comma-separated line, never
@@ -262,7 +270,8 @@ footer to produce, not this skill's.
    separate response (see `listing-to-social`'s "Never Blend Properties") —
    don't merge them, and don't drop one in favor of the other.
 11. **Missing or malformed Listing Record footer.** Every complete response
-   needs its own footer, in the exact 7-line format, immediately after that
+   needs its own footer, in the exact format above — the 7 required labeled
+   lines, plus the optional `Features` line last — immediately after that
    listing's Yad2 section. Without it (or with a wrong `Status`), the
    reporting system can't recognize this as an update to the *same*
    property and may create a duplicate instead of transitioning it.
@@ -298,8 +307,9 @@ footer to produce, not this skill's.
 - [ ] Each distinguishable property got its own complete, separate response
       if more than one appeared in the request
 - [ ] Numbers use sqm and ₪ (unless told otherwise)
-- [ ] Every complete response ends with its own exact 7-line Listing Record
-      footer, with `Status` matching this update (`Active` for a price
+- [ ] Every complete response ends with its own Listing Record footer in the
+      format above (7 required lines, with `Features` last and optional),
+      with `Status` matching this update (`Active` for a price
       drop or `Under Contract`), immediately after that listing's Yad2
       section — never `Sold`. **Except** the no-stated-locator case above,
       where the footer is deliberately withheld until the agent confirms in
