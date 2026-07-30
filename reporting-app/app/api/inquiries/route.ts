@@ -11,11 +11,18 @@ import { isBackgroundReviewTurn } from "@/lib/hermes-harness";
 // (authenticateMachineRequest resolves the Customer, scoped to the BUYER
 // role — a different credential from /api/ingest's), same discriminated-union
 // turn_started/turn_completed shape - but keyed on the SESSION (one Inquiry
-// per buyer conversation), not the turn, and carrying two buyer-only optional
-// fields the sync-inquiries-to-webapp plugin resolves best-effort:
-//   - sender:       an opaque stable handle for the buyer (reference only).
+// per buyer conversation), not the turn, and carrying one buyer-only optional
+// field the sync-inquiries-to-webapp plugin resolves best-effort:
 //   - buyerContact: the best human-reachable contact (phone/name) - THE #1
 //                   lead field; null when nothing reachable was captured.
+//
+// A `sender` handle (the platform's opaque sender_id) was accepted here until
+// 2026-07-31 and removed: no column ever stored it and nothing read it - the
+// thread key is hermesSessionId by design. Removing it from the schema is
+// safe against a not-yet-redeployed buyer instance, because Zod objects STRIP
+// unknown keys rather than rejecting them (verified against the installed
+// zod 4, not assumed), so an old plugin still posting the field still gets a
+// 200. Reinstating it needs an Inquiry column and a real consumer first.
 
 const turnStartedSchema = z.object({
   event: z.literal("turn_started"),
@@ -23,7 +30,6 @@ const turnStartedSchema = z.object({
   turnId: z.string().min(1),
   platform: z.enum(["whatsapp", "whatsapp_cloud", "telegram"]),
   userMessage: z.string().nullish(),
-  sender: z.string().nullish(),
   buyerContact: z.string().nullish(),
   occurredAt: z.string().datetime(),
 });
@@ -35,7 +41,6 @@ const turnCompletedSchema = z.object({
   platform: z.enum(["whatsapp", "whatsapp_cloud", "telegram"]),
   userMessage: z.string().min(1),
   assistantResponse: z.string().min(1),
-  sender: z.string().nullish(),
   buyerContact: z.string().nullish(),
   occurredAt: z.string().datetime(),
 });

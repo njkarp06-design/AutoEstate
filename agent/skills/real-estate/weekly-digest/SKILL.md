@@ -1,7 +1,7 @@
 ---
 name: weekly-digest
 description: Use when a real estate agent asks for a digest, roundup, or summary of what's still active/on the market — not a single new listing or a single status change. Turns the reporting system's currently-active listings into one bilingual roundup post, with zero facts retyped by the agent.
-version: 0.1.0
+version: 0.2.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -67,10 +67,21 @@ This is the core rule of this skill:
   listing you recall from earlier in this conversation that isn't in the
   context (it may have since sold or been withdrawn; the context is the
   current truth, memory isn't).
-- Never omit a listing that IS present in the context.
-- If the context says there are zero active listings, state that plainly
-  ("No active listings on record right now.") — don't invent a roundup to
-  avoid an empty-feeling reply.
+- **Include only rows tagged `[ACTIVE]`. Silently skip every row tagged
+  `[UNDER CONTRACT - not available]`.** This is the one case where omitting
+  a listing from the context is not just permitted but required, and it
+  overrides the rule below. A digest answers "what is still on the market",
+  and a property under contract is spoken for — listing it would advertise
+  a home the agent cannot sell, to buyers who would then ask about it.
+  Don't mention the skipped ones, don't add a "plus one under contract"
+  aside, and never present them as available with a caveat attached: the
+  post is a public marketing artifact, not a status report for the agent.
+- Never omit a listing that IS present in the context **and tagged
+  `[ACTIVE]`**.
+- If the context says there are zero active listings, **or every row in it
+  is tagged `[UNDER CONTRACT - not available]`**, state that plainly ("No
+  active listings on record right now.") — don't invent a roundup to avoid
+  an empty-feeling reply, and don't pad it with the under-contract ones.
 
 ## Output Format
 

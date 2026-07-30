@@ -42,7 +42,7 @@ export type Listing = {
 
 /**
  * Every listing ever advertised through Hermes for this customer, regardless
- * of status - unlike /api/listings/active (ACTIVE only, for the digest),
+ * of status - unlike /api/listings/active (every non-SOLD listing),
  * this read-only view intentionally shows everything so an auto-matching
  * mistake at ingest time (see app/api/ingest/route.ts) stays visible rather
  * than silently hidden. No mutation helpers: there is no edit UI for

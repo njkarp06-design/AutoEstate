@@ -15,13 +15,15 @@ differences from that plugin, both driven by the buyer-inquiry design:
      guess. So this fires on every buyer turn. The endpoint read is cheap and
      the buyer instance handles far less traffic than the operator one.
 
-  2. **Includes status (ACTIVE / UNDER_CONTRACT / SOLD), not ACTIVE-only.**
-     active-listings-context hits /api/listings/active (ACTIVE only) because
-     the outbound skills only ever act on live listings. The buyer skill
-     needs the opposite: it must be able to tell a buyer truthfully that a
-     listing is already sold or under contract, so it needs the non-active
-     rows too, each labeled with its status. It reads /api/listings/buyer-view
-     (added in the reporting app for exactly this) which returns every status.
+  2. **Includes SOLD rows, which the operator-side endpoint never returns.**
+     active-listings-context hits /api/listings/active, which returns every
+     NON-SOLD listing (ACTIVE and UNDER_CONTRACT, each tagged - widened
+     2026-07-31; it was ACTIVE-only before). That is right for the outbound
+     skills, which only ever act on a listing still in play. The buyer skill
+     needs the one row type that endpoint still excludes: it must be able to
+     tell a buyer truthfully that a listing is already SOLD rather than
+     quietly omit it. So it reads /api/listings/buyer-view (added in the
+     reporting app for exactly this), which returns every status.
 
 Like active-listings-context, this is a genuinely BLOCKING httpx.get whose
 return value IS the injected context (pre_llm_call's contract — see
