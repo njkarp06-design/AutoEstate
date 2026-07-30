@@ -1,7 +1,7 @@
 ---
 name: listing-status-update
 description: Use when a real estate agent wants to announce a change to a listing they already advertised — a price drop, or going under contract/rented — and wants ready-to-post content. Not for a completed sale — see just-sold. The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the status change plus the listing's core facts into platform-formatted Hebrew and English posts for Instagram, a Facebook group, and Yad2.
-version: 0.5.1
+version: 0.6.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -51,7 +51,11 @@ memory of one from earlier in this conversation never counts, only the
 literal block delivered in *this specific turn*):
 
 - Search that block for listings whose area reasonably matches the stated
-  locator.
+  locator. **Both `[ACTIVE]` and `[UNDER CONTRACT - not available]` rows are
+  valid targets for this skill** — it is what sets `Under Contract` in the
+  first place, and a listing already in that state can still have a further
+  update to announce. (Contrast `listing-reengagement` and `weekly-digest`,
+  which may use `[ACTIVE]` rows only.)
 - **Exactly one match** → use that listing's identity facts (area,
   transaction type, rooms, sqm, floor, price) below, and open your reply
   with a short confirmation line restating them before the status content.
@@ -75,13 +79,12 @@ literal block delivered in *this specific turn*):
   from that point on this is a single-match locator case (above), not a
   no-locator case.
 - **Zero matches** → do **not** tell the agent the listing isn't on record.
-  This lookup only covers listings still marked **Active**, so one that has
-  already gone under contract *is* tracked but will not appear here — which
-  matters especially for this skill, since it is what sets `Under Contract`
-  in the first place. Say you couldn't find a matching *active* listing,
-  then fall through to asking for the identity facts directly (below) —
-  never guess. Restating the facts still updates the right listing, so
-  nothing is lost by asking.
+  The block covers every listing not already marked **Sold**, so a genuine
+  gap here usually means it was recorded under a differently-spelled area,
+  or it has already been marked sold. Say you couldn't find a matching
+  listing, then fall through to asking for the identity facts directly
+  (below) — never guess. Restating the facts still updates the right
+  listing, so nothing is lost by asking.
 - **Multiple matches** → ask one specific question naming the real
   candidates with distinguishing facts (rooms/sqm/price) — not a generic
   "please restate everything."

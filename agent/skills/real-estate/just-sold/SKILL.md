@@ -1,7 +1,7 @@
 ---
 name: just-sold
 description: Use when a real estate agent's listing just sold and they want a celebratory, shareable social-proof post about it — not a factual status note. The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the sale plus the listing's core facts into platform-formatted Hebrew and English posts for Instagram, a Facebook group, and Yad2.
-version: 0.3.1
+version: 0.4.0
 author: AutoEstate
 license: MIT
 metadata:
@@ -47,7 +47,11 @@ memory of one from earlier in this conversation never counts, only the
 literal block delivered in *this specific turn*):
 
 - Search that block for listings whose area reasonably matches the stated
-  locator.
+  locator. **Both `[ACTIVE]` and `[UNDER CONTRACT - not available]` rows are
+  valid targets for this skill** — "under contract, then sold" is the
+  ordinary lifecycle, so a sale following either one is expected. (Contrast
+  `listing-reengagement` and `weekly-digest`, which may use `[ACTIVE]` rows
+  only.)
 - **Exactly one match** → use that listing's identity facts (area,
   transaction type, rooms, sqm, floor) below, and open your reply with a
   short confirmation line restating them before the celebratory content.
@@ -71,12 +75,12 @@ literal block delivered in *this specific turn*):
   this section, so from that point on this is a single-match locator case
   (above), not a no-locator case.
 - **Zero matches** → do **not** tell the agent the listing isn't on record.
-  This lookup only covers listings still marked **Active**, so one that has
-  already gone under contract *is* tracked but will not appear here — and
-  "under contract, then sold" is the ordinary lifecycle, not an edge case.
-  Say you couldn't find a matching *active* listing, then fall through to
-  asking for the identity facts directly (below) — never guess. Restating
-  the facts still updates the right listing, so nothing is lost by asking.
+  The block covers every listing not already marked **Sold**, so a genuine
+  gap here usually means it was recorded under a differently-spelled area,
+  or the sale has already been recorded. Say you couldn't find a matching
+  listing, then fall through to asking for the identity facts directly
+  (below) — never guess. Restating the facts still updates the right
+  listing, so nothing is lost by asking.
 - **Multiple matches** → ask one specific question naming the real
   candidates with distinguishing facts (rooms/sqm/price) — not a generic
   "please restate everything."
