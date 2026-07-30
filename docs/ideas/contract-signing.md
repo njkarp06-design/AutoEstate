@@ -53,14 +53,25 @@ party, no email round trip.
 (a) **The bot CAN send the contract as a real attachment** — this corrects an
     earlier read of mine that said it couldn't. Verified in the vendored source on
     2026-07-29, not assumed: outbound file delivery is triggered by the model
-    emitting `MEDIA:<abs path>` in its reply TEXT; the gateway strips the tag and
-    dispatches the file (`gateway/run.py` → `adapter.extract_media` →
-    image/video/`send_document` partition, `gateway/platforms/base.py:1440-1460`).
+    emitting a path in its reply TEXT; the gateway strips it and dispatches the
+    file (`gateway/run.py`, which owns the image/video/`send_document` partition;
+    the shared extension allowlist is `gateway/platforms/base.py:1440-1460`).
     Documents/PDFs are an explicitly supported class, and `[[as_document]]` forces
     document delivery. It is NOT a tool and NOT a hook — which is why it doesn't
     show up when you go looking for a send hook, and why PR #28's "no delivery
     hook" finding (true, and still true for controlling message *boundaries*) does
     not settle this question.
+
+    **Two triggers, not one — corrected 2026-07-31, and it sharpens the argument
+    below rather than softening it.** `extract_media` handles an explicit
+    `MEDIA:<abs path>` tag; `extract_local_files` handles a BARE absolute / `~/` /
+    drive-letter path *merely mentioned* in the reply, with a known extension and
+    passing `os.path.isfile()` — its docstring says so outright ("without needing
+    an explicit `MEDIA:` tag"). Both run on every reply. The lockdown in the
+    second bullet covers both (`filter_media_delivery_paths` and
+    `filter_local_delivery_paths` share `validate_media_delivery_path`), so
+    nothing about the security posture changes — but the *trigger surface* is
+    wider than a single tag, which makes the first bullet's objection stronger.
 
     Three consequences, and together they still point at the link:
 

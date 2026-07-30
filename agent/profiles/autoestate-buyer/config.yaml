@@ -293,12 +293,24 @@ session_reset:
 # --- Outbound media delivery: STRICT -----------------------------------------
 # THIRD isolation layer, and it is NOT covered by either of the other two.
 #
-# Outbound file delivery is triggered by the MODEL EMITTING `MEDIA:<abs path>`
-# in its reply TEXT — the gateway strips the tag and dispatches the file
-# (gateway/run.py -> adapter.extract_media -> send_video/send_multiple_images).
-# It is not a tool, so this instance's 3-tool lockdown does not constrain it
-# and `agent.disabled_toolsets` says nothing about it. A prompt-injected buyer
-# who gets the model to emit one path gets that file delivered to themselves.
+# Outbound file delivery is triggered by the MODEL EMITTING A PATH in its reply
+# TEXT — the gateway strips it and dispatches the file (gateway/run.py ->
+# send_video/send_multiple_images/send_document). It is not a tool, so this
+# instance's 3-tool lockdown does not constrain it and `agent.disabled_toolsets`
+# says nothing about it. A prompt-injected buyer who gets the model to emit one
+# path gets that file delivered to themselves.
+#
+# TWO TRIGGERS, NOT ONE (corrected 2026-07-31; every doc previously said
+# `MEDIA:` alone, understating the surface):
+#   * extract_media       -> an explicit `MEDIA:<abs path>` tag
+#   * extract_local_files -> a BARE absolute / ~/ / drive-letter path merely
+#                            MENTIONED in the reply, with a known extension and
+#                            passing os.path.isfile(). Its docstring states the
+#                            intent outright: ship artifacts "without needing an
+#                            explicit MEDIA: tag".
+# Both keys below still cover both triggers — filter_media_delivery_paths and
+# filter_local_delivery_paths each call the same validate_media_delivery_path
+# (gateway/platforms/base.py), which is why this was a docs gap, not a hole.
 #
 # `strict: false` (the Hermes DEFAULT) accepts any existing regular file not on
 # a credential denylist — and that denylist is scoped to the ACTIVE profile plus

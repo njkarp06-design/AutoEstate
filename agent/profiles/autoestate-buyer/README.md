@@ -236,13 +236,29 @@ Added 2026-07-29. It is a *fourth* layer because neither the skill lockdown, the
 tool lockdown nor the credential scoping touches it, and it took a feature
 question about listing photos to notice it was open.
 
-**Outbound media is not a tool.** The model emits `MEDIA:<absolute path>` in its
-reply **text**; the gateway strips the tag and delivers the file
-(`gateway/run.py` → `adapter.extract_media` → `send_video` /
-`send_multiple_images`). So this instance's 3-tool allowlist constrains it not at
-all, and `agent.disabled_toolsets` has nothing to say about it. A prompt-injected
-buyer who gets the model to emit one path gets that file — delivered to
-themselves.
+**Outbound media is not a tool.** The model emits a path in its reply **text**;
+the gateway strips it and delivers the file (`gateway/run.py` → `send_video` /
+`send_multiple_images` / `send_document`). So this instance's 3-tool allowlist
+constrains it not at all, and `agent.disabled_toolsets` has nothing to say about
+it. A prompt-injected buyer who gets the model to emit one path gets that file —
+delivered to themselves.
+
+**There are TWO triggers, not one** (corrected 2026-07-31 — every doc here said
+`MEDIA:` alone, which understates the surface):
+
+- `extract_media` — an explicit `MEDIA:<abs path>` tag.
+- `extract_local_files` — a **bare** absolute, `~/` or Windows drive-letter path
+  merely *mentioned* in the reply, with a recognised extension and passing
+  `os.path.isfile()`. Its own docstring states the intent: ship artifacts
+  "without needing an explicit `MEDIA:` tag". Both run on every reply
+  (`gateway/run.py`, the `extract_media` → `extract_images` → `extract_local_files`
+  chain).
+
+**The lockdown covers both**, which is why this was a documentation gap and not a
+hole: `filter_media_delivery_paths` and `filter_local_delivery_paths`
+(`gateway/platforms/base.py`) each call the same `validate_media_delivery_path`,
+so the table below holds for either trigger. Verified by reading both call sites,
+not assumed.
 
 Hermes ships `gateway.strict: false` by default, which accepts **any** existing
 file not on a credential denylist, and that denylist is scoped to the *active*
