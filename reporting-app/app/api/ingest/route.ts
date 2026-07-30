@@ -5,7 +5,7 @@ import { authenticateMachineRequest } from "@/lib/ingest-auth";
 import { parseListingRecords } from "@/lib/listing-record";
 import { generateRefCode } from "@/lib/ref-code";
 import { isBackgroundReviewTurn } from "@/lib/hermes-harness";
-import { withSerializationRetry } from "@/lib/serialization-retry";
+import { withWriteConflictRetry } from "@/lib/write-conflict-retry";
 
 /**
  * A ref code that no listing currently holds.
@@ -200,19 +200,25 @@ export async function POST(request: NextRequest) {
       // findFirst and both create, leaving duplicate Listing rows that no UI
       // can merge or delete.
       //
-      // A unique index would be the stronger fix but the obvious one is WRONG
-      // here: this lookup is case-insensitive AND excludes SOLD on purpose, so
-      // a sold row plus a relisted active row for the same property is two
-      // rows by design. Only a partial expression index
-      // (UNIQUE (customerId, lower(area), rooms, sqm) WHERE status <> 'SOLD')
-      // matches those semantics; it needs a migration and is tracked in
-      // TODO.md as the durable fix before the Vercel deploy.
+      // The database-level guarantee LANDED 2026-07-31: migration
+      // 20260731_listing_partial_unique_index creates
+      //   UNIQUE (customerId, lower(area), rooms, sqm) WHERE status <> 'SOLD'
+      // A partial *expression* index specifically, because this lookup is
+      // case-insensitive AND excludes SOLD on purpose - so a sold row plus a
+      // relisted active row for the same property is two rows by design, and
+      // the obvious @@unique([customerId, area, rooms, sqm]) would wrongly
+      // block a legitimate relist. Prisma cannot express either the predicate
+      // or the lower(), so it is raw SQL and invisible to schema.prisma.
       //
-      // Wrapped in withSerializationRetry because Prisma does not retry an
-      // interactive transaction, and Postgres aborts one side of a real
-      // conflict with P2034. Unretried, the Serializable level TRADED duplicate
-      // rows for a silently-lost listing - see lib/serialization-retry.ts.
-      const listing = await withSerializationRetry(() => prisma.$transaction(
+      // Wrapped in withWriteConflictRetry because Prisma does not retry an
+      // interactive transaction. It covers BOTH ways a lost race surfaces:
+      // P2034 (Serializable abort) and - now that the index exists - P2002,
+      // which is the more likely one, since the second inserter blocks on the
+      // index and gets a duplicate-key error once the first commits. On retry
+      // the findFirst below sees the committed row and updates it. Unretried,
+      // either code would be swallowed by this block's catch and the listing
+      // silently never tracked - see lib/write-conflict-retry.ts.
+      const listing = await withWriteConflictRetry(() => prisma.$transaction(
         async (tx) => {
           const existing = await tx.listing.findFirst({
             where: {
