@@ -66,7 +66,8 @@ const BARE_PLATFORM_LABEL: Record<PlatformKey, RegExp> = {
 
 // Real output usually carries bold-numbered headers, which isHeaderLine
 // already covers. This tolerates one further shape observed in a real reply:
-// an unadorned all-caps "INSTAGRAM" line (see CLAUDE.md's PR #19 entry).
+// an unadorned all-caps "INSTAGRAM" line (see the REPO-ROOT CLAUDE.md's PR
+// #19 entry - reporting-app/CLAUDE.md is a one-line import, not the doc).
 //
 // Measured 2026-07-31 before changing anything: that shape does NOT appear in
 // any ingested reply - all 22 real multi-platform messages in the dev database
