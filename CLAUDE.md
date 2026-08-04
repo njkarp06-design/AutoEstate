@@ -643,6 +643,8 @@ Dev data is 3 ACTIVE / 1 UNDER_CONTRACT / 3 SOLD as a result (2026-07-31); re-de
 
 **Dropped suspicions, so they aren't re-litigated:** a hook TypeError breaking gateway turns (vendored `invoke_hook` wraps every callback — verified in source); WhatsApp single-asterisk footers defeating the parser (contradicted by live parses); server-action argument forgery (bound args are encrypted); ESLint walking generated Prisma files (ran clean); the partial-index migration failing on production duplicates (no production DB exists yet — the pre-flight query is in TODO item 4).
 
+**And the sweep's own fixes produced one more finding, caught by the final `next build`: `next build` catches a SECOND error class that `tsc` and `eslint` both miss.** The known one is a `"use server"` module exporting a non-function. The new one is a **client component importing a server-only module** — the shared Instagram-mode list was placed in `lib/customer.ts` (which imports Clerk and Prisma) and consumed by the new client form, so the client bundle pulled server code in and the build failed with *"the chunking context does not support external modules (request: `node:module`)"*. Fixed by moving the union and its list to `lib/instagram-post-mode.ts`, a module with no server imports. *Generalise: when a fix introduces a shared constant, the question is not only "who reads it" but "which side of the client/server boundary does each reader sit on" — and only the build will tell you.*
+
 ## 6. Guardrails
 - Simplicity over cleverness — smallest thing that works, then iterate.
 - Security is never optional and never last.
