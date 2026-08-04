@@ -34,8 +34,11 @@ variable "ingestion_api_url" {
   type = string
 }
 
+# Empty is legal for a TELEGRAM-ONLY customer (set the Telegram pair below
+# instead) - the module refuses to plan an operator with NO channel at all.
 variable "whatsapp_allowed_users" {
-  type = string
+  type    = string
+  default = ""
 }
 
 # The agent-facing channel can be Telegram, WhatsApp or both (TODO 12a).
@@ -102,6 +105,38 @@ variable "buyer_whatsapp_admin_lids" {
   default = []
 }
 
+# The five per-customer tuning knobs the module documents as overridable.
+# Declared here BECAUSE of the invariant above: before these existed, setting
+# any of them in terraform.tfvars (e.g. pinning hermes_image_tag, or
+# hetzner_location per the module's own "pick one close to the customer")
+# produced a warning, a clean green apply, and a silently discarded value -
+# the same regression class as the Telegram pair, five more times. Defaults
+# mirror the module's.
+variable "hetzner_server_type" {
+  type    = string
+  default = "cx22"
+}
+
+variable "hetzner_location" {
+  type    = string
+  default = "nbg1"
+}
+
+variable "hetzner_image" {
+  type    = string
+  default = "ubuntu-24.04"
+}
+
+variable "hermes_model" {
+  type    = string
+  default = "anthropic/claude-opus-4.6"
+}
+
+variable "hermes_image_tag" {
+  type    = string
+  default = "latest"
+}
+
 module "hermes" {
   source = "../../modules/hermes-instance"
 
@@ -118,6 +153,11 @@ module "hermes" {
   operator_ssh_key_name         = var.operator_ssh_key_name
   operator_ssh_private_key_path = var.operator_ssh_private_key_path
   operator_ssh_cidrs            = var.operator_ssh_cidrs
+  hetzner_server_type           = var.hetzner_server_type
+  hetzner_location              = var.hetzner_location
+  hetzner_image                 = var.hetzner_image
+  hermes_model                  = var.hermes_model
+  hermes_image_tag              = var.hermes_image_tag
 }
 
 output "server_ipv4" {

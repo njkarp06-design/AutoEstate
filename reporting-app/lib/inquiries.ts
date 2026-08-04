@@ -142,6 +142,26 @@ async function deferringInquiryIds(customerId: string): Promise<Set<string>> {
   return new Set(rows.map((row) => row.inquiryId));
 }
 
+// Mirror of lib/db.ts's excludeGhostRuns, for the surface that needs it MORE:
+// a turn_started upserts a permanent Inquiry, so a turn that never completes
+// (gateway restart mid-turn, model error, the documented interrupt merge)
+// leaves an empty NEEDS_OPERATOR lead on the page forever - and this is the
+// public instance, the only surface where strangers create rows. Same 3-minute
+// window, same self-correcting property: an inquiry that later gets a message
+// stops matching immediately. Prisma emits NOT (a AND b) here - verified for
+// the run-side twin by capturing the SQL (2026-07-30 sweep).
+const STALE_EMPTY_INQUIRY_MS = 3 * 60 * 1000;
+
+function excludeGhostInquiries(customerId: string) {
+  return {
+    customerId,
+    NOT: {
+      messages: { none: {} },
+      startedAt: { lt: new Date(Date.now() - STALE_EMPTY_INQUIRY_MS) },
+    },
+  };
+}
+
 /**
  * Every buyer inquiry for this customer, newest first. Scoped by customerId -
  * a customer only ever sees their own buyer's leads. Disposition comes from
@@ -152,7 +172,7 @@ async function deferringInquiryIds(customerId: string): Promise<Set<string>> {
 export async function getInquiries(customer: Customer): Promise<Inquiry[]> {
   const [inquiries, deferring] = await Promise.all([
     prisma.inquiry.findMany({
-      where: { customerId: customer.id },
+      where: excludeGhostInquiries(customer.id),
       orderBy: { startedAt: "desc" },
     }),
     deferringInquiryIds(customer.id),

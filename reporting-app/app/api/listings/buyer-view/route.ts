@@ -26,6 +26,15 @@ export async function GET(request: NextRequest) {
   const listings = await prisma.listing.findMany({
     where: { customerId: authResult.customer.id },
     orderBy: { updatedAt: "desc" },
+    // Safety valve, not a filter. This whole list is injected into the buyer
+    // instance's context on EVERY turn (the plugin deliberately has no keyword
+    // gate), and rows only accumulate - SOLD rows stay forever, by design, so
+    // the bot can answer an old ad link honestly. Do NOT "tidy" this into an
+    // age or status filter: a buyer tapping a year-old REF link must still
+    // resolve, so exclusion by age would make the bot deny a listing it sold -
+    // worse than the token cost. 200 newest-updated rows is far beyond pilot
+    // scale; revisit with pagination-by-refCode if a customer ever nears it.
+    take: 200,
   });
 
   return NextResponse.json({

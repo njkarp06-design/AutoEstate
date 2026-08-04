@@ -70,7 +70,11 @@ export default async function RunPage({
 
       <div className="mt-5 border border-card-border bg-card p-5">
         <div className="flex items-start justify-between gap-4">
-          <h1 className="font-display text-lg font-semibold">
+          {/* dir="auto": the title falls back to the raw Hebrew agent message
+              while a listing is in progress or unsplit, and this page renders
+              inside <html lang="en"> - without it, RTL titles mis-place
+              punctuation. Same convention the Inquiries pages already use. */}
+          <h1 dir="auto" className="font-display text-lg font-semibold">
             {run.title ?? "Untitled listing"}
           </h1>
           <span
@@ -89,7 +93,6 @@ export default async function RunPage({
         </div>
         <p className="mt-3 border-t border-card-border pt-3 font-mono text-xs uppercase tracking-wide text-status-muted">
           {sourceLabel(run.source)}
-          {run.displayName ? ` · ${run.displayName}` : ""}
           {" · "}
           {formatRelativeDateTime(run.startedAt)}
         </p>
@@ -110,6 +113,11 @@ export default async function RunPage({
               const status = run.platformStatus[platform];
               const displayContent = status.editedContent ?? parsed.sections[platform];
               const isEdited = status.editedContent != null;
+              // Actions bind BOTH ids: run.id is the group's canonical LAST
+              // run (where the content rows live); `id` is the URL actually
+              // being viewed, which may be an older precursor run in the same
+              // group - revalidating only run.id left a precursor-URL view
+              // stale after every save.
               return (
                 <PlatformSection
                   key={platform}
@@ -121,9 +129,9 @@ export default async function RunPage({
                   instagramPostMode={
                     platform === "instagram" ? customer.instagramPostMode : undefined
                   }
-                  saveAction={savePlatformContentAction.bind(null, run.id, platform)}
-                  resetAction={resetPlatformContentAction.bind(null, run.id, platform)}
-                  setPostedAction={setPlatformPostedAction.bind(null, run.id, platform)}
+                  saveAction={savePlatformContentAction.bind(null, run.id, id, platform)}
+                  resetAction={resetPlatformContentAction.bind(null, run.id, id, platform)}
+                  setPostedAction={setPlatformPostedAction.bind(null, run.id, id, platform)}
                 />
               );
             })

@@ -128,7 +128,6 @@ model Run {
   // earlier or later listings.
   hermesTurnId    String
   source          String // "whatsapp" | "whatsapp_cloud" | "telegram"
-  displayName     String?
   startedAt       DateTime
   title           String?
   status          RunStatus            @default(IN_PROGRESS)

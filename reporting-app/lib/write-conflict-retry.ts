@@ -14,8 +14,12 @@
  *     second inserter BLOCKS on it and then raises a duplicate-key error once
  *     the first commits, so P2002 is the *likely* outcome of a real race -
  *     more likely than 40001, which needs Postgres's SSI to spot the conflict
- *     first. Retrying re-runs the transaction, whose findFirst now sees the
- *     committed row and takes the update branch.
+ *     first. Retrying re-runs the transaction, whose lookups now see the
+ *     committed row and take an update branch - including for a SOLD footer,
+ *     but ONLY because ingest's SOLD fallback (added 2026-08-04) re-finds the
+ *     just-committed SOLD row that the non-SOLD match excludes. Before that
+ *     fallback existed, retrying a SOLD race re-CREATED the row it had just
+ *     lost the race to, converting the race into a duplicate.
  *
  * WHY THIS EXISTS AT ALL. Without a retry, the Serializable level added to
  * `/api/ingest`'s Listing match-and-write made the failure mode worse rather

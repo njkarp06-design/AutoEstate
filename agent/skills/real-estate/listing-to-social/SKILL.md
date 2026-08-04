@@ -1,7 +1,7 @@
 ---
 name: listing-to-social
 description: Use when a real estate agent provides new listing details (facts about a property, and optionally photo descriptions or attached photos) and wants ready-to-post content. Turns raw listing facts into platform-formatted Hebrew and English captions for Instagram, a Facebook group, and Yad2.
-version: 0.5.0
+version: 0.5.1
 author: AutoEstate
 license: MIT
 metadata:
@@ -174,7 +174,8 @@ prospective buyer.
 
 `Status` is always
 `Active` for this skill (a new listing is always going on the market, never
-sold/under contract — that's `listing-status-update`'s job). Use `N/A` for
+sold/under contract — a status change is `listing-status-update`'s job and
+a completed sale is `just-sold`'s). Use `N/A` for
 `Floor`/`Price` only if genuinely not being stated — normally both are
 required input, so this should be rare. If a single incoming message
 produces more than one separate, complete listing response (see Never Blend

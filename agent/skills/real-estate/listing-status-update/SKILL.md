@@ -1,7 +1,7 @@
 ---
 name: listing-status-update
 description: Use when a real estate agent wants to announce a change to a listing they already advertised — a price drop, or going under contract/rented — and wants ready-to-post content. Not for a completed sale — see just-sold. The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the status change plus the listing's core facts into platform-formatted Hebrew and English posts for Instagram, a Facebook group, and Yad2.
-version: 0.6.0
+version: 0.6.1
 author: AutoEstate
 license: MIT
 metadata:
@@ -20,8 +20,10 @@ contract (or was rented). This skill turns that status change, plus the
 listing's core facts, into ready-to-use, platform-formatted content in
 Hebrew and English, which the agent reviews and posts themselves. This
 skill only produces text — it does not post anything automatically, and it
-does not look up or remember the original listing; the agent restates the
-identifying facts each time.
+never trusts conversation memory for the listing's facts: identity comes
+from the agent restating them in the current message, or from a locator
+match against this turn's injected listings context (see Required Input) —
+never from recalling an earlier exchange.
 
 A completed sale is **not** handled here — that's `just-sold`, which uses a
 distinct celebratory/social-proof tone rather than this skill's factual
@@ -43,12 +45,12 @@ status-note format (see When to Use).
 ## Required Input
 
 **First, check whether a locator lookup applies.** If the agent's message
-doesn't restate the identity facts below but does name a locator (a
-street/area name, e.g. "Dizengoff" or "the Ben Gurion listing") — and this
-turn's context contains a real, literal "Active listings context (from
-reporting system...)" block (the same block `weekly-digest` requires; a
-memory of one from earlier in this conversation never counts, only the
-literal block delivered in *this specific turn*):
+doesn't restate the identity facts below — whether it names a locator (a
+street/area name, e.g. "Dizengoff" or "the Ben Gurion listing") or names
+nothing at all — and this turn's context contains a real, literal "Active
+listings context (from reporting system...)" block (the same block
+`weekly-digest` requires; a memory of one from earlier in this conversation
+never counts, only the literal block delivered in *this specific turn*):
 
 - Search that block for listings whose area reasonably matches the stated
   locator. **Both `[ACTIVE]` and `[UNDER CONTRACT - not available]` rows are
@@ -66,18 +68,25 @@ literal block delivered in *this specific turn*):
   transitions the `Listing` table the instant the message is sent, with no
   review step on that side effect and (as of this writing) no way to undo a
   wrong one in the reporting app — so the footer specifically needs a real
-  confirmation first, even though the rest of the content doesn't. Go ahead
-  and produce the Instagram/Facebook/Yad2 content using the one plausible
-  candidate's facts (or, if there's more than one candidate, using
-  whichever seems most likely, clearly labeled as unconfirmed) — but in
-  place of the Listing Record footer, end with a plain confirmation
-  question naming the candidate(s) (e.g. "Reply to confirm this is your Ben
-  Gurion listing, 4 rooms, 95 sqm, so I can record the price change" — or,
-  with more than one candidate, ask which one). Only add the actual Listing
-  Record footer once the agent confirms in a **later message** — that
-  confirmation is itself the "locator" for the purposes of this section, so
-  from that point on this is a single-match locator case (above), not a
-  no-locator case.
+  confirmation first, even though the rest of the content doesn't. **START
+  your reply** with a short, friendly two-or-three-line intro — the very
+  first thing in the message, before any post content, so it can't be
+  missed; never a question buried at the end, which reads as a soft
+  sign-off and gets skipped. The intro should (1) say the draft post is
+  below, naming the candidate's identity facts (area + rooms + sqm) so a
+  wrong match is obvious, (2) explain that replying to confirm records the
+  update to their AutoEstate dashboard — NOT that it posts anywhere,
+  posting stays theirs — and (3) say how to confirm (e.g. "Reply *yes* to
+  confirm this is your Ben Gurion listing, 4 rooms, 95 sqm, so I can record
+  the price change"; with more than one candidate, ask which one). Then a
+  divider, then the Instagram/Facebook/Yad2 content using the candidate's
+  facts (labeled unconfirmed if more than one was plausible) — with **no**
+  Listing Record footer. Only add the footer once the agent confirms in a
+  **later message** — that confirmation is itself the "locator" for the
+  purposes of this section, so from that point on this is a single-match
+  locator case (above), not a no-locator case. (The always-injected footer
+  reminder in this turn's context describes the same intro shape — the two
+  must agree.)
 - **Zero matches** → do **not** tell the agent the listing isn't on record.
   The block covers every listing not already marked **Sold**, so a genuine
   gap here usually means it was recorded under a differently-spelled area,
@@ -221,7 +230,11 @@ them. Only include it when the agent has genuinely restated or changed them.
 market, just at a new price — use the new price in `Price`), `Under
 Contract` for going under contract or rented-pending-close. `Price` is
 `N/A` when this update doesn't require one (under contract with no price
-shared). If more than one property's status is being updated in the same
+shared). `Type`: if sale-vs-rental was neither stated in the current
+message nor supplied by a locator match, write `Type: N/A` — **never
+guess.** The reporting system keeps the stored type when this line reads
+N/A, whereas a guessed `Sale` would overwrite a real rental listing's
+record. If more than one property's status is being updated in the same
 message, give each its own complete response and its own Listing Record
 footer. Never write `Status: Sold` here — a completed sale is `just-sold`'s
 footer to produce, not this skill's.
@@ -248,11 +261,11 @@ footer to produce, not this skill's.
    requirement.
 3. **Appending a Listing Record footer with no stated locator.** Even with
    exactly one active listing on record, this skill must withhold the
-   footer and ask a confirmation question in its place — see Required
-   Input. (`listing-reengagement` is allowed to auto-pick and never has a
+   footer and LEAD with the confirmation intro (top of the reply, before
+   the content — never a question at the end) — see Required Input.
+   (`listing-reengagement` is allowed to auto-pick and never has a
    footer anyway; this skill and `just-sold` are not, since their footer has
-   an automatic,
-   un-reviewed database effect.)
+   an automatic, un-reviewed database effect.)
 4. **Guessing a locator match instead of asking.** Zero matches or
    multiple matches both mean "ask," never "pick the closest-sounding one."
 5. **Skipping a language or platform.** All three platforms, both
@@ -284,10 +297,10 @@ footer to produce, not this skill's.
 - [ ] Locator lookup was attempted first when identity facts weren't fully
       restated, using only a real, literal injected context block from
       *this* turn — never a memory of one
-- [ ] With no stated locator, the Listing Record footer was withheld and a
-      confirmation question was asked in its place — even with only one
-      active listing on record — rather than committing the status change
-      unconfirmed
+- [ ] With no stated locator, the Listing Record footer was withheld and
+      the reply LED with the confirmation intro (before the content, never
+      a question at the end) — even with only one active listing on record
+      — rather than committing the status change unconfirmed
 - [ ] A locator match was either unambiguous (single match) or resolved by
       asking a specific question naming the real candidates — never guessed
 - [ ] All required facts present (area, rooms, size, status type, and any

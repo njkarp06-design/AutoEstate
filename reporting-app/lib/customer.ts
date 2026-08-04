@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { normalizeWhatsappNumber } from "@/lib/ref-code";
+import type { InstagramPostMode } from "@/lib/instagram-post-mode";
 import type { Customer } from "@/prisma/generated/prisma/client";
 
 /**
@@ -13,8 +14,13 @@ import type { Customer } from "@/prisma/generated/prisma/client";
  *
  * "Verified" is now ENFORCED here rather than only claimed. Email is the entire
  * tenancy boundary on first login: whoever presents a matching address gets
- * permanently bound to that Customer row (`clerkUserId` is unique, so the FIRST
- * claimant wins) and with it the customer's runs, listings and buyer leads. This
+ * permanently bound to that Customer row and with it the customer's runs,
+ * listings and buyer leads. First claimant genuinely wins as of 2026-08-04:
+ * the link below refuses to REBIND a row whose clerkUserId is already set to a
+ * different user. (A previous comment credited that protection to the unique
+ * constraint on clerkUserId, which is wrong - uniqueness stops one Clerk user
+ * holding two Customer rows, it does nothing to stop a second Clerk user
+ * overwriting the first's binding via a freed/re-registered email.) This
  * function previously read the address and bound the row without ever looking at
  * `verification.status`, which left that boundary resting entirely on a Clerk
  * dashboard setting that nothing in this repo pins, asserts or documents - and
@@ -55,8 +61,27 @@ export async function getCurrentCustomer(): Promise<Customer | null> {
     return null;
   }
 
-  const customer = await prisma.customer.findUnique({ where: { email } });
+  // Lowercased on both ends: Clerk stores addresses lowercased, but Postgres
+  // findUnique is byte-exact - a mixed-case provisioned email would silently
+  // never link. provision-customer.ts lowercases at storage for the same
+  // reason; this covers rows provisioned before it did.
+  const customer = await prisma.customer.findUnique({
+    where: { email: email.toLowerCase() },
+  });
   if (!customer) return null; // signed in, but not provisioned by the operator yet
+
+  // First claimant wins, enforced. A row already bound to a DIFFERENT Clerk
+  // user is never silently rebound - a freed or re-registered email must not
+  // hand a second account the tenant's runs, listings and buyer leads. If a
+  // customer legitimately re-creates their Clerk account, relinking is a
+  // deliberate operator action (clear clerkUserId in the DB), not automatic.
+  if (customer.clerkUserId && customer.clerkUserId !== userId) {
+    console.warn(
+      "customer: refusing to rebind %s - already linked to a different Clerk user",
+      customer.id,
+    );
+    return null;
+  }
 
   return prisma.customer.update({
     where: { id: customer.id },
@@ -64,12 +89,12 @@ export async function getCurrentCustomer(): Promise<Customer | null> {
   });
 }
 
-// Inline literal union rather than Prisma's generated `PostMode` - see
-// lib/db.ts's DbPlatform for the convention. Worth noting the one asymmetry:
-// Customer itself IS passed around as Prisma's raw generated type throughout
-// this app (unlike Run/RunMessage, which get translated), so this field
-// follows that existing precedent rather than inventing a one-off exception.
-export type InstagramPostMode = "MANUAL" | "AUTO_IMMEDIATE" | "AUTO_AFTER_EDIT";
+// Re-exported for callers that already reach for it here. The definition
+// lives in lib/instagram-post-mode.ts because a CLIENT component needs it and
+// this module imports Clerk + Prisma - see that file's header for the build
+// error that arrangement caused. An inline literal union rather than Prisma's
+// generated `PostMode`, per lib/db.ts's DbPlatform convention.
+export type { InstagramPostMode } from "@/lib/instagram-post-mode";
 
 export async function updateInstagramPostMode(
   customer: Customer,

@@ -9,8 +9,9 @@ model:
 
 # --- Skill isolation -------------------------------------------------------
 # ONLY the buyer skill. Deliberately NOT the operator's agent/skills dir,
-# which holds the five outbound, Listing-table-mutating skills. A stranger
-# must never be able to route to just-sold / listing-status-update / etc.
+# which holds the five outbound skills - three of them (listing-to-social,
+# listing-status-update, just-sold) mutate the Listing table via the footer.
+# A stranger must never be able to route to any of them.
 skills:
   # MACHINE-SPECIFIC - change per deployment. An absolute path on the dev
   # laptop. On a Linux instance it resolves to nothing, and the failure is

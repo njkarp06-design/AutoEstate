@@ -52,11 +52,12 @@ the `Listing` table (`just-sold`, `listing-status-update`, …). Role-by-channel
 isolation is therefore forced, not preferred: **the dangerous skills are simply
 not loaded here.**
 
-Plugin *hooks* do receive `sender_id` (`pre_llm_call` and `post_llm_call` both;
-`sync-inquiries-to-webapp` uses it). That does not weaken the above and must not
-be mistaken for a way to gate by role: a plugin can only inject text, and text
-does not reliably stop the model taking an action — proven three times in this
-project. Isolation stays structural.
+Plugin *hooks* do receive `sender_id` (`pre_llm_call` and `post_llm_call` both —
+nothing here consumes it since the `sender` field was dropped in PR #90; the
+reinstatement path is documented in `sync-inquiries-to-webapp`). That does not
+weaken the above and must not be mistaken for a way to gate by role: a plugin
+can only inject text, and text does not reliably stop the model taking an
+action — proven three times in this project. Isolation stays structural.
 
 ## The two isolation layers
 
@@ -144,8 +145,13 @@ open every platform at once.
 
 ## ⚠ Both lockdowns are per-platform — now Telegram **and** WhatsApp
 
-`platform_toolsets` and the slash-command gating are keyed by platform name.
-They cover `telegram`, `whatsapp` and `cli`.
+`platform_toolsets` and the slash-command gating are keyed by platform name —
+and they do NOT cover the same set. `platform_toolsets` covers `telegram`,
+`whatsapp` and `cli`; the slash gating (the `platforms:` block) covers
+`telegram` and `whatsapp` **only** — there is no `platforms.cli` block, so cli
+slash access is ungated. That is fine, deliberately: cli is the operator's own
+local console, not a surface a stranger can reach. Stated precisely because
+this section's whole argument depends on being read literally.
 
 Slash gating is switched on *by the presence of an admin list* — so any future
 platform block with no `allow_admin_from` puts every stranger back at admin tier

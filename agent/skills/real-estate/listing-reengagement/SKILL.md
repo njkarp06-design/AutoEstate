@@ -1,7 +1,7 @@
 ---
 name: listing-reengagement
 description: Use when a real estate agent wants to re-promote or remind people about a listing they already advertised and that is still active — nothing about it has changed. Trigger phrases include "still available," "re-post this," "remind people," "hasn't sold yet," "it's been a few weeks." The agent can name just the listing (e.g. "the Dizengoff place") instead of retyping every fact, if it can be found in the reporting system's active listings. Turns the listing's core facts into a fresh round of platform-formatted Hebrew and English posts, framed as a reminder rather than a first-time introduction.
-version: 0.3.0
+version: 0.3.1
 author: AutoEstate
 license: MIT
 metadata:
@@ -21,9 +21,11 @@ listing's facts into a fresh round of ready-to-use, platform-formatted
 content in Hebrew and English, framed as a reminder ("still available")
 rather than a first-time introduction. The agent reviews and posts it
 themselves. This skill only produces text — it does not post anything
-automatically, and it does not look up, remember, or verify the original
-listing against anything on file; the agent restates the facts each time,
-same as `listing-to-social` and `listing-status-update` already do.
+automatically, and it never trusts conversation memory for the listing's
+facts: identity comes from the agent restating them in the current message,
+or from an `[ACTIVE]` locator match against this turn's injected listings
+context (see Required Input) — never from recalling an earlier exchange.
+(`listing-status-update` and `just-sold` follow the same rule.)
 
 This skill never creates or transitions anything in the reporting system —
 see Output Format. The listing's `Active` record already exists from the
@@ -59,11 +61,15 @@ delivered in *this specific turn*):
   that is spoken for must never be re-promoted as still available, so treat
   those as non-matches for the purposes of every branch below — except the
   one that names them explicitly.
-- **Exactly one `[ACTIVE]` match** → use that listing's facts (transaction
-  type, rooms, sqm, floor, price) as this post's identity facts, and open
-  your reply with a short confirmation line restating them (e.g.
-  "Re-posting: 4-room apartment, Ben Gurion Blvd, 95 sqm, ₪4,800,000") so a
-  wrong match is visible before the agent does anything with the content.
+- **Exactly one `[ACTIVE]` match** → use that listing's facts (area,
+  transaction type, rooms, sqm, floor, price) as this post's identity
+  facts, and open your reply with a short confirmation line restating them
+  (e.g. "Re-posting: 4-room apartment, Ben Gurion Blvd, 95 sqm,
+  ₪4,800,000") so a wrong match is visible before the agent does anything
+  with the content. **A match supplies those core facts only — the injected
+  context carries no features.** The standout feature this post needs (see
+  below) must still come from the agent's message, or go into the single
+  batched follow-up question; never invent one to fill the gap.
 - **The locator matches only an `[UNDER CONTRACT - not available]` row** →
   do **not** produce re-promotion content, and do not silently treat it as
   "not found". Say plainly that that listing is under contract, so
@@ -178,8 +184,11 @@ context; that reminder applies to the other three skills, not this one.
 ## Common Pitfalls
 
 1. **Inventing facts.** Never add a price, room count, address detail, or
-   feature that wasn't restated in this message or present in a real
-   locator-matched listing (see Required Input).
+   feature that wasn't restated in this message or supplied by a real
+   locator-matched listing (see Required Input) — and remember a locator
+   match supplies core facts only, **never features**: an amenity that
+   didn't come from the agent's own words goes in the batched question, not
+   the copy.
 2. **Assuming identity facts from earlier in the conversation.** Restate
    them fresh, or match them via a real, literal locator-lookup context
    block delivered in *this* turn — never from memory of an earlier
@@ -213,9 +222,11 @@ context; that reminder applies to the other three skills, not this one.
 - [ ] A locator match was either unambiguous (single match, or no locator
       with exactly one active listing) or resolved by asking a specific
       question naming the real candidates — never guessed
-- [ ] All required facts present (area, sale/rental, rooms, size, price,
-      floor, at least one feature) — via restatement, a confirmed locator
-      match, or a single batched follow-up question, not guessing
+- [ ] All required CORE facts present (area, sale/rental, rooms, size,
+      price, floor) — via restatement or a confirmed locator match — and at
+      least one feature via **restatement or the single batched follow-up
+      question only** (a locator match never supplies features; the
+      injected context doesn't carry them), not guessing
 - [ ] If a locator match was used, the reply opens with a confirmation line
       restating the matched facts
 - [ ] All three platforms produced (Instagram, Facebook, Yad2), each with

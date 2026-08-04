@@ -39,7 +39,12 @@ const turnCompletedSchema = z.object({
   sessionId: z.string().min(1),
   turnId: z.string().min(1),
   platform: z.enum(["whatsapp", "whatsapp_cloud", "telegram"]),
-  userMessage: z.string().min(1),
+  // Empty is legal - a media-only message (sticker, screenshot with no
+  // caption), which the buyer instance sees with vision disabled. The old
+  // min(1) 400'd the whole turn, and the plugin deliberately never retries a
+  // 4xx - so the reply, the contact capture and the operator notification for
+  // that turn were all permanently lost. See MEDIA_ONLY_PLACEHOLDER below.
+  userMessage: z.string(),
   assistantResponse: z.string().min(1),
   buyerContact: z.string().nullish(),
   occurredAt: z.string().datetime(),
@@ -53,6 +58,10 @@ const bodySchema = z.discriminatedUnion("event", [
 function deriveTitle(userMessage: string): string {
   return userMessage.split("\n")[0].slice(0, 60);
 }
+
+// Same convention as /api/ingest - a media-only turn stores a legible
+// placeholder rather than an empty transcript bubble.
+const MEDIA_ONLY_PLACEHOLDER = "[media-only message]";
 
 export async function POST(request: NextRequest) {
   // BUYER role only. Writes are confined to this customer's Inquiry and
@@ -126,6 +135,8 @@ export async function POST(request: NextRequest) {
   }
 
   // turn_completed
+  const userMessageText = body.userMessage || MEDIA_ONLY_PLACEHOLDER;
+
   const inquiry = await prisma.inquiry.upsert({
     where: {
       customerId_hermesSessionId: {
@@ -138,7 +149,7 @@ export async function POST(request: NextRequest) {
       hermesSessionId: body.sessionId,
       source: body.platform,
       startedAt,
-      title: deriveTitle(body.userMessage),
+      title: deriveTitle(userMessageText),
       buyerContact: body.buyerContact ?? null,
     },
     update: {},
@@ -148,7 +159,7 @@ export async function POST(request: NextRequest) {
   if (!inquiry.title) {
     await prisma.inquiry.update({
       where: { id: inquiry.id },
-      data: { title: deriveTitle(body.userMessage) },
+      data: { title: deriveTitle(userMessageText) },
     });
   }
 
@@ -160,7 +171,7 @@ export async function POST(request: NextRequest) {
         inquiryId: inquiry.id,
         hermesTurnId: body.turnId,
         role: "user",
-        content: body.userMessage,
+        content: userMessageText,
         timestamp: startedAt,
         sortIndex: 0,
       },
@@ -169,7 +180,10 @@ export async function POST(request: NextRequest) {
         hermesTurnId: body.turnId,
         role: "assistant",
         content: body.assistantResponse,
-        timestamp: new Date(),
+        // Clamped to never precede the user row it answers - startedAt is the
+        // Hermes box's clock, this is ours, and display orders by timestamp
+        // first. Same reasoning as /api/ingest.
+        timestamp: new Date(Math.max(Date.now(), startedAt.getTime() + 1)),
         sortIndex: 1,
       },
     ],
@@ -195,9 +209,9 @@ export async function POST(request: NextRequest) {
         customer,
         inquiryId: inquiry.id,
         buyerContact: inquiry.buyerContact ?? body.buyerContact ?? null,
-        title: inquiry.title ?? deriveTitle(body.userMessage),
+        title: inquiry.title ?? deriveTitle(userMessageText),
         source: body.platform,
-        latestBuyerMessage: body.userMessage,
+        latestBuyerMessage: userMessageText,
       });
     } catch (err) {
       console.error("inquiries: operator notification failed", err);

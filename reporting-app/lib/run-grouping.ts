@@ -16,7 +16,6 @@ export type GroupableRun<M extends GroupableMessage = GroupableMessage> = {
   status: "IN_PROGRESS" | "COMPLETED";
   title: string | null;
   source: string;
-  displayName: string | null;
   messages: M[];
 };
 
@@ -72,12 +71,31 @@ function matchedContent(run: GroupableRun) {
  * differently (all of a customer's runs vs. all runs in one session), so
  * sorting is the caller's responsibility rather than baked in here.
  */
+// A follow-up turn belonging to the SAME listing arrives within minutes - the
+// batched-question flow is an immediate back-and-forth. Without a bound, ANY
+// non-listing turn joined the session's open group and the next listing
+// absorbed it: a "Thanks!" exchange (or a weekly digest, whose reply has no
+// platform headers) from hours earlier became the opening transcript - and the
+// startedAt - of an unrelated listing's Activity entry. A gap longer than this
+// closes the open group and starts fresh. Chit-chat INSIDE the window still
+// glues to a listing that follows it; accepted, since no content signal
+// distinguishes "clarifying answer" from "chat" and the window is what bounds
+// the damage.
+const MAX_FOLLOW_UP_GAP_MS = 30 * 60 * 1000;
+
 export function groupRunsIntoListings<T extends GroupableRun>(runs: T[]): RunGroup<T>[] {
   const groups: RunGroup<T>[] = [];
   const openGroupBySession = new Map<string, RunGroup<T>>();
 
   for (const run of runs) {
     let group = openGroupBySession.get(run.hermesSessionId);
+    if (group) {
+      const previous = group.runs[group.runs.length - 1];
+      if (run.startedAt.getTime() - previous.startedAt.getTime() > MAX_FOLLOW_UP_GAP_MS) {
+        openGroupBySession.delete(run.hermesSessionId);
+        group = undefined;
+      }
+    }
     if (!group) {
       group = { runs: [], listingTitle: null };
       groups.push(group);

@@ -122,8 +122,13 @@ TIMEOUT_SECONDS = 10
 #
 # `status` is deliberately NOT required: the endpoint only started sending it
 # on 2026-07-31, and a row without it must still be usable rather than dropped.
-# See _status_tag for why an absent status renders as UNDER CONTRACT-ish
-# (withheld from roundups) rather than as ACTIVE.
+# See _status_tag for why an ABSENT status renders as ACTIVE (a row without
+# the key can only have come from the pre-widening route, which returned
+# ACTIVE rows exclusively) while a present-but-unrecognised one renders
+# unavailable. An earlier version of this comment said the opposite - it
+# described a "withhold when absent" rule that was considered and rejected
+# precisely because it would blank the digest during a plugin-ahead-of-app
+# deploy window; the long block above _status_tag is the authority.
 REQUIRED_FIELDS = ("area", "rooms", "sqm", "transactionType")
 
 NO_LISTINGS_CONTEXT = "Active listings context: no currently active listings on record."
@@ -163,21 +168,31 @@ def _status_tag(listing: dict) -> str:
 # false negative (wrong answer for weekly-digest; softer fallback for the
 # three locator-lookup skills). Keep roughly in sync with each skill's own
 # `description` field.
+#
+# Apostrophes: ['’] not a bare ' - WhatsApp/iOS smart punctuation types
+# U+2019, so the exact digest phrasings this gate was written for failed on
+# the punctuation real phones actually produce. And the RENTAL vocabulary is
+# not optional: listing-status-update's own description covers "going under
+# contract/rented" and just-sold treats a completed rental as Sold, yet the
+# gate had no rented/leased/הושכר alternative at all - so the entire rental
+# half of those skills' vocabulary silently never fetched locator context
+# (measured 2026-08-04: "The Frishman apartment just rented" -> no match).
 LISTING_LOOKUP_KEYWORDS = re.compile(
     # weekly-digest
-    r"digest|roundup|round-up|round up|still active|still on the market|"
-    r"what'?s active|what'?s still|weekly update|summary|"
+    r"digest|roundup|round-up|round up|still active|on the market|"
+    r"what['’]?s active|what['’]?s still|weekly update|summary|"
     # listing-reengagement (incl. "it's been a few weeks", one of that skill's
     # own documented trigger phrases, which this gate was missing)
-    r"re-?post|remind (?:people|them|buyers)|hasn'?t sold|re-?promote|"
-    r"still available|been a (?:few|couple of) weeks|"
+    r"re-?post|remind (?:people|them|buyers)|hasn['’]?t sold|re-?promote|"
+    r"still available|been a (?:few|couple(?: of)?) weeks|"
     # listing-status-update
-    r"price drop|reduced|lowered the price|under contract|"
-    # just-sold
-    r"\bsold\b|closed on|"
+    r"price drop|price cut|reduced|lowered the price|"
+    r"dropp?ed the price|cut the price|under contract|"
+    # just-sold (a completed rental counts as Sold there)
+    r"\bsold\b|closed on|\brented\b|\bleased\b|rented out|"
     # Hebrew, spanning all four
     r"סיכום|עדכון שבועי|מה עוד פעיל|מה נשאר|"
-    r"עדיין זמינה|תזכיר|תפרסם שוב|ירד במחיר|בהליכי מכירה|נמכר",
+    r"עדיין זמינה|תזכיר|תפרסם שוב|ירד במחיר|בהליכי מכירה|נמכר|הושכר",
     re.IGNORECASE,
 )
 

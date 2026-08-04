@@ -1,34 +1,10 @@
 import Link from "next/link";
-import { getCurrentCustomer } from "@/lib/customer";
-import { updateInstagramPostModeAction } from "./actions";
+import { getCurrentCustomer, type InstagramPostMode } from "@/lib/customer";
 import { TelegramChatIdForm } from "./telegram-chat-id-form";
 import { BuyerNumberForm } from "./buyer-number-form";
+import { InstagramModeForm } from "./instagram-mode-form";
 
 export const dynamic = "force-dynamic";
-
-const INSTAGRAM_OPTIONS: {
-  value: "MANUAL" | "AUTO_IMMEDIATE" | "AUTO_AFTER_EDIT";
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: "MANUAL",
-    label: "Manual",
-    description: "Hermes drafts the caption; you copy and post it yourself.",
-  },
-  {
-    value: "AUTO_AFTER_EDIT",
-    label: "Auto-post after I edit (coming soon)",
-    description:
-      "You review and edit the caption here, then it posts to Instagram automatically. Requires connecting Instagram - not available yet.",
-  },
-  {
-    value: "AUTO_IMMEDIATE",
-    label: "Auto-post immediately (coming soon)",
-    description:
-      "Hermes posts to Instagram as soon as content is generated, no review step. Requires connecting Instagram - not available yet.",
-  },
-];
 
 export default async function SettingsPage() {
   const customer = await getCurrentCustomer();
@@ -66,34 +42,9 @@ export default async function SettingsPage() {
           Applies to every future listing&apos;s Instagram caption.
         </p>
 
-        <form action={updateInstagramPostModeAction} className="mt-5">
-          {INSTAGRAM_OPTIONS.map((option) => (
-            <label
-              key={option.value}
-              className="flex cursor-pointer items-start gap-3 border-t border-card-border py-4 first:border-t-0"
-            >
-              <input
-                type="radio"
-                name="instagramPostMode"
-                value={option.value}
-                defaultChecked={customer.instagramPostMode === option.value}
-                className="mt-1.5 accent-brand"
-              />
-              <span>
-                <span className="block font-medium">{option.label}</span>
-                <span className="mt-0.5 block text-sm text-status-muted">
-                  {option.description}
-                </span>
-              </span>
-            </label>
-          ))}
-          <button
-            type="submit"
-            className="mt-4 border-b border-line-strong font-mono text-xs uppercase tracking-wide"
-          >
-            Save
-          </button>
-        </form>
+        <InstagramModeForm
+          defaultValue={customer.instagramPostMode as InstagramPostMode}
+        />
       </section>
 
       <section className="mt-10 border-t border-card-border pt-6">

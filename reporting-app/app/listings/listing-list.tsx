@@ -38,7 +38,18 @@ export function ListingList({
       // Search the ref code as well as the area: an agent looking at an ad
       // has the code in front of them, not necessarily the street name.
       const haystack = `${listing.area} ${listing.refCode ?? ""}`.toLowerCase();
-      if (!haystack.includes(q.replace(/^ref[\s:_-]*/i, ""))) return false;
+      // Try the query AS TYPED first, plus - only when the query is an
+      // explicit code reference ("REF-K7M2P", "ref k7m2p") - the same query
+      // with that prefix stripped, since codes are stored bare. The strip
+      // REQUIRES a separator after "ref": stripping unconditionally turned
+      // "refa" into the needle "a" (matching almost every row) and "ref"
+      // alone into "" (matching all of them), while an area genuinely
+      // starting with "Ref..." still works through the as-typed branch.
+      const stripped = q.replace(/^ref[\s:_-]+/, "");
+      const matches =
+        haystack.includes(q) ||
+        (stripped !== q && stripped !== "" && haystack.includes(stripped));
+      if (!matches) return false;
     }
     return true;
   });
@@ -119,7 +130,10 @@ export function ListingList({
               <>
                 <div className="min-w-0">
                   <p className="truncate font-display text-[1.05rem] font-semibold">
-                    {listing.rooms}-room {transactionTypeLabel(listing.transactionType).toLowerCase()} in {listing.area}
+                    {/* || "listing": same fallback as the inquiry detail page -
+                        an empty/unrecognized stored type otherwise renders
+                        "3-room  in Haifa" with a double space. */}
+                    {listing.rooms}-room {transactionTypeLabel(listing.transactionType).toLowerCase() || "listing"} in {listing.area}
                   </p>
                   <p className="mt-1 font-mono text-xs uppercase tracking-wide text-status-muted">
                     {listing.sqm} sqm
