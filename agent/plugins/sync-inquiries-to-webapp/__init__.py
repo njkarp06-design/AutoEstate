@@ -144,19 +144,37 @@ def _extract_phone(text: str | None) -> str | None:
         return None
     for match in _PHONE_RE.finditer(str(text)):
         raw = match.group(0).strip()
-        digits = re.sub(r"\D", "", raw)
-        if not (9 <= len(digits) <= 15):
-            continue
-
-        groups = [re.sub(r"\D", "", g) for g in re.split(r"[ \t\-]+", raw) if g]
-        if len(groups) > 1:
-            if len(groups) > _MAX_PHONE_GROUPS:
-                continue
-            if any(len(g) < _MIN_DIGITS_PER_GROUP for g in groups):
-                continue
-
-        return raw
+        if _valid_phone_shape(raw):
+            return raw
+        # The regex yields the LONGEST run of digits and separators, so two
+        # adjacent numbers ("052-441-9087 054-111-2222"), or a price typed
+        # right before a phone ("3950000 0524419087"), merge into ONE run
+        # that fails the guards - and rejecting the whole run silently lost
+        # the perfectly valid number inside it (measured 2026-08-04: all
+        # three of those inputs returned None). Fall back to testing the
+        # run's space-separated tokens individually; first valid wins. A
+        # pair separated ONLY by spaces still rejects (each token alone is
+        # too short) - recoverable from the transcript, and preferable to
+        # loosening the guards that keep prices out of this field.
+        for token in raw.split():
+            if _valid_phone_shape(token):
+                return token
     return None
+
+
+def _valid_phone_shape(raw: str) -> bool:
+    """The two discriminators from _extract_phone's docstring, as a predicate
+    so the whole-run check and the per-token fallback cannot drift apart."""
+    digits = re.sub(r"\D", "", raw)
+    if not (9 <= len(digits) <= 15):
+        return False
+    groups = [re.sub(r"\D", "", g) for g in re.split(r"[ \t\-]+", raw) if g]
+    if len(groups) > 1:
+        if len(groups) > _MAX_PHONE_GROUPS:
+            return False
+        if any(len(g) < _MIN_DIGITS_PER_GROUP for g in groups):
+            return False
+    return True
 
 
 def _resolve_lead(kwargs: dict, user_message: str | None = None) -> str | None:

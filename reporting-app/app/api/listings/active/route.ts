@@ -60,11 +60,15 @@ export async function GET(request: NextRequest) {
       sqm: l.sqm,
       floor: l.floor,
       price: l.price,
-      // Added 2026-07-31 with the widening above. A plugin old enough to
-      // ignore this field still renders correctly, it just cannot distinguish
-      // the two - which is why the plugin treats a missing/unknown status as
-      // NOT active rather than assuming ACTIVE: the safe default is to
-      // withhold a row from a roundup, never to advertise one wrongly.
+      // Added 2026-07-31 with the widening above. The plugin's handling is
+      // deliberately asymmetric, and an earlier version of this comment
+      // described it BACKWARDS: a row with the key ABSENT renders as ACTIVE
+      // (absent can only mean the pre-widening route, which returned ACTIVE
+      // rows exclusively - treating it as unavailable would blank the digest
+      // during a plugin-ahead-of-app deploy window), while a PRESENT but
+      // unrecognised value renders unavailable (under-advertising is the
+      // harmless direction for a value we genuinely can't interpret). See
+      // _status_tag in agent/plugins/active-listings-context/__init__.py.
       status: l.status,
     })),
   });
