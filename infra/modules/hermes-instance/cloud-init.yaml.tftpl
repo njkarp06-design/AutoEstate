@@ -12,6 +12,11 @@ write_files:
   - path: /root/.hermes/.env
     permissions: '0600'
     content: |
+      # AUTOESTATE_CUSTOMER_ID is read by nothing at runtime. It is the
+      # SENTINEL for null_resource.inject_secrets: its presence after the
+      # .env rewrite proves the file's content survived, before the
+      # destructive mv. Do not remove it as unused - the two sites
+      # cross-reference each other (see main.tf).
       AUTOESTATE_CUSTOMER_ID=${customer_id}
       AUTOESTATE_INGESTION_URL=${ingestion_api_url}
 %{ if instance_role == "buyer" ~}

@@ -2,20 +2,21 @@
 # Never commit terraform.tfvars - it holds real secrets.
 
 hcloud_token       = "REPLACE_ME"    # Hetzner Cloud console -> Security -> API Tokens (project-scoped)
-customer_id        = "REPLACE_ME"    # short slug, e.g. "acme-realty"
+customer_id        = "REPLACE_ME"    # short slug, e.g. "acme-realty" - the SAME value in both of a customer's stacks (the module adds the role to resource names)
 customer_email     = "REPLACE_ME"    # must match the Customer row created in the reporting webapp beforehand
 
 anthropic_api_key  = "REPLACE_ME"
 
-ingestion_api_url      = "REPLACE_ME"  # e.g. https://app.autoestate.example/api/ingest
-whatsapp_allowed_users = "REPLACE_ME"  # customer's WhatsApp number, international format, no + (e.g. 972501234567)
+ingestion_api_url  = "REPLACE_ME"    # e.g. https://app.autoestate.example/api/ingest
 
-# Agent-facing Telegram. Independent of WhatsApp - set either, neither or both
-# (module README, step 4). Telegram costs no phone number, which is why it is
-# the route to one number per customer. Leave the token empty and no Telegram
-# adapter starts, which is the correct value for a WhatsApp-only customer.
-# Set the token WITHOUT the allowed-users id and the bot answers nobody, so set
-# both or neither.
+# Agent-facing channels - WhatsApp, Telegram or both (module README, step 4).
+# An operator stack needs at least ONE (the module refuses to plan with
+# neither). A Telegram-only customer is fully supported - leave
+# whatsapp_allowed_users as "" and set the Telegram pair instead; Telegram
+# costs no phone number, which is why it is the route to one number per
+# customer (TODO 12a). Set the Telegram token WITHOUT the allowed-users id and
+# the bot answers nobody, so set both or neither.
+whatsapp_allowed_users = ""          # customer's WhatsApp number, international format, no + (e.g. 972501234567) - or "" for Telegram-only
 # telegram_bot_token     = "REPLACE_ME"  # BotFather token
 # telegram_allowed_users = "REPLACE_ME"  # customer's own numeric Telegram user id
 
@@ -26,3 +27,25 @@ operator_ssh_cidrs = ["REPLACE_ME/32"] # your own current IP - never leave this 
 # Hetzner rejects the same public key twice in a project, so this is looked up
 # rather than created per customer. Defaults to "autoestate-operator".
 # operator_ssh_key_name = "autoestate-operator"
+
+# --- BUYER STACK ONLY ------------------------------------------------------
+# A fully-provisioned customer is TWO stacks: copy this wrapper twice (e.g.
+# acme-operator/ and acme-buyer/), keep customer_id IDENTICAL in both, and in
+# the buyer copy uncomment these. The module REFUSES TO PLAN a buyer stack
+# without both admin id lists - an empty list switches slash-command gating
+# off entirely, which on a public instance promotes every stranger to admin
+# tier (including /profile). These are the OPERATOR's own ids (whoever runs
+# the business), never a customer's and never a buyer's.
+# instance_role             = "buyer"
+# buyer_telegram_admin_ids  = ["REPLACE_ME"]     # numeric Telegram user id(s)
+# buyer_whatsapp_admin_lids = ["REPLACE_ME@lid"] # WITH the @lid suffix - the bare number does not work
+
+# --- Optional per-customer tuning (defaults shown) -------------------------
+# All five are declared in the wrapper deliberately: an undeclared variable
+# set in this file is a WARNING, not an error - the apply succeeds and the
+# value is silently discarded.
+# hetzner_server_type = "cx22"
+# hetzner_location    = "nbg1"           # pick one close to the customer
+# hetzner_image       = "ubuntu-24.04"
+# hermes_model        = "anthropic/claude-opus-4.6"
+# hermes_image_tag    = "latest"         # pin once a version is verified

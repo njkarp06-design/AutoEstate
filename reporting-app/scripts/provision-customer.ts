@@ -8,10 +8,13 @@
 //   operator (default) - POST /api/ingest, GET /api/listings/active
 //   buyer              - POST /api/inquiries, GET /api/listings/buyer-view
 //
-// Operator, right after `terraform apply` for a new customer instance:
+// Operator, right after `terraform apply` for a new customer instance
+// (the wrapper's output is named `ingestion_secret` - an earlier version of
+// this line said `operator_ingestion_secret`, which only exists inside the
+// module and errors "Output not found" from the customer directory):
 //
 //   cd infra/customers/<customer>
-//   terraform output -raw operator_ingestion_secret | npx tsx ../../../reporting-app/scripts/provision-customer.ts customer@email.com
+//   terraform output -raw ingestion_secret | npx tsx ../../../reporting-app/scripts/provision-customer.ts customer@email.com --role operator
 //
 // Buyer, once that customer has a buyer instance. Mint a secret, register it,
 // and put the same value in the buyer profile's AUTOESTATE_INGESTION_SECRET:
@@ -41,6 +44,17 @@ const scriptDir = path.dirname(path.resolve(process.argv[1]));
 dotenv.config({ path: path.resolve(scriptDir, "..", ".env.local") });
 
 function readStdin(): Promise<string> {
+  // Fail loudly on a TTY instead of waiting on an `end` that never comes:
+  // invoked without the pipe (an operator retyping the usage line and
+  // dropping the `|`), stdin is an interactive terminal and this promise
+  // never settled - the script hung forever with zero output, the one
+  // silent failure path in a file where every other one is deliberately
+  // loud.
+  if (process.stdin.isTTY) {
+    console.error("No secret piped in via stdin (stdin is a terminal).");
+    console.error(USAGE);
+    process.exit(1);
+  }
   return new Promise((resolve, reject) => {
     let data = "";
     process.stdin.on("data", (chunk) => (data += chunk));

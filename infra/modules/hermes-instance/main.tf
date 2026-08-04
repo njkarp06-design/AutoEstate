@@ -50,11 +50,29 @@ locals {
   # The buyer instance also ships a SOUL.md (its receptionist persona). Folded
   # into the hash so editing it actually redeploys, same as a SKILL.md.
   buyer_soul_path = "${local.agent_root}/profiles/autoestate-buyer/SOUL.md"
+  # Filenames are folded into the hash alongside contents ("name:hash"), not
+  # contents alone: hashing only contents made a same-content RENAME invisible
+  # - the old filename lingered on the server, the new one never arrived, and
+  # inject_secrets (which triggers on this same hash) never restarted the
+  # gateway.
   agent_content_hash = sha256(join("", concat(
-    [for f in local.skill_files : filesha256("${local.skills_dir}/${f}")],
-    [for f in local.plugin_files : filesha256("${local.plugins_dir}/${f}")],
+    [for f in local.skill_files : "${f}:${filesha256("${local.skills_dir}/${f}")}"],
+    [for f in local.plugin_files : "${f}:${filesha256("${local.plugins_dir}/${f}")}"],
     local.is_buyer ? [filesha256(local.buyer_soul_path)] : [],
   )))
+
+  # Every plugin directory must be claimed by exactly one role list above.
+  # Without this check the split FAILS OPEN: a future plugin named in neither
+  # list is uploaded to BOTH roles and deleted from neither - i.e. the next
+  # plugin silently lands on the public buyer box. Enforced by a precondition
+  # on hcloud_server below.
+  all_plugin_dirs = distinct([
+    for f in tolist(fileset(local.plugins_dir, "*/plugin.yaml")) : dirname(f)
+  ])
+  unassigned_plugins = setsubtract(
+    local.all_plugin_dirs,
+    concat(local.operator_plugins, local.buyer_plugins),
+  )
 }
 
 resource "random_password" "ingestion_secret" {
@@ -73,8 +91,15 @@ data "hcloud_ssh_key" "operator" {
   name = var.operator_ssh_key_name
 }
 
+# The role is part of BOTH resource names below, and it is load-bearing: a
+# fully-provisioned customer is TWO stacks (operator + buyer) sharing one
+# customer_id, and Hetzner enforces project-scoped uniqueness on server and
+# firewall names - so without the role suffix the second stack's apply failed
+# on a name collision, and the documented workaround (suffixing customer_id
+# by hand) silently broke the AUTOESTATE_CUSTOMER_ID symmetry and the
+# `customer` label correlation between a customer's two boxes.
 resource "hcloud_firewall" "hermes" {
-  name = "${var.customer_id}-hermes"
+  name = "${var.customer_id}-${var.instance_role}-hermes"
 
   rule {
     direction  = "in"
@@ -87,7 +112,7 @@ resource "hcloud_firewall" "hermes" {
 }
 
 resource "hcloud_server" "hermes" {
-  name         = "hermes-${var.customer_id}"
+  name         = "hermes-${var.customer_id}-${var.instance_role}"
   server_type  = var.hetzner_server_type
   image        = var.hetzner_image
   location     = var.hetzner_location
@@ -129,6 +154,18 @@ resource "hcloud_server" "hermes" {
   # correct outcome: this is the one misconfiguration that silently produces a
   # working-looking public bot with no isolation at all.
   lifecycle {
+    # user_data is consumed ONCE, at first boot - cloud-init never re-runs it
+    # on an existing server, but Terraform treats any change to it as
+    # force-new and would DESTROY the box (losing the paired WhatsApp
+    # session) to deliver a value the replacement is the only thing that
+    # could read anyway. ingestion_api_url is guaranteed to change at least
+    # once (the vercel.app -> custom-domain cutover), so this trap sat
+    # directly on the planned path. Config changes to a live box are
+    # out-of-band (SSH, edit /root/.hermes/.env or config, restart the
+    # gateway - see the README); a deliberate rebuild is
+    # `terraform apply -replace=module.<name>.hcloud_server.hermes`.
+    ignore_changes = [user_data]
+
     precondition {
       condition     = !local.is_buyer || length(var.buyer_telegram_admin_ids) > 0
       error_message = "instance_role = \"buyer\" requires a non-empty buyer_telegram_admin_ids. An empty list disables slash-command gating entirely, which promotes every stranger on a public instance to admin tier (including /profile)."
@@ -137,9 +174,18 @@ resource "hcloud_server" "hermes" {
       condition     = !local.is_buyer || length(var.buyer_whatsapp_admin_lids) > 0
       error_message = "instance_role = \"buyer\" requires a non-empty buyer_whatsapp_admin_lids (WITH the @lid suffix). An empty list disables slash-command gating entirely - see buyer_telegram_admin_ids."
     }
+    # At least ONE agent-facing channel, not WhatsApp specifically: a
+    # Telegram-only operator is a supported configuration (module README
+    # step 4/5, and the channel-consolidation decision makes it the TARGET
+    # one) - the previous `whatsapp_allowed_users != ""` condition refused
+    # to plan exactly that.
     precondition {
-      condition     = local.is_buyer || var.whatsapp_allowed_users != ""
-      error_message = "instance_role = \"operator\" requires whatsapp_allowed_users (the customer's own number). Only the buyer role runs open to everyone."
+      condition     = local.is_buyer || var.whatsapp_allowed_users != "" || (var.telegram_bot_token != "" && var.telegram_allowed_users != "")
+      error_message = "instance_role = \"operator\" requires at least one agent-facing channel: whatsapp_allowed_users (the customer's own number), or BOTH telegram_bot_token and telegram_allowed_users for a Telegram-only customer. Only the buyer role runs open to everyone."
+    }
+    precondition {
+      condition     = length(local.unassigned_plugins) == 0
+      error_message = "Every directory under agent/plugins/ must be named in exactly one of operator_plugins or buyer_plugins (main.tf locals). Unassigned plugins would be uploaded to BOTH roles - including the public buyer instance - and deleted from neither."
     }
   }
 }
@@ -347,6 +393,12 @@ resource "null_resource" "inject_secrets" {
       "chmod 600 /root/.hermes/.env.secrets",
       "grep -v -e '^AUTOESTATE_INGESTION_SECRET=' -e '^ANTHROPIC_API_KEY=' -e '^TELEGRAM_BOT_TOKEN=' /root/.hermes/.env > /root/.hermes/.env.tmp",
       "cat /root/.hermes/.env.secrets >> /root/.hermes/.env.tmp",
+      # AUTOESTATE_CUSTOMER_ID is read by NOTHING at runtime - it exists in
+      # the generated .env (cloud-init.yaml.tftpl) PRECISELY to be this
+      # sentinel: proof the original file's content survived the rewrite
+      # above, before the destructive mv. Removing it from the template as
+      # "unused" breaks secret injection on every instance. The two sites
+      # cross-reference each other.
       "grep -q '^AUTOESTATE_CUSTOMER_ID=' /root/.hermes/.env.tmp",
       "mv /root/.hermes/.env.tmp /root/.hermes/.env",
       "chmod 600 /root/.hermes/.env",

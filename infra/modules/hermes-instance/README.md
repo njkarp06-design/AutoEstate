@@ -23,7 +23,15 @@ operator's channel could trigger the outbound, `Listing`-mutating skills.
 
 The other role's plugins are deleted after upload: the whole `plugins/` directory
 is uploaded in one go, and a public buyer box has no business carrying the
-operator's `Listing`-mutating sync code.
+operator's `Listing`-mutating sync code. (Every plugin directory must be named
+in one of the two role lists in `main.tf` - the module refuses to plan
+otherwise, because an unlisted plugin would land on **both** roles.)
+
+**Both stacks use the SAME `customer_id`.** The module appends the role to the
+Hetzner server and firewall names (`hermes-<customer_id>-<role>`), so the two
+stacks never collide on Hetzner's project-unique names - do not work around a
+name conflict by suffixing `customer_id` by hand, which would break the
+`customer` label correlation between a customer's two boxes.
 
 **Buyer instances require `buyer_telegram_admin_ids` and
 `buyer_whatsapp_admin_lids`, and the module refuses to plan without them.** An
@@ -114,7 +122,10 @@ must already exist, so register their operator credential first.
 ### 4. Pick the customer's agent-facing channel(s)
 
 The agent-facing bot can run on **Telegram, WhatsApp, or both** (decided
-2026-07-28, TODO 12a). They are independent - set either, neither or both.
+2026-07-28, TODO 12a). They are independent, but an operator stack needs at
+least **one** - the module refuses to plan with neither, and a Telegram-only
+customer (leave `whatsapp_allowed_users = ""`) is a first-class, supported
+configuration, not a workaround.
 
 **Telegram costs no phone number**, which is the whole point: it is the route
 to one number per customer rather than two. Create a bot in BotFather, then set
@@ -171,6 +182,25 @@ terraform apply
 terraform output -raw ingestion_secret | \
   npx tsx ../../../reporting-app/scripts/provision-customer.ts <customer-email> --role operator
 ```
+
+## Changing configuration on a LIVE instance
+
+`user_data` is consumed **once, at first boot** - cloud-init never re-reads it
+- and the server carries `lifecycle { ignore_changes = [user_data] }` so that
+editing a baked-in value (`ingestion_api_url` at the vercel.app → custom-domain
+cutover, an allowlist, the model) does **not** plan a destroy-and-rebuild that
+would lose the customer's paired WhatsApp session in exchange for a value the
+replacement box is the only thing that could read. Instead:
+
+- **Secrets** (API key, ingestion secret, Telegram token): change the variable
+  and re-apply - `null_resource.inject_secrets` owns that path and never
+  rebuilds the server.
+- **Anything else baked into `.env` or `config.yaml`**: SSH in, edit the file,
+  `docker compose -f /root/docker-compose.yml restart gateway`. Update the
+  tfvars too so the next genuinely-new server is built right.
+- **A deliberate rebuild** (new base image, fresh start):
+  `terraform apply -replace='module.<name>.hcloud_server.hermes'` - and expect
+  to re-pair WhatsApp afterwards.
 
 ## What's deliberately not automated
 
