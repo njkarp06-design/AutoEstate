@@ -38,7 +38,6 @@ const EMPTY_PLATFORM_STATUS: RunPlatformStatus = {
 export type Run = {
   id: string;
   source: string;
-  displayName: string | null;
   startedAt: number; // epoch seconds - kept as a number so lib/format.ts needs no changes
   status: RunStatus;
   title: string | null;
@@ -117,7 +116,6 @@ export async function getRuns(customer: Customer): Promise<Run[]> {
         // links point at - it holds the real content, once there is any.
         id: last.id,
         source: last.source,
-        displayName: last.displayName,
         // The first run's startedAt - when the listing request actually
         // began. Title prefers the group's clean, generated-content-derived
         // title (see run-grouping.ts); falls back to the first run's raw,
@@ -176,7 +174,6 @@ export async function getRun(id: string, customer: Customer): Promise<RunDetail 
   return {
     id: last.id,
     source: last.source,
-    displayName: last.displayName,
     startedAt: toEpochSeconds(first.startedAt),
     status: toRunStatus(last.status),
     title: group.listingTitle ?? first.title,

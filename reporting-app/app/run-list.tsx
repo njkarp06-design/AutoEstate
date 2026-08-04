@@ -120,12 +120,13 @@ export function RunList({ runs }: { runs: Run[] }) {
                 className="flex items-center justify-between gap-4 py-4 transition hover:bg-card"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-display text-[1.05rem] font-semibold">
+                  {/* dir="auto": in-progress/unsplit listings fall back to the
+                      raw Hebrew title - same convention as the Inquiries list. */}
+                  <p dir="auto" className="truncate font-display text-[1.05rem] font-semibold">
                     {run.title ?? "Untitled listing"}
                   </p>
                   <p className="mt-1 font-mono text-xs uppercase tracking-wide text-status-muted">
                     {sourceLabel(run.source)}
-                    {run.displayName ? ` · ${run.displayName}` : ""}
                     {" · "}
                     {formatRelativeDateTime(run.startedAt)}
                   </p>

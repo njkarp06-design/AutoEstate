@@ -153,20 +153,47 @@ export function splitPlatformContent(raw: string): ParsedPlatformContent {
   };
 }
 
+// Matches any of the footer's labeled lines, label-only (no captures) - per-
+// field parsing belongs to lib/listing-record.ts's FIELD_RE, which cannot be
+// imported here without a cycle (that file imports LISTING_RECORD_HEADER_RE
+// from this one). If a field is ever added to the footer format, update BOTH.
+const LISTING_FIELD_LINE_RE = /^(area|type|rooms|size|floor|price|status|features):/i;
+
 /**
- * Drops everything from the first "Listing Record" footer onwards.
+ * Removes each "Listing Record" footer BLOCK (its header plus the contiguous
+ * labeled lines after it), keeping everything else.
  *
  * splitPlatformContent already caps its Yad2 slice at that header so the
  * footer's raw labels can't leak into the customer-facing caption. This is the
  * same guarantee for the *unmatched* path (`matched: false`), which renders the
- * reply verbatim - otherwise the one place a viewer sees raw bookkeeping is the
- * fallback. Takes the FIRST footer, unlike the platform split's last-occurrence
- * rule: here everything after it is footer material either way.
+ * reply verbatim. It previously truncated at the FIRST footer instead - which,
+ * in a merged two-listing reply that fails the platform split, cut listing 2's
+ * entire content out of the one view whose job is to show the reply verbatim.
  */
 export function stripListingRecordFooter(raw: string): string {
   const lines = raw.split("\n");
-  const at = lines.findIndex((line) => LISTING_RECORD_HEADER_RE.test(line.trim()));
-  return at === -1 ? raw : lines.slice(0, at).join("\n").trimEnd();
+  const kept: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (LISTING_RECORD_HEADER_RE.test(lines[i].trim())) {
+      i++; // skip the header line
+      // Skip the footer's own field lines (and blank lines between them),
+      // stopping at the first real content line - same scan rule as the
+      // parser, so the two agree on where a footer ends.
+      while (i < lines.length) {
+        const trimmed = lines[i].trim();
+        if (trimmed === "" || LISTING_FIELD_LINE_RE.test(trimmed)) {
+          i++;
+          continue;
+        }
+        break;
+      }
+      continue;
+    }
+    kept.push(lines[i]);
+    i++;
+  }
+  return kept.join("\n").trimEnd();
 }
 
 const HEBREW_CHAR_RE = /[֐-׿]/;

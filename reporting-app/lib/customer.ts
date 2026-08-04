@@ -95,6 +95,17 @@ export async function getCurrentCustomer(): Promise<Customer | null> {
 // follows that existing precedent rather than inventing a one-off exception.
 export type InstagramPostMode = "MANUAL" | "AUTO_IMMEDIATE" | "AUTO_AFTER_EDIT";
 
+// THE one runtime list of modes. The settings action validates against it and
+// the settings form renders from it - previously each held its own hand-copied
+// literal (plus a third in platform-section.tsx's label map), so a renamed or
+// added member type-checked everywhere while the mismatched radio silently
+// no-op'd through the action's validation.
+export const INSTAGRAM_POST_MODES: readonly InstagramPostMode[] = [
+  "MANUAL",
+  "AUTO_IMMEDIATE",
+  "AUTO_AFTER_EDIT",
+];
+
 export async function updateInstagramPostMode(
   customer: Customer,
   mode: InstagramPostMode,

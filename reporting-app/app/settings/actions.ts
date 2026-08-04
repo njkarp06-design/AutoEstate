@@ -6,22 +6,34 @@ import {
   updateBuyerWhatsappNumber,
   updateInstagramPostMode,
   updateOperatorTelegramChatId,
-  type InstagramPostMode,
+  INSTAGRAM_POST_MODES,
 } from "@/lib/customer";
 import { normalizeWhatsappNumber } from "@/lib/ref-code";
 
-const VALID_MODES: readonly InstagramPostMode[] = ["MANUAL", "AUTO_IMMEDIATE", "AUTO_AFTER_EDIT"];
-
-export async function updateInstagramPostModeAction(formData: FormData) {
+/**
+ * Same result-returning shape as the two actions below, and late to it: this
+ * was the app's one remaining silent-discard form - every failure branch
+ * `return`ed void, so pressing Save looked identical whether it saved,
+ * the account wasn't linked, or the value was rejected.
+ */
+export async function updateInstagramPostModeAction(
+  _prevState: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
   const customer = await getCurrentCustomer();
-  if (!customer) return;
+  if (!customer) {
+    return { status: "error", message: "Your account isn't linked yet." };
+  }
 
   const raw = String(formData.get("instagramPostMode") ?? "");
-  const mode = VALID_MODES.find((m) => m === raw);
-  if (!mode) return; // reject anything outside the known 3 values
+  const mode = INSTAGRAM_POST_MODES.find((m) => m === raw);
+  if (!mode) {
+    return { status: "error", message: "Pick one of the listed options." };
+  }
 
   await updateInstagramPostMode(customer, mode);
   revalidatePath("/settings");
+  return { status: "saved", message: "Saved." };
 }
 
 // Deliberately small and serializable - action return values are sent to the

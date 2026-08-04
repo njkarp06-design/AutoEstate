@@ -25,6 +25,16 @@ export function CopyButton({
   const [failed, setFailed] = useState(false);
 
   function handleCopy() {
+    // Guarded, not just promise-handled: on a non-secure context (plain http
+    // over a LAN IP - i.e. demoing the dashboard from a phone)
+    // navigator.clipboard is UNDEFINED, so the call throws a synchronous
+    // TypeError before any promise exists and the rejection handler below
+    // never runs - leaving the silently-dead button this component's whole
+    // failure handling exists to prevent.
+    if (!navigator.clipboard) {
+      setFailed(true);
+      return;
+    }
     navigator.clipboard.writeText(value).then(
       () => {
         setFailed(false);
