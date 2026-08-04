@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { normalizeWhatsappNumber } from "@/lib/ref-code";
+import type { InstagramPostMode } from "@/lib/instagram-post-mode";
 import type { Customer } from "@/prisma/generated/prisma/client";
 
 /**
@@ -88,23 +89,12 @@ export async function getCurrentCustomer(): Promise<Customer | null> {
   });
 }
 
-// Inline literal union rather than Prisma's generated `PostMode` - see
-// lib/db.ts's DbPlatform for the convention. Worth noting the one asymmetry:
-// Customer itself IS passed around as Prisma's raw generated type throughout
-// this app (unlike Run/RunMessage, which get translated), so this field
-// follows that existing precedent rather than inventing a one-off exception.
-export type InstagramPostMode = "MANUAL" | "AUTO_IMMEDIATE" | "AUTO_AFTER_EDIT";
-
-// THE one runtime list of modes. The settings action validates against it and
-// the settings form renders from it - previously each held its own hand-copied
-// literal (plus a third in platform-section.tsx's label map), so a renamed or
-// added member type-checked everywhere while the mismatched radio silently
-// no-op'd through the action's validation.
-export const INSTAGRAM_POST_MODES: readonly InstagramPostMode[] = [
-  "MANUAL",
-  "AUTO_IMMEDIATE",
-  "AUTO_AFTER_EDIT",
-];
+// Re-exported for callers that already reach for it here. The definition
+// lives in lib/instagram-post-mode.ts because a CLIENT component needs it and
+// this module imports Clerk + Prisma - see that file's header for the build
+// error that arrangement caused. An inline literal union rather than Prisma's
+// generated `PostMode`, per lib/db.ts's DbPlatform convention.
+export type { InstagramPostMode } from "@/lib/instagram-post-mode";
 
 export async function updateInstagramPostMode(
   customer: Customer,

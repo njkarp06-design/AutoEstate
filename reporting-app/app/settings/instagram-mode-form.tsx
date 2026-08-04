@@ -5,7 +5,10 @@ import {
   updateInstagramPostModeAction,
   type SettingsFormState,
 } from "./actions";
-import { INSTAGRAM_POST_MODES, type InstagramPostMode } from "@/lib/customer";
+// From lib/instagram-post-mode.ts, NOT lib/customer.ts: this is a client
+// component, and lib/customer.ts imports Clerk + Prisma - pulling it into the
+// client bundle fails `next build` (an error tsc and eslint both pass).
+import { INSTAGRAM_POST_MODES, type InstagramPostMode } from "@/lib/instagram-post-mode";
 
 // Same reason as telegram-chat-id-form.tsx: a "use server" module can only
 // export async functions, so this constant can't live in actions.ts.

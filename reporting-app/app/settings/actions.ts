@@ -6,8 +6,8 @@ import {
   updateBuyerWhatsappNumber,
   updateInstagramPostMode,
   updateOperatorTelegramChatId,
-  INSTAGRAM_POST_MODES,
 } from "@/lib/customer";
+import { INSTAGRAM_POST_MODES } from "@/lib/instagram-post-mode";
 import { normalizeWhatsappNumber } from "@/lib/ref-code";
 
 /**
