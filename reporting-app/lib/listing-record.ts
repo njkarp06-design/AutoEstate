@@ -77,12 +77,27 @@ function parseIntegerField(value: string | undefined): number | null {
   if (!value) return null;
   const parsed = parseNumber(value);
   if (parsed === null || !Number.isInteger(parsed)) return null;
+  // Postgres INTEGER bound. Beyond it (a fat-fingered ₪12,000,000,000) the
+  // write throws numeric_field_overflow, which ingest's blanket catch swallows
+  // - the listing silently never tracked, the same invisible failure this
+  // function's doc comment already defends against for non-integers. Null
+  // reads as "unknown" and keeps the listing tracked.
+  if (Math.abs(parsed) > 2147483647) return null;
   return parsed;
 }
 
 function normalizeTransactionType(value: string): string {
   if (/rent/i.test(value)) return "rental";
   if (/sale/i.test(value)) return "sale";
+  // "N/A" and friends normalize to "" - falsy - so ingest's
+  // `record.transactionType || existing.transactionType` PRESERVES the stored
+  // value instead of overwriting a real "rental" with the literal string
+  // "N/A". Floor/price/features already had this treatment (N/A parses to
+  // null); Type was the one field where a placeholder leaked through as data.
+  // The skills' restated-facts path can't always know sale-vs-rental and is
+  // told to write N/A rather than guess, which makes this normalization
+  // load-bearing, not cosmetic.
+  if (/^(none|n\/?a|-|unknown)$/i.test(value.trim())) return "";
   return value.trim();
 }
 
@@ -92,6 +107,16 @@ function normalizeStatus(value: string): ListingStatusKey | null {
   if (/under.?contract/i.test(v)) return "UNDER_CONTRACT";
   if (/^(sold|rented)$/i.test(v)) return "SOLD";
   return null;
+}
+
+/**
+ * Whether a reply contains a Listing Record header at all - regardless of
+ * whether any record parses. Lets /api/ingest log the one case that was
+ * previously invisible: header present, zero records parsed (e.g. an
+ * unrecognized Status value), listing silently untracked.
+ */
+export function hasListingRecordHeader(raw: string): boolean {
+  return raw.split("\n").some((line) => LISTING_RECORD_HEADER_RE.test(line.trim()));
 }
 
 /**

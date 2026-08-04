@@ -91,7 +91,7 @@ export async function updateBuyerWhatsappNumberAction(
     return {
       status: "error",
       message:
-        "That doesn't look like a phone number - use the international form, e.g. +972 52 441 9087.",
+        "Use the international form, e.g. +972 52 441 9087 - a local number starting with 0 makes a WhatsApp link that opens a chat with nobody.",
     };
   }
 

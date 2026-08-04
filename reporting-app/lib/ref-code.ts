@@ -95,10 +95,20 @@ export function buildPrefilledMessage(code: string): string {
  * no separators). Returns null if what's left can't be a real number, so a
  * half-typed value renders as "no link yet" rather than a link that silently
  * opens a chat with nobody.
+ *
+ * A LEADING ZERO is rejected outright: wa.me numbers are international and
+ * never start with 0, but a local-format Israeli mobile ("052-441-9087", the
+ * way an agent naturally writes their own number) is 10 digits and passed the
+ * old length-only check - producing wa.me/0524419087, a link that opens a
+ * chat with nobody, in every ad the agent pastes it into. That is precisely
+ * the failure this function's contract promises to prevent. No silent 0->972
+ * rewriting either: guessing the country belongs to the human, not a
+ * normalize function - the Settings form's error tells them the format.
  */
 export function normalizeWhatsappNumber(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
   if (digits.length < 9 || digits.length > 15) return null;
+  if (digits.startsWith("0")) return null;
   return digits;
 }
 

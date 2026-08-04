@@ -68,7 +68,13 @@ async function main() {
   // index (the email, in the documented `<email>` invocation), so excluding it
   // would break the common path while fixing the rare one.
   const roleValueIndex = roleIndex === -1 ? -1 : roleIndex + 1;
-  const email = args.find((a, i) => !a.startsWith("--") && i !== roleValueIndex);
+  // Lowercased at storage: Clerk presents addresses lowercased and the
+  // first-login link (lib/customer.ts) looks the row up byte-exactly - a
+  // mixed-case email typed here would provision a row that silently never
+  // links, with "your account isn't linked yet" as the only symptom.
+  const email = args
+    .find((a, i) => !a.startsWith("--") && i !== roleValueIndex)
+    ?.toLowerCase();
   if (role !== "operator" && role !== "buyer") {
     console.error(`Unknown role ${JSON.stringify(role)}. Expected "operator" or "buyer".`);
     console.error(USAGE);

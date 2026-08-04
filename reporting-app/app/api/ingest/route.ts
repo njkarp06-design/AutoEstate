@@ -2,10 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authenticateMachineRequest } from "@/lib/ingest-auth";
-import { parseListingRecords } from "@/lib/listing-record";
+import { parseListingRecords, hasListingRecordHeader } from "@/lib/listing-record";
 import { generateRefCode } from "@/lib/ref-code";
 import { isBackgroundReviewTurn } from "@/lib/hermes-harness";
 import { withWriteConflictRetry } from "@/lib/write-conflict-retry";
+
+// Prisma compiles `equals` + mode: "insensitive" to ILIKE (verified by
+// capturing the emitted SQL, 2026-08-04), where % and _ are live wildcards -
+// so an unescaped area value would make this match a PATTERN while the partial
+// unique index compares lower(area) exactly. Escaping keeps the two keys the
+// same function, which is the property the index's own migration comment
+// claims. Storage always uses the raw (unescaped) value.
+function escapeIlike(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+// A media-only message (photo/sticker with no caption) reaches the sync plugin
+// with an empty user_message - the adapter sets body = "" and native image
+// routing adds no text. Rejecting it with the old min(1) schema meant the
+// whole turn was dropped permanently (the plugin deliberately never retries a
+// 4xx), losing the reply and any Listing Record footer with it. Accept it and
+// store a placeholder instead, so the transcript stays legible.
+const MEDIA_ONLY_PLACEHOLDER = "[media-only message]";
 
 /**
  * A ref code that no listing currently holds.
@@ -46,7 +64,8 @@ const turnCompletedSchema = z.object({
   sessionId: z.string().min(1),
   turnId: z.string().min(1),
   platform: z.enum(["whatsapp", "whatsapp_cloud", "telegram"]),
-  userMessage: z.string().min(1),
+  // Empty is legal - a media-only message. See MEDIA_ONLY_PLACEHOLDER above.
+  userMessage: z.string(),
   assistantResponse: z.string().min(1),
   occurredAt: z.string().datetime(),
 });
@@ -133,6 +152,8 @@ export async function POST(request: NextRequest) {
   }
 
   // turn_completed
+  const userMessageText = body.userMessage || MEDIA_ONLY_PLACEHOLDER;
+
   const run = await prisma.run.upsert({
     where: {
       customerId_hermesTurnId: {
@@ -147,7 +168,7 @@ export async function POST(request: NextRequest) {
       source: body.platform,
       startedAt,
       status: "COMPLETED",
-      title: deriveTitle(body.userMessage),
+      title: deriveTitle(userMessageText),
     },
     update: {
       status: "COMPLETED",
@@ -157,7 +178,7 @@ export async function POST(request: NextRequest) {
   if (!run.title) {
     await prisma.run.update({
       where: { id: run.id },
-      data: { title: deriveTitle(body.userMessage) },
+      data: { title: deriveTitle(userMessageText) },
     });
   }
 
@@ -166,7 +187,7 @@ export async function POST(request: NextRequest) {
       {
         runId: run.id,
         role: "user",
-        content: body.userMessage,
+        content: userMessageText,
         timestamp: startedAt,
         sortIndex: 0,
       },
@@ -174,7 +195,12 @@ export async function POST(request: NextRequest) {
         runId: run.id,
         role: "assistant",
         content: body.assistantResponse,
-        timestamp: new Date(),
+        // Never earlier than the user row it answers. startedAt is stamped by
+        // the HERMES box's clock and this row by the app server's; display
+        // orders by timestamp first, so a Hermes clock ahead of ours by more
+        // than the request latency would render the reply ABOVE its question.
+        // Clamping at write time fixes ordering without touching read paths.
+        timestamp: new Date(Math.max(Date.now(), startedAt.getTime() + 1)),
         sortIndex: 1,
       },
     ],
@@ -187,6 +213,16 @@ export async function POST(request: NextRequest) {
   // already recorded above - this is purely additive bookkeeping.
   try {
     const records = parseListingRecords(body.assistantResponse);
+    // The one diagnostic this pipeline was missing: a reply that CONTAINS a
+    // Listing Record header but parses to zero records previously produced no
+    // log line anywhere - the silent-untracked-listing shape again, e.g. a
+    // model writing "Status: Available" (unrecognized) drops the whole record.
+    if (records.length === 0 && hasListingRecordHeader(body.assistantResponse)) {
+      console.error(
+        "ingest: reply contains a Listing Record header but no record parsed - listing NOT tracked (run %s). Check the footer's required lines (Area/Rooms/Size/Status).",
+        run.id,
+      );
+    }
     const listingIds: string[] = [];
 
     for (const record of records) {
@@ -220,29 +256,55 @@ export async function POST(request: NextRequest) {
       // silently never tracked - see lib/write-conflict-retry.ts.
       const listing = await withWriteConflictRetry(() => prisma.$transaction(
         async (tx) => {
+          const areaMatch = { equals: escapeIlike(record.area.trim()), mode: "insensitive" as const };
           const existing = await tx.listing.findFirst({
             where: {
               customerId: customer.id,
-              area: { equals: record.area.trim(), mode: "insensitive" },
+              area: areaMatch,
               rooms: roomsKey,
               sqm: sqmKey,
               NOT: { status: "SOLD" },
             },
           });
 
-          if (existing) {
-            return tx.listing.update({
-              where: { id: existing.id },
+          const applyUpdate = (target: { id: string; transactionType: string; floor: number | null; price: number | null; features: string | null }) =>
+            tx.listing.update({
+              where: { id: target.id },
               data: {
                 status: record.status,
-                transactionType: record.transactionType || existing.transactionType,
-                floor: record.floor ?? existing.floor,
-                price: record.price ?? existing.price,
+                transactionType: record.transactionType || target.transactionType,
+                floor: record.floor ?? target.floor,
+                price: record.price ?? target.price,
                 // ?? not =, same as floor/price: a just-sold or status-change
                 // footer need not restate features, and must never wipe them.
-                features: record.features ?? existing.features,
+                features: record.features ?? target.features,
               },
             });
+
+          if (existing) return applyUpdate(existing);
+
+          // A SOLD record with no non-SOLD match: before creating, look for an
+          // existing SOLD row with the same identity and update THAT in place.
+          // Without this, re-announcing a sale ("redo that sold post") minted a
+          // duplicate SOLD row with a fresh refCode on every regeneration -
+          // invisible to the partial unique index, which deliberately excludes
+          // SOLD so a genuine relist-then-sell-again can produce two rows. The
+          // legitimate double-sale still works: the relist creates an ACTIVE
+          // row, which the non-SOLD match above catches first. This fallback is
+          // also what makes the write-conflict retry sound for SOLD footers -
+          // the re-run now finds the committed row instead of re-creating it.
+          if (record.status === "SOLD") {
+            const priorSold = await tx.listing.findFirst({
+              where: {
+                customerId: customer.id,
+                area: areaMatch,
+                rooms: roomsKey,
+                sqm: sqmKey,
+                status: "SOLD",
+              },
+              orderBy: { updatedAt: "desc" },
+            });
+            if (priorSold) return applyUpdate(priorSold);
           }
 
           return tx.listing.create({
