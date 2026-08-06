@@ -46,7 +46,7 @@
 
 ### What this project is
 
-**AutoEstate** — marketing automation for independent real estate agents in Tel Aviv. An agent messages a bot with listing facts and gets back bilingual (Hebrew + English) content for Instagram, Facebook and Yad2. Prospective buyers message a *separate, public* bot — on **either WhatsApp or Telegram** — and get honest answers about a property 24/7, captured as leads. Both show up in a Next.js dashboard the agent logs into. Built on Hermes, one dedicated instance per customer.
+**AutoEstate** — marketing automation for independent real estate agents in Tel Aviv. An agent messages a bot with listing facts and gets back bilingual (Hebrew + English) content for Instagram, Facebook and Yad2. Prospective buyers message a *separate, public* bot — on **either WhatsApp or Telegram** — and get honest answers about a property 24/7, captured as leads. Both show up in a Next.js dashboard the agent logs into. Built on Hermes, with dedicated instances per customer — one agent-facing operator instance, one public buyer instance (`instance_role` in the Terraform module).
 
 Read [CLAUDE.md](CLAUDE.md) for the brief, architecture and engineering history; [TODO.md](TODO.md) for what's outstanding. Repo: https://github.com/njkarp06-design/AutoEstate (private).
 
